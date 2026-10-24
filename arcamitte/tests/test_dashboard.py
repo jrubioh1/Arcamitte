@@ -231,7 +231,17 @@ class DashboardTestCase(TestCase):
         resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
         self.assertEqual(resp_detail.status_code, 200)
 
-        # Otro usuario regular NO puede verlo
+        # Otro usuario regular NO puede verlo (incluso perteneciendo a la misma UO)
+        same_uo_user = User.objects.create_user(username="colega_seguridad", email="colega@arcamitte.local", password="Pass123!")
+        UserUOMembership.objects.create(user=same_uo_user, uo=self.uo_security, role=UserUOMembership.Role.OPERATOR, is_active=True)
+        self.client.force_login(same_uo_user)
+
+        resp_same_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertNotContains(resp_same_list, "asiento_personal.pdf")
+        resp_same_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        self.assertEqual(resp_same_detail.status_code, 403)
+
+        # Otro usuario de otra UO tampoco
         other_user = User.objects.create_user(username="otro_operador", email="otro@empresa.com", password="Pass123!")
         UserUOMembership.objects.create(user=other_user, uo=self.uo_legal, role=UserUOMembership.Role.OPERATOR, is_active=True)
         self.client.force_login(other_user)
@@ -247,6 +257,55 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_admin_list, "asiento_personal.pdf")
         resp_admin_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
         self.assertEqual(resp_admin_detail.status_code, 200)
+
+    def test_dashboard_user_without_any_uo_operates_standalone(self) -> None:
+        """Verifica que un usuario activo sin UO asignada pueda operar en modo personal autónomo."""
+        standalone_user = User.objects.create_user(
+            username="sin_uo", email="sin_uo@empresa.com", password="Password123!"
+        )
+        self.client.force_login(standalone_user)
+
+        # 1. Acceso a Home sin errores (0 documentos inicialmente)
+        resp_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(resp_home.status_code, 200)
+        self.assertEqual(resp_home.context["total_documents"], 0)
+
+        # 2. Formulario de subida: disponible y contiene modal de confirmación
+        resp_upload_page = self.client.get(reverse("dashboard:document_upload"))
+        self.assertEqual(resp_upload_page.status_code, 200)
+        self.assertEqual(len(resp_upload_page.context["available_origin_uos"]), 0)
+        self.assertContains(resp_upload_page, "Ninguna (Asiento Personal Privado)")
+        self.assertContains(resp_upload_page, "personalSeatConfirmModal")
+
+        # 3. Subir documento personal
+        pdf_file = SimpleUploadedFile("mi_asiento.pdf", b"%PDF-1.4\nStandalone\n%%EOF", content_type="application/pdf")
+        post_data = {
+            "original_file": pdf_file,
+            "origin_uo": "",
+            "allowed_emails": "cliente@externo.com",
+            "description": "Asiento personal creado por usuario sin UO",
+        }
+        resp_post = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        self.assertEqual(resp_post.status_code, 200)
+
+        doc = EncryptedDocument.objects.filter(original_filename="mi_asiento.pdf").first()
+        self.assertIsNotNone(doc)
+        self.assertIsNone(doc.origin_uo)
+        self.assertEqual(doc.uploaded_by, standalone_user)
+
+        # 4. Solo ve su propio documento en el listado
+        resp_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertContains(resp_list, "mi_asiento.pdf")
+        self.assertNotContains(resp_list, "contrato_confidencial.pdf")  # No ve el de Seguridad
+
+        # 5. Puede ver el detalle de su documento
+        resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash}))
+        self.assertEqual(resp_detail.status_code, 200)
+
+        # 6. Intentar ver documento de otra UO devuelve 403
+        resp_sec_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": self.doc_sec.file_hash}))
+        self.assertEqual(resp_sec_detail.status_code, 403)
 
     def test_dashboard_document_upload_multiple_individual_emails(self) -> None:
         """Verifica que se reciban múltiples campos individuales de correo (POST getlist)."""

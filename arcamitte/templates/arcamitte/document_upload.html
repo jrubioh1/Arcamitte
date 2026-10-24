@@ -176,11 +176,50 @@
 						<a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary">
 							&larr; {% trans "Cancelar" %}
 						</a>
-						<button type="submit" class="btn btn-primary px-4">
+						<button type="submit" class="btn btn-primary px-4" id="btn_submit_upload">
 							<i data-feather="lock" style="width:16px;height:16px;" class="me-1"></i> {% trans "Cifrar y Registrar Asiento" %}
 						</button>
 					</div>
 				</form>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Modal de confirmación para Asiento Personal Privado -->
+<div class="modal fade" id="personalSeatConfirmModal" tabindex="-1" aria-labelledby="personalSeatConfirmModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered">
+		<div class="modal-content border-0 shadow">
+			<div class="modal-header bg-light border-bottom">
+				<h5 class="modal-title d-flex align-items-center gap-2 text-dark fs-6 fw-bold" id="personalSeatConfirmModalLabel">
+					<i data-feather="user-check" style="width:18px;height:18px;" class="text-primary"></i>
+					{% trans "Confirmación: Asiento Personal Privado" %}
+				</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body p-4">
+				<div class="d-flex gap-3 align-items-start">
+					<div class="p-2 rounded-circle bg-warning-subtle text-warning flex-shrink-0">
+						<i data-feather="alert-circle" style="width:24px;height:24px;"></i>
+					</div>
+					<div>
+						<p class="mb-2 text-dark fw-semibold">
+							{% trans "No ha seleccionado ninguna UO emisora." %}
+						</p>
+						<p class="mb-0 text-muted small">
+							{% trans "Este documento se registrará como un asiento confidencial y únicamente visible por usted. Ningún compañero de unidad organizativa tendrá acceso a él. ¿Desea continuar con el registro?" %}
+						</p>
+					</div>
+				</div>
+			</div>
+			<div class="modal-footer bg-light border-top d-flex justify-content-between">
+				<button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+					{% trans "Revisar y seleccionar UO" %}
+				</button>
+				<button type="button" class="btn btn-primary btn-sm px-3" id="btn_confirm_personal_seat">
+					<i data-feather="check" style="width:14px;height:14px;" class="me-1"></i>
+					{% trans "Continuar como Asiento Personal" %}
+				</button>
 			</div>
 		</div>
 	</div>
@@ -447,6 +486,42 @@ document.addEventListener("DOMContentLoaded", function() {
 			addEmailRow(currentMailboxEmail);
 		}
 	});
+
+	// Interceptar envío si no se seleccionó UO emisora (Asiento Personal Privado)
+	const uploadForm = document.getElementById("upload_form");
+	const personalModalEl = document.getElementById("personalSeatConfirmModal");
+	const btnConfirmPersonal = document.getElementById("btn_confirm_personal_seat");
+	let personalConfirmed = false;
+
+	if (uploadForm && personalModalEl && btnConfirmPersonal) {
+		uploadForm.addEventListener("submit", function(e) {
+			const originVal = originSelect ? originSelect.value : "";
+			if (!originVal && !personalConfirmed) {
+				if (!uploadForm.checkValidity()) {
+					return;
+				}
+				e.preventDefault();
+				const modalInstance = new bootstrap.Modal(personalModalEl);
+				modalInstance.show();
+				if (window.feather) feather.replace();
+			}
+		});
+
+		btnConfirmPersonal.addEventListener("click", function() {
+			personalConfirmed = true;
+			const modalInstance = bootstrap.Modal.getInstance(personalModalEl);
+			if (modalInstance) {
+				modalInstance.hide();
+			}
+			uploadForm.submit();
+		});
+
+		if (originSelect) {
+			originSelect.addEventListener("change", function() {
+				personalConfirmed = false;
+			});
+		}
+	}
 
 	// Si hay UO preseleccionada al cargar
 	if ((targetSelect && targetSelect.value) || (originSelect && originSelect.value)) {
