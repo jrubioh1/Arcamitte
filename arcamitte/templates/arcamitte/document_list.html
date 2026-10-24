@@ -110,7 +110,7 @@
 							<a href="{% url 'dashboard:document_detail' doc.file_hash %}" class="btn btn-sm btn-outline-primary" title="{% trans 'Detalle y Auditoría' %}">
 								<i data-feather="eye" style="width:14px;height:14px;"></i>
 							</a>
-							{% if doc.is_active and not doc.is_consumed and not doc.is_expired %}
+							{% if doc.id in terminable_doc_ids and doc.is_active and not doc.is_consumed and not doc.is_expired %}
 								<a href="{% url 'dashboard:document_terminate' doc.file_hash %}" class="btn btn-sm btn-outline-danger ms-1" title="{% trans 'Terminar y Destruir' %}">
 									<i data-feather="trash-2" style="width:14px;height:14px;"></i>
 								</a>

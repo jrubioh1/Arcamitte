@@ -47,9 +47,14 @@
 					</thead>
 					<tbody>
 						{% for m in memberships %}
-							<tr>
+							<tr {% if m.user == request.user %}class="table-light"{% endif %}>
 								<td>
 									<strong>{{ m.user.username }}</strong>
+									{% if m.user == request.user %}
+										<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1" style="font-size:0.7rem;">
+											{% trans "Usted" %}
+										</span>
+									{% endif %}
 									{% if m.user.get_full_name %}
 										<div class="text-muted small">{{ m.user.get_full_name }}</div>
 									{% endif %}
@@ -64,52 +69,91 @@
 									{% endif %}
 								</td>
 								<td>
-									<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-flex align-items-center gap-1">
-										{% csrf_token %}
-										<input type="hidden" name="action" value="update_role">
-										<input type="hidden" name="membership_id" value="{{ m.id }}">
-										<select name="role" class="form-select form-select-sm" style="min-width: 140px;" onchange="this.form.submit()">
-											{% for code, label in roles %}
-												<option value="{{ code }}" {% if m.role == code %}selected{% endif %}>{{ label }}</option>
-											{% endfor %}
-										</select>
-									</form>
+									{% if m.user.is_superuser and not request.user.is_superuser %}
+										<span class="badge bg-danger-subtle text-danger border py-2 px-3">
+											{{ m.get_role_display }}
+										</span>
+										<small class="text-muted d-block" style="font-size:0.75rem;">
+											{% trans "(Superusuario: protegido)" %}
+										</small>
+									{% elif m.user == request.user and not request.user.is_superuser %}
+										<span class="badge bg-secondary-subtle text-dark border py-2 px-3">
+											{{ m.get_role_display }}
+										</span>
+										<small class="text-muted d-block" style="font-size:0.75rem;">
+											{% trans "(Propio: no modificable)" %}
+										</small>
+									{% else %}
+										<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-flex align-items-center gap-1">
+											{% csrf_token %}
+											<input type="hidden" name="action" value="update_role">
+											<input type="hidden" name="membership_id" value="{{ m.id }}">
+											<select name="role" class="form-select form-select-sm" style="min-width: 140px;" onchange="this.form.submit()">
+												{% for code, label in roles %}
+													<option value="{{ code }}" {% if m.role == code %}selected{% endif %}>{{ label }}</option>
+												{% endfor %}
+											</select>
+										</form>
+									{% endif %}
 								</td>
 								<td>
-									<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline">
-										{% csrf_token %}
-										<input type="hidden" name="action" value="toggle_active">
-										<input type="hidden" name="membership_id" value="{{ m.id }}">
-										<button type="submit" class="btn btn-sm p-0 border-0 bg-transparent" title="{% trans 'Pulsar para alternar estado' %}">
-											{% if m.is_active %}
-												<span class="badge bg-success">{% trans "Activo" %}</span>
-											{% else %}
-												<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
-											{% endif %}
-										</button>
-									</form>
+									{% if m.user.is_superuser and not request.user.is_superuser %}
+										<span class="badge bg-success" title="{% trans 'No se puede modificar el estado de un superusuario' %}">
+											{% trans "Activo" %}
+										</span>
+									{% elif m.user == request.user and not request.user.is_superuser %}
+										<span class="badge bg-success" title="{% trans 'No puede desactivar su propia membresía' %}">
+											{% trans "Activo" %}
+										</span>
+									{% else %}
+										<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline">
+											{% csrf_token %}
+											<input type="hidden" name="action" value="toggle_active">
+											<input type="hidden" name="membership_id" value="{{ m.id }}">
+											<button type="submit" class="btn btn-sm p-0 border-0 bg-transparent" title="{% trans 'Pulsar para alternar estado' %}">
+												{% if m.is_active %}
+													<span class="badge bg-success">{% trans "Activo" %}</span>
+												{% else %}
+													<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
+												{% endif %}
+											</button>
+										</form>
+									{% endif %}
 								</td>
 								<td class="text-end">
-									<div class="d-flex justify-content-end gap-1">
-										<!-- Botón Reset Password -->
-										<form method="post" action="{% url 'dashboard:user_reset_password' m.user.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una contraseña temporal y enviarla al correo de este usuario?' %}');">
-											{% csrf_token %}
-											<input type="hidden" name="next" value="{{ request.get_full_path }}">
-											<button type="submit" class="btn btn-outline-warning btn-sm" title="{% trans 'Resetear Contraseña' %}">
-												<i data-feather="key" style="width:13px;height:13px;"></i>
-											</button>
-										</form>
+									{% if m.user.is_superuser and not request.user.is_superuser %}
+										<span class="badge bg-secondary-subtle text-muted border p-2 d-inline-flex align-items-center gap-1" title="{% trans 'Solo administrable por un superusuario global' %}">
+											<i data-feather="lock" style="width:13px;height:13px;"></i>
+											<span class="small">{% trans "Protegido" %}</span>
+										</span>
+									{% else %}
+										<div class="d-flex justify-content-end gap-1">
+											<!-- Botón Reset Password -->
+											<form method="post" action="{% url 'dashboard:user_reset_password' m.user.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una contraseña temporal y enviarla al correo de este usuario?' %}');">
+												{% csrf_token %}
+												<input type="hidden" name="next" value="{{ request.get_full_path }}">
+												<button type="submit" class="btn btn-outline-warning btn-sm" title="{% trans 'Resetear Contraseña' %}">
+													<i data-feather="key" style="width:13px;height:13px;"></i>
+												</button>
+											</form>
 
-										<!-- Botón Eliminar Membresía -->
-										<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea desvincular este usuario de la Unidad Organizativa?' %}');">
-											{% csrf_token %}
-											<input type="hidden" name="action" value="remove_member">
-											<input type="hidden" name="membership_id" value="{{ m.id }}">
-											<button type="submit" class="btn btn-outline-danger btn-sm" title="{% trans 'Desvincular' %}">
-												<i data-feather="user-x" style="width:13px;height:13px;"></i>
-											</button>
-										</form>
-									</div>
+											<!-- Botón Eliminar Membresía -->
+											{% if m.user == request.user and not request.user.is_superuser %}
+												<button type="button" class="btn btn-outline-secondary btn-sm" disabled title="{% trans 'No puede auto-expulsarse de esta Unidad Organizativa' %}">
+													<i data-feather="user-x" style="width:13px;height:13px;"></i>
+												</button>
+											{% else %}
+												<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea desvincular este usuario de la Unidad Organizativa?' %}');">
+													{% csrf_token %}
+													<input type="hidden" name="action" value="remove_member">
+													<input type="hidden" name="membership_id" value="{{ m.id }}">
+													<button type="submit" class="btn btn-outline-danger btn-sm" title="{% trans 'Desvincular' %}">
+														<i data-feather="user-x" style="width:13px;height:13px;"></i>
+													</button>
+												</form>
+											{% endif %}
+										</div>
+									{% endif %}
 								</td>
 							</tr>
 						{% empty %}
@@ -125,45 +169,92 @@
 		</div>
 	</div>
 
-	<!-- Formulario para Añadir Miembro -->
+	<!-- Formulario para Añadir Miembro con Barra de Búsqueda Interactiva -->
 	<div class="col-lg-4">
 		<div class="card shadow-sm border-0 sticky-top" style="top: 85px;">
 			<div class="card-header bg-white py-3 border-bottom">
-				<h2 class="h6 fw-bold mb-0 text-dark">
-					<i data-feather="user-plus" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+				<h2 class="h6 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+					<i data-feather="user-plus" style="width:16px;height:16px;" class="text-primary"></i>
 					{% trans "Asignar Usuario a la UO" %}
 				</h2>
 			</div>
 			<div class="card-body p-3">
 				{% if available_users %}
-					<form method="post" action="{% url 'dashboard:uo_members' uo.id %}">
+					<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" id="add_member_form">
 						{% csrf_token %}
 						<input type="hidden" name="action" value="add_member">
+						<input type="hidden" name="user_id" id="selected_member_id" required>
 
+						<!-- Barra de Búsqueda de Usuario -->
 						<div class="mb-3">
-							<label class="form-label fw-semibold small">{% trans "Seleccionar Usuario" %}</label>
-							<select name="user_id" class="form-select form-select-sm" required>
-								<option value="" disabled selected>{% trans "Elija un usuario del sistema..." %}</option>
-								{% for u in available_users %}
-									<option value="{{ u.id }}">
-										{{ u.username }} {% if u.get_full_name %}({{ u.get_full_name }}){% endif %}
-									</option>
-								{% endfor %}
-							</select>
+							<label class="form-label fw-semibold small mb-1" for="member_search_input">
+								{% trans "Buscar Usuario del Sistema" %}
+							</label>
+							<div class="input-group input-group-sm mb-2 shadow-sm rounded">
+								<span class="input-group-text bg-white border-end-0">
+									<i data-feather="search" style="width:14px;height:14px;" class="text-muted"></i>
+								</span>
+								<input type="text" id="member_search_input" class="form-control form-control-sm border-start-0 border-end-0 ps-1" placeholder="{% trans 'Nombre, apellidos, correo o usuario...' %}" autocomplete="off">
+								<button type="button" class="btn btn-white border border-start-0 text-muted d-none" id="clear_member_search_btn" title="{% trans 'Limpiar' %}">
+									<i data-feather="x" style="width:13px;height:13px;"></i>
+								</button>
+							</div>
+
+							<!-- Tarjeta del Usuario Seleccionado -->
+							<div id="selected_member_card" class="d-none alert alert-primary d-flex align-items-center justify-content-between p-2 mb-2 border rounded-3">
+								<div class="d-flex align-items-center gap-2 overflow-hidden">
+									<span class="badge bg-primary rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;">
+										<i data-feather="user-check" style="width:16px;height:16px;" class="text-white"></i>
+									</span>
+									<div class="text-truncate">
+										<strong id="selected_member_username" class="d-block text-dark small text-truncate"></strong>
+										<span id="selected_member_details" class="text-muted d-block text-truncate" style="font-size:0.75rem;"></span>
+									</div>
+								</div>
+								<button type="button" id="deselect_member_btn" class="btn btn-sm btn-link text-danger p-0 ms-2 text-decoration-none flex-shrink-0" title="{% trans 'Cambiar selección' %}">
+									<i data-feather="x-circle" style="width:16px;height:16px;"></i>
+								</button>
+							</div>
+
+							<!-- Alerta Informativa para Usuario Ocupado -->
+							<div id="member_occupied_warning" class="alert alert-warning py-2 px-3 small d-none mb-2 border rounded-3">
+								<div class="d-flex align-items-start gap-2">
+									<i data-feather="alert-circle" style="width:16px;height:16px;" class="text-warning-emphasis flex-shrink-0 mt-1"></i>
+									<div id="member_occupied_warning_text" class="text-warning-emphasis"></div>
+								</div>
+							</div>
+
+							<!-- Lista interactiva de resultados filtrados -->
+							<div id="member_results_container" class="border rounded-3 p-1 mb-2 bg-light-subtle" style="max-height: 220px; overflow-y: auto;">
+								<div id="member_results_list" class="list-group list-group-flush">
+									<!-- Items generados dinámicamente -->
+								</div>
+								<div id="member_no_results" class="text-muted text-center py-3 small d-none">
+									<i data-feather="user-x" style="width:22px;height:22px;" class="mb-1 text-secondary opacity-50 d-block mx-auto"></i>
+									<span>{% trans "No se encontraron usuarios coincidentes." %}</span>
+								</div>
+							</div>
+
+							<small class="text-muted d-block" id="member_search_help" style="font-size:0.75rem;">
+								{% trans "Escriba en la barra superior o haga clic en un usuario de la lista para seleccionarlo." %}
+							</small>
 						</div>
 
 						<div class="mb-3">
-							<label class="form-label fw-semibold small">{% trans "Rol a Asignar" %}</label>
-							<select name="role" class="form-select form-select-sm">
+							<label class="form-label fw-semibold small mb-1">{% trans "Rol a Asignar en la UO" %}</label>
+							<select name="role" class="form-select form-select-sm" required>
 								{% for code, label in roles %}
 									<option value="{{ code }}" {% if code == 'OPERATOR' %}selected{% endif %}>{{ label }}</option>
 								{% endfor %}
 							</select>
+							<small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+								{% trans "Operador: cifra y tramita. Auditor: tramita e inspecciona/descarga legal. Administrador: gestión UO." %}
+							</small>
 						</div>
 
 						<div class="d-grid mt-4">
-							<button type="submit" class="btn btn-primary btn-sm d-flex align-items-center justify-content-center gap-1">
-								<i data-feather="plus-circle" style="width:14px;height:14px;"></i>
+							<button type="submit" id="add_member_submit_btn" class="btn btn-primary btn-sm d-flex align-items-center justify-content-center gap-1" disabled>
+								<i data-feather="user-plus" style="width:14px;height:14px;"></i>
 								<span>{% trans "Vincular a esta UO" %}</span>
 							</button>
 						</div>
@@ -178,4 +269,231 @@
 		</div>
 	</div>
 </div>
+
+<script id="available-users-json" type="application/json">{{ available_users_json|safe }}</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+	var rawDataEl = document.getElementById('available-users-json');
+	if (!rawDataEl) return;
+
+	var availableUsers = [];
+	try {
+		availableUsers = JSON.parse(rawDataEl.textContent || '[]');
+	} catch (e) {
+		availableUsers = [];
+	}
+
+	var searchInput = document.getElementById('member_search_input');
+	var clearBtn = document.getElementById('clear_member_search_btn');
+	var resultsContainer = document.getElementById('member_results_container');
+	var resultsList = document.getElementById('member_results_list');
+	var noResults = document.getElementById('member_no_results');
+	var selectedIdInput = document.getElementById('selected_member_id');
+	var selectedCard = document.getElementById('selected_member_card');
+	var selectedUsernameEl = document.getElementById('selected_member_username');
+	var selectedDetailsEl = document.getElementById('selected_member_details');
+	var deselectBtn = document.getElementById('deselect_member_btn');
+	var submitBtn = document.getElementById('add_member_submit_btn');
+	var helpText = document.getElementById('member_search_help');
+	var occupiedWarning = document.getElementById('member_occupied_warning');
+	var occupiedWarningText = document.getElementById('member_occupied_warning_text');
+
+	function escapeHtml(str) {
+		var div = document.createElement('div');
+		div.textContent = str || '';
+		return div.innerHTML;
+	}
+
+	function showOccupiedWarning(u) {
+		if (!occupiedWarning || !occupiedWarningText) return;
+		var uoAlias = u.assigned_uo_alias || '{% trans "otra Unidad Organizativa" %}';
+		occupiedWarningText.innerHTML = '<strong>' + escapeHtml(u.username) + '</strong> ' +
+			'{% trans "ya está asignado a" %} <strong>' + escapeHtml(uoAlias) + '</strong>. ' +
+			'{% trans "Debe ser desvinculado previamente por su UO correspondiente o por un superusuario para poder vincularlo aquí." %}';
+		occupiedWarning.classList.remove('d-none');
+		if (typeof feather !== 'undefined') {
+			feather.replace();
+		}
+	}
+
+	function hideOccupiedWarning() {
+		if (occupiedWarning) {
+			occupiedWarning.classList.add('d-none');
+		}
+	}
+
+	function normalize(str) {
+		return (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+	}
+
+	function renderList(query) {
+		if (!resultsList) return;
+		resultsList.innerHTML = '';
+		var q = normalize(query);
+
+		var filtered = availableUsers.filter(function(u) {
+			if (!q) return true;
+			return (
+				normalize(u.username).includes(q) ||
+				normalize(u.full_name).includes(q) ||
+				normalize(u.first_name).includes(q) ||
+				normalize(u.last_name).includes(q) ||
+				normalize(u.email).includes(q)
+			);
+		});
+
+		if (filtered.length === 0) {
+			noResults.classList.remove('d-none');
+		} else {
+			noResults.classList.add('d-none');
+			filtered.forEach(function(u) {
+				var isOccupied = Boolean(u.is_occupied);
+
+				var item = document.createElement(isOccupied ? 'div' : 'a');
+				if (!isOccupied) {
+					item.href = 'javascript:void(0);';
+				}
+				item.className = isOccupied
+					? 'list-group-item d-flex align-items-center justify-content-between p-2 rounded-2 mb-1 border bg-light-subtle text-muted'
+					: 'list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2 rounded-2 mb-1 border bg-white';
+
+				if (isOccupied) {
+					item.style.cursor = 'not-allowed';
+				}
+
+				var leftDiv = document.createElement('div');
+				leftDiv.className = 'overflow-hidden me-2';
+
+				var topRow = document.createElement('div');
+				topRow.className = 'd-flex align-items-center flex-wrap gap-1';
+
+				var usernameStrong = document.createElement('strong');
+				usernameStrong.className = isOccupied ? 'font-mono text-secondary small' : 'font-mono text-dark small';
+				usernameStrong.textContent = u.username;
+				topRow.appendChild(usernameStrong);
+
+				if (u.full_name) {
+					var nameSpan = document.createElement('span');
+					nameSpan.className = 'text-muted small ms-1 text-truncate';
+					nameSpan.textContent = '(' + u.full_name + ')';
+					topRow.appendChild(nameSpan);
+				}
+
+				if (isOccupied) {
+					var occBadge = document.createElement('span');
+					occBadge.className = 'badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1 d-inline-flex align-items-center';
+					occBadge.style.fontSize = '0.68rem';
+					occBadge.innerHTML = '<i data-feather="lock" style="width:10px;height:10px;" class="me-1"></i>' +
+						'{% trans "Asignado a" %} ' + escapeHtml(u.assigned_uo_alias || '{% trans "otra UO" %}');
+					topRow.appendChild(occBadge);
+				}
+
+				leftDiv.appendChild(topRow);
+
+				var emailDiv = document.createElement('div');
+				emailDiv.className = 'text-muted small text-truncate';
+				emailDiv.style.fontSize = '0.75rem';
+				emailDiv.textContent = u.email || '{% trans "Sin correo" %}';
+				leftDiv.appendChild(emailDiv);
+
+				item.appendChild(leftDiv);
+
+				if (isOccupied) {
+					var occStatusBadge = document.createElement('span');
+					occStatusBadge.className = 'badge bg-secondary-subtle text-secondary border small flex-shrink-0';
+					occStatusBadge.textContent = '{% trans "Ocupado" %}';
+					occStatusBadge.title = '{% trans "Este usuario ya tiene una Unidad Organizativa asignada." %}';
+					item.appendChild(occStatusBadge);
+
+					item.addEventListener('click', function(e) {
+						e.preventDefault();
+						showOccupiedWarning(u);
+					});
+				} else {
+					var selectBadge = document.createElement('span');
+					selectBadge.className = 'badge bg-light text-primary border small flex-shrink-0';
+					selectBadge.textContent = '{% trans "Elegir" %}';
+					item.appendChild(selectBadge);
+
+					item.addEventListener('click', function(e) {
+						e.preventDefault();
+						hideOccupiedWarning();
+						selectUser(u);
+					});
+				}
+
+				resultsList.appendChild(item);
+			});
+
+			if (typeof feather !== 'undefined') {
+				feather.replace();
+			}
+		}
+	}
+
+	function selectUser(user) {
+		selectedIdInput.value = user.id;
+		selectedUsernameEl.textContent = user.username + (user.full_name ? ' (' + user.full_name + ')' : '');
+		selectedDetailsEl.textContent = user.email || '{% trans "Sin correo asignado" %}';
+
+		selectedCard.classList.remove('d-none');
+		resultsContainer.classList.add('d-none');
+		helpText.classList.add('d-none');
+		searchInput.value = '';
+		clearBtn.classList.add('d-none');
+		submitBtn.disabled = false;
+
+		if (typeof feather !== 'undefined') {
+			feather.replace();
+		}
+	}
+
+	function deselectUser() {
+		hideOccupiedWarning();
+		selectedIdInput.value = '';
+		selectedCard.classList.add('d-none');
+		resultsContainer.classList.remove('d-none');
+		helpText.classList.remove('d-none');
+		submitBtn.disabled = true;
+		searchInput.value = '';
+		clearBtn.classList.add('d-none');
+		renderList('');
+		searchInput.focus();
+
+		if (typeof feather !== 'undefined') {
+			feather.replace();
+		}
+	}
+
+	if (searchInput) {
+		searchInput.addEventListener('input', function() {
+			renderList(this.value);
+			if (this.value.trim().length > 0) {
+				clearBtn.classList.remove('d-none');
+			} else {
+				clearBtn.classList.add('d-none');
+			}
+		});
+	}
+
+	if (clearBtn) {
+		clearBtn.addEventListener('click', function() {
+			hideOccupiedWarning();
+			searchInput.value = '';
+			clearBtn.classList.add('d-none');
+			renderList('');
+			searchInput.focus();
+		});
+	}
+
+	if (deselectBtn) {
+		deselectBtn.addEventListener('click', function() {
+			deselectUser();
+		});
+	}
+
+	// Renderizar lista inicial completa
+	renderList('');
+});
+</script>
 {% endblock %}

@@ -55,7 +55,7 @@
 					</a>
 				</li>
 
-				{% if request.user.is_superuser and dashboard_mode != 'operational' %}
+				{% if user_can_view_audit_logs and dashboard_mode != 'operational' %}
 				<li class="arca-nav-header">
 					{% trans "Seguridad y Auditoría" %}
 				</li>
@@ -66,11 +66,13 @@
 					</a>
 				</li>
 
+				{% if request.user.is_superuser %}
 				<li class="arca-nav-item {% if active_nav == 'tokens' %}active{% endif %}">
 					<a class="arca-nav-link" href="{% url 'dashboard:api_tokens' %}">
 						<i data-feather="key"></i> <span>{% trans "API Tokens (M2M)" %}</span>
 					</a>
 				</li>
+				{% endif %}
 				{% endif %}
 
 				{% if request.user.is_superuser and dashboard_mode != 'operational' or user_is_uo_admin and not request.user.is_superuser %}
@@ -104,10 +106,18 @@
 
 			<div class="arca-sidebar-footer">
 				<div class="d-flex align-items-center gap-2 mb-1">
-					<i data-feather="shield" style="width:14px;height:14px;"></i>
-					<strong class="text-white">Arcamitte</strong>
+					<i data-feather="user-check" style="width:14px;height:14px;" class="text-info"></i>
+					<strong class="text-white small text-truncate">{{ request.user.username }}</strong>
 				</div>
-				<div>{% trans "Custodia Criptográfica" %}</div>
+				<div class="small text-white-50 text-truncate" style="font-size:0.72rem;">
+					{% if request.user.is_superuser %}
+						<span class="text-warning fw-semibold">{% trans "Superusuario Global" %}</span>
+					{% elif user_primary_uo_alias %}
+						<span>{{ user_primary_role_display }}</span> &bull; <span class="fw-semibold text-white">{{ user_primary_uo_alias }}</span>
+					{% else %}
+						<span>{{ user_primary_role_display }}</span>
+					{% endif %}
+				</div>
 			</div>
 		</nav>
 
@@ -139,7 +149,7 @@
 								<span class="d-none d-md-inline small fw-bold">{% trans "Modo Operativa" %}</span>
 							{% endif %}
 						</button>
-						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="modeSwitchBtn">
+						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="modeSwitchBtn" style="z-index: 1060;">
 							<li><h6 class="dropdown-header small text-uppercase fw-bold">{% trans "Modo de Interfaz" %}</h6></li>
 							<li>
 								<a class="dropdown-item {% if dashboard_mode == 'governance' %}active{% endif %}" href="{% url 'dashboard:mode_selection' %}?set=governance&next={{ request.get_full_path|urlencode }}">
@@ -182,10 +192,62 @@
 							</span>
 							<span class="fw-semibold">{{ request.user.username }}</span>
 							{% if request.user.is_superuser %}
-								<span class="badge bg-danger ms-1" style="font-size:0.65rem;">Superadmin</span>
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1 d-inline-flex align-items-center" style="font-size:0.65rem;">
+									<i data-feather="shield" style="width:10px;height:10px;" class="me-1"></i>{% trans "Superusuario" %}
+								</span>
+							{% elif user_primary_role == 'AUDITOR' %}
+								<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1 d-inline-flex align-items-center" style="font-size:0.65rem;">
+									<i data-feather="eye" style="width:10px;height:10px;" class="me-1"></i>{% trans "Auditor" %}{% if user_primary_uo_alias %} ({{ user_primary_uo_alias }}){% endif %}
+								</span>
+							{% elif user_primary_role == 'ADMIN' %}
+								<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1 d-inline-flex align-items-center" style="font-size:0.65rem;">
+									<i data-feather="award" style="width:10px;height:10px;" class="me-1"></i>{% trans "Admin UO" %}{% if user_primary_uo_alias %} ({{ user_primary_uo_alias }}){% endif %}
+								</span>
+							{% elif user_primary_role == 'OPERATOR' %}
+								<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1 d-inline-flex align-items-center" style="font-size:0.65rem;">
+									<i data-feather="user" style="width:10px;height:10px;" class="me-1"></i>{% trans "Operador" %}{% if user_primary_uo_alias %} ({{ user_primary_uo_alias }}){% endif %}
+								</span>
+							{% else %}
+								<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size:0.65rem;">
+									{% trans "Personal" %}
+								</span>
 							{% endif %}
 						</button>
-						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userMenuBtn">
+						<ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenuBtn" style="z-index: 1060; min-width: 240px;">
+							<li class="px-3 py-2 border-bottom bg-light-subtle">
+								<div class="fw-bold text-dark text-truncate">{{ request.user.get_full_name|default:request.user.username }}</div>
+								{% if request.user.email %}
+									<div class="text-muted small text-truncate" style="font-size:0.75rem;">{{ request.user.email }}</div>
+								{% endif %}
+								<div class="mt-2">
+									{% if request.user.is_superuser %}
+										<span class="badge bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1 w-100 py-1 px-2" style="font-size:0.72rem;">
+											<i data-feather="shield" style="width:12px;height:12px;"></i>
+											<span>{% trans "Superusuario Global" %}</span>
+										</span>
+									{% elif user_primary_role == 'AUDITOR' %}
+										<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle d-inline-flex align-items-center gap-1 w-100 py-1 px-2" style="font-size:0.72rem;">
+											<i data-feather="eye" style="width:12px;height:12px;"></i>
+											<span>{% trans "Auditor de UO" %}{% if user_primary_uo_alias %} &bull; {{ user_primary_uo_alias }}{% endif %}</span>
+										</span>
+									{% elif user_primary_role == 'ADMIN' %}
+										<span class="badge bg-primary-subtle text-primary border border-primary-subtle d-inline-flex align-items-center gap-1 w-100 py-1 px-2" style="font-size:0.72rem;">
+											<i data-feather="award" style="width:12px;height:12px;"></i>
+											<span>{% trans "Administrador de UO" %}{% if user_primary_uo_alias %} &bull; {{ user_primary_uo_alias }}{% endif %}</span>
+										</span>
+									{% elif user_primary_role == 'OPERATOR' %}
+										<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle d-inline-flex align-items-center gap-1 w-100 py-1 px-2" style="font-size:0.72rem;">
+											<i data-feather="user" style="width:12px;height:12px;"></i>
+											<span>{% trans "Operador de UO" %}{% if user_primary_uo_alias %} &bull; {{ user_primary_uo_alias }}{% endif %}</span>
+										</span>
+									{% else %}
+										<span class="badge bg-secondary-subtle text-muted border d-inline-flex align-items-center gap-1 w-100 py-1 px-2" style="font-size:0.72rem;">
+											<i data-feather="user-x" style="width:12px;height:12px;"></i>
+											<span>{% trans "Personal / Sin UO" %}</span>
+										</span>
+									{% endif %}
+								</div>
+							</li>
 							<li>
 								<a class="dropdown-item" href="{% url 'dashboard:password_change' %}">
 									<i data-feather="lock" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Contraseña" %}
@@ -208,14 +270,6 @@
 								<form action="{% url 'dashboard:logout' %}" method="post" class="d-inline">
 									{% csrf_token %}
 									<button type="submit" class="dropdown-item text-danger">
-										<i data-feather="log-out" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cerrar sesión" %}
-									</button>
-								</form>
-							</li>
-						</ul>
-					</div>
-				</div>
-			</header>
 										<i data-feather="log-out" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cerrar sesión" %}
 									</button>
 								</form>

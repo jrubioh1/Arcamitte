@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 
@@ -7,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from arcamitte.models import (
     APIToken,
@@ -225,6 +227,43 @@ class DashboardTestCase(TestCase):
         self.assertEqual(resp_unauth.status_code, 400)
         self.assertContains(resp_unauth, "No tiene autorización operativa sobre la UO emisora seleccionada", status_code=400)
 
+    def test_dashboard_auditor_can_upload_documents(self) -> None:
+        """Verifica que un usuario con rol de Auditor en una UO pueda cifrar y emitir documentos de su UO."""
+        auditor_user = User.objects.create_user(
+            username="auditor_emisor",
+            email="auditor_emisor@arcamitte.local",
+            password="AuditorPass123!",
+        )
+        UserUOMembership.objects.create(
+            user=auditor_user,
+            uo=self.uo_security,
+            role=UserUOMembership.Role.AUDITOR,
+            is_active=True,
+        )
+
+        self.client.force_login(auditor_user)
+
+        pdf_file = SimpleUploadedFile(
+            "auditoria_fiscal.pdf",
+            b"%PDF-1.4\nInforme Auditoria Fiscal 2026\n%%EOF",
+            content_type="application/pdf",
+        )
+        post_data = {
+            "original_file": pdf_file,
+            "origin_uo": self.uo_security.id,
+            "allowed_emails": "fiscalia@hacienda.gob.es",
+            "description": "Documento subido por el auditor de la UO",
+            "burn_policy": EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+        }
+        resp = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Asiento cifrado con éxito")
+
+        doc = EncryptedDocument.objects.filter(original_filename="auditoria_fiscal.pdf").first()
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.origin_uo, self.uo_security)
+        self.assertEqual(doc.uploaded_by, auditor_user)
+
     def test_dashboard_document_upload_personal_seat(self) -> None:
         """Verifica que un documento sin UO emisora sea un asiento personal privado solo visible por su autor."""
         self.client.force_login(self.operator_user)
@@ -276,6 +315,126 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_admin_list, "asiento_personal.pdf")
         resp_admin_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
         self.assertEqual(resp_admin_detail.status_code, 200)
+
+    def test_dashboard_document_upload_duplicate_hash_reactivates_seat_and_preserves_logs(self) -> None:
+        """
+        Verifica que al subir un archivo con un hash SHA-256 ya existente en el sistema:
+        1. No se lance ValidationError ni error 500.
+        2. Se reactive automáticamente el asiento, re-cifrando en disco y actualizando destinatarios.
+        3. Se preserve íntegramente todo el historial previo en DocumentAccessLog.
+        4. Se registre la nueva vicisitud de reactivación en la auditoría.
+        """
+        self.client.force_login(self.operator_user)
+
+        sample_pdf_bytes = b"%PDF-1.4\nContenido Unico Reutilizable 2026\n%%EOF"
+        first_pdf = SimpleUploadedFile("expediente_reapertura.pdf", sample_pdf_bytes, content_type="application/pdf")
+
+        # 1. Primera subida
+        post_data_1 = {
+            "original_file": first_pdf,
+            "origin_uo": self.uo_security.id,
+            "target_uo": self.uo_legal.id,
+            "allowed_emails": "destinatario_antiguo@empresa.com",
+            "description": "Primera remesa del expediente",
+            "burn_policy": EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+        }
+        resp1 = self.client.post(reverse("dashboard:document_upload"), post_data_1, follow=True)
+        self.assertEqual(resp1.status_code, 200)
+        self.assertContains(resp1, "Asiento cifrado con éxito")
+
+        doc = EncryptedDocument.objects.get(original_filename="expediente_reapertura.pdf")
+        initial_pk = doc.pk
+        initial_hash = doc.file_hash
+
+        # Simular que el documento fue consumido y tiene registros de auditoría previos
+        doc.is_consumed = True
+        doc.consumed_by = "consumidor@empresa.com"
+        doc.consumed_at = timezone.now()
+        doc.save()
+
+        DocumentAccessLog.objects.create(
+            document=doc,
+            email="consumidor@empresa.com",
+            action=DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN,
+            origin_uo=doc.origin_uo,
+            target_uo=doc.target_uo,
+            ip_address="192.168.1.10",
+            details="Primer canje exitoso antes del cierre",
+        )
+        prev_logs_count = DocumentAccessLog.objects.filter(document=doc).count()
+        self.assertGreaterEqual(prev_logs_count, 1)
+
+        # 2. Segunda subida con el mismo archivo exacto (mismo hash SHA-256) y nuevos destinatarios
+        second_pdf = SimpleUploadedFile("expediente_reapertura.pdf", sample_pdf_bytes, content_type="application/pdf")
+        post_data_2 = {
+            "original_file": second_pdf,
+            "origin_uo": self.uo_security.id,
+            "target_uo": self.uo_legal.id,
+            "allowed_emails": "nuevo_destinatario_1@empresa.com, nuevo_destinatario_2@empresa.com",
+            "description": "Segunda remesa reactivada del expediente",
+            "burn_policy": EncryptedDocument.BurnPolicy.ALL_RECIPIENTS,
+        }
+        resp2 = self.client.post(reverse("dashboard:document_upload"), post_data_2, follow=True)
+        self.assertEqual(resp2.status_code, 200)
+
+        # Verificar mensaje informativo de reactivación
+        self.assertContains(resp2, "Asiento existente reactivado con éxito")
+
+        # Verificar que el documento reactivado mantiene el mismo PK y hash
+        doc.refresh_from_db()
+        self.assertEqual(doc.pk, initial_pk)
+        self.assertEqual(doc.file_hash, initial_hash)
+
+        # El asiento vuelve a estar activo y disponible
+        self.assertFalse(doc.is_consumed)
+        self.assertIsNone(doc.consumed_by)
+        self.assertIsNone(doc.consumed_at)
+
+        # Los destinatarios han sido actualizados
+        self.assertEqual(doc.allowed_emails, ["nuevo_destinatario_1@empresa.com", "nuevo_destinatario_2@empresa.com"])
+        self.assertEqual(doc.description, "Segunda remesa reactivada del expediente")
+
+        # El historial anterior de auditoría sigue intacto + nueva vicisitud de reactivación
+        current_logs = DocumentAccessLog.objects.filter(document=doc)
+        self.assertGreater(current_logs.count(), prev_logs_count)
+        self.assertTrue(current_logs.filter(action=DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN).exists())
+        self.assertTrue(current_logs.filter(action=DocumentAccessLog.Action.REACTIVACION_DOCUMENTO).exists())
+
+    def test_dashboard_document_upload_duplicate_hash_denied_for_other_uo(self) -> None:
+        """
+        Verifica que si un usuario de una UO distinta intenta reactivar un documento
+        perteneciente a otra UO, se rechace con ValidationError defensivo (status 400).
+        """
+        # Usuario de UO Legal
+        legal_user = User.objects.create_user(
+            username="operador_legal_hijack",
+            email="legal_hijack@arcamitte.local",
+            password="Password123!",
+        )
+        UserUOMembership.objects.create(
+            user=legal_user,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
+
+        self.client.force_login(legal_user)
+
+        # Intentar subir el mismo contenido de doc_sec (que pertenece a Seguridad)
+        hijack_file = SimpleUploadedFile(
+            "expediente_sec.pdf",
+            b"%PDF-1.4\n1 0 obj\n<< /Title (Confidential) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF",
+            content_type="application/pdf",
+        )
+        post_data = {
+            "original_file": hijack_file,
+            "origin_uo": self.uo_legal.id,
+            "allowed_emails": "atacante@externo.com",
+            "description": "Intento de reactivacion cruzada no autorizada",
+        }
+        resp = self.client.post(reverse("dashboard:document_upload"), post_data)
+        self.assertEqual(resp.status_code, 400)
+        self.assertContains(resp, "pertenece a otra Unidad Organizativa", status_code=400)
 
     def test_dashboard_user_without_any_uo_operates_standalone(self) -> None:
         """Verifica que un usuario activo sin UO asignada pueda operar en modo personal autónomo."""
@@ -357,11 +516,17 @@ class DashboardTestCase(TestCase):
         """Verifica la visualización de metadatos, estado de canje y trazas forenses."""
         self.client.force_login(self.admin_user)
 
+        # Configurar un destinatario consumido como lista de cadenas (formato oficial de modelo)
+        self.doc_sec.consumed_recipients = ["auditor@empresa.com"]
+        self.doc_sec.save(update_fields=["consumed_recipients"])
+
         response = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": self.doc_sec.file_hash}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.doc_sec.file_hash)
         self.assertContains(response, "auditor@empresa.com")
         self.assertContains(response, "director@empresa.com")
+        self.assertContains(response, "Canjeado")
+        self.assertContains(response, "Pendiente")
         self.assertContains(response, "Trazabilidad Forense")
 
     def test_dashboard_document_terminate_flow(self) -> None:
@@ -756,4 +921,617 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_mode, "Entry Mode Selection")
         self.assertContains(resp_mode, "Governance and Administration")
         self.assertContains(resp_mode, "Document Operations")
+
+    def test_self_demotion_and_lockout_protection_in_user_management_form(self) -> None:
+        """Verifica que un administrador/superusuario no pueda auto-bloquearse ni auto-degradarse."""
+        from arcamitte.forms import UserManagementForm
+
+        # 1. Enviar payload malicioso intentando auto-desactivar y auto-degradar la propia cuenta
+        # Las salvaguardas de UserManagementForm deben desestimar la manipulación y preservar los privilegios
+        form_self = UserManagementForm(
+            data={
+                "username": self.admin_user.username,
+                "email": self.admin_user.email,
+                "first_name": "Admin",
+                "last_name": "Test",
+                "is_active": False,
+                "is_staff": False,
+                "is_superuser": False,
+            },
+            instance=self.admin_user,
+            is_superuser=True,
+            current_user=self.admin_user,
+        )
+        self.assertTrue(form_self.is_valid(), form_self.errors)
+        self.assertTrue(form_self.cleaned_data["is_active"])
+        self.assertTrue(form_self.cleaned_data["is_staff"])
+        self.assertTrue(form_self.cleaned_data["is_superuser"])
+
+        saved_user = form_self.save()
+        self.assertTrue(saved_user.is_active)
+        self.assertTrue(saved_user.is_staff)
+        self.assertTrue(saved_user.is_superuser)
+
+        # 2. Intentar degradar al único superusuario activo del sistema por un tercero -> ValidationError
+        # Aseguramos que solo existe un superusuario activo
+        User.objects.filter(is_superuser=True).exclude(pk=self.admin_user.pk).delete()
+        other_operator = User.objects.create_user(
+            username="gestor_externo",
+            email="gestor@arcamitte.local",
+            password="Password123!",
+            is_staff=True,
+        )
+
+        form_last_super = UserManagementForm(
+            data={
+                "username": self.admin_user.username,
+                "email": self.admin_user.email,
+                "first_name": "Admin",
+                "last_name": "Test",
+                "is_active": True,
+                "is_staff": True,
+                "is_superuser": False,
+            },
+            instance=self.admin_user,
+            is_superuser=True,
+            current_user=other_operator,  # No es él mismo
+        )
+        self.assertFalse(form_last_super.is_valid())
+        self.assertIn("is_superuser", form_last_super.errors)
+        self.assertIn("único superusuario", str(form_last_super.errors["is_superuser"]))
+
+        # 3. Asignar is_superuser=True automáticamente otorga is_staff=True
+        new_target = User.objects.create_user(
+            username="nuevo_candidato",
+            email="candidato@arcamitte.local",
+            password="Password123!",
+        )
+        form_promote = UserManagementForm(
+            data={
+                "username": new_target.username,
+                "email": new_target.email,
+                "first_name": "Nuevo",
+                "last_name": "Candidato",
+                "is_active": True,
+                "is_staff": False,
+                "is_superuser": True,
+            },
+            instance=new_target,
+            is_superuser=True,
+            current_user=self.admin_user,
+        )
+        self.assertTrue(form_promote.is_valid(), form_promote.errors)
+        saved_promoted = form_promote.save()
+        self.assertTrue(saved_promoted.is_superuser)
+        self.assertTrue(saved_promoted.is_staff)
+
+    def test_uo_admin_self_protection_in_uo_members(self) -> None:
+        """Verifica que un Administrador de UO no pueda auto-degradarse, auto-desactivarse ni auto-expulsarse."""
+        uo_admin = User.objects.create_user(
+            username="admin_propio",
+            email="admin_propio@arcamitte.local",
+            password="AdminPassword123!",
+        )
+        m = UserUOMembership.objects.create(
+            user=uo_admin,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.client.force_login(uo_admin)
+
+        # 1. Intentar auto-degradar su rol de ADMIN a OPERATOR -> Denegado con mensaje de error
+        resp_demote = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "update_role", "membership_id": m.id, "role": UserUOMembership.Role.OPERATOR},
+            follow=True,
+        )
+        self.assertEqual(resp_demote.status_code, 200)
+        m.refresh_from_db()
+        self.assertEqual(m.role, UserUOMembership.Role.ADMIN)  # Debe seguir siendo ADMIN
+        self.assertContains(resp_demote, "no puede revocar sus propios privilegios de administrador")
+
+        # 2. Intentar auto-desactivar su membresía -> Denegado con mensaje de error
+        resp_toggle = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "toggle_active", "membership_id": m.id},
+            follow=True,
+        )
+        self.assertEqual(resp_toggle.status_code, 200)
+        m.refresh_from_db()
+        self.assertTrue(m.is_active)  # Debe seguir activo
+        self.assertContains(resp_toggle, "no puede desactivar su propia membresía")
+
+        # 3. Intentar auto-expulsarse de la UO -> Denegado con mensaje de error
+        resp_remove = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "remove_member", "membership_id": m.id},
+            follow=True,
+        )
+        self.assertEqual(resp_remove.status_code, 200)
+        self.assertTrue(UserUOMembership.objects.filter(pk=m.pk).exists())  # Debe seguir existiendo
+        self.assertContains(resp_remove, "no puede auto-expulsarse de esta Unidad Organizativa")
+
+    def test_user_form_renders_clear_descriptions_and_protection(self) -> None:
+        """Verifica que el formulario de edición de usuario distinga claramente is_staff de is_superuser y alerte de auto-edición."""
+        self.client.force_login(self.admin_user)
+
+        # Cargar edición de la propia cuenta del superusuario
+        resp_self = self.client.get(reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id}))
+        self.assertEqual(resp_self.status_code, 200)
+        self.assertContains(resp_self, "Editando su propia cuenta")
+        self.assertContains(resp_self, "Acceso Administrativo Departamental")
+        self.assertContains(resp_self, "Superusuario Global del Sistema")
+        self.assertContains(resp_self, "Nivel Departamental")
+        self.assertContains(resp_self, "Control Total / Soberano")
+        # Verificar que no se muestran tecnicismos de código como (is_staff) o (is_superuser) en el texto
+        self.assertNotContains(resp_self, "(is_staff)")
+        self.assertNotContains(resp_self, "(is_superuser)")
+
+        # Verificar z-index del navbar y menú desplegable
+        self.assertContains(resp_self, 'style="z-index: 1060;')
+
+    def test_hierarchical_authority_level_enforcement(self) -> None:
+        """Verifica que nadie pueda otorgar un nivel superior al suyo ni administrar a un superusuario."""
+        from arcamitte.forms import UserManagementForm
+
+        # Crear un administrador de UO (is_staff=True, is_superuser=False)
+        uo_admin = User.objects.create_user(
+            username="admin_departamental",
+            email="admin_dep@arcamitte.local",
+            password="AdminPassword123!",
+            is_staff=True,
+        )
+        UserUOMembership.objects.create(
+            user=uo_admin,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.ADMIN,
+            is_active=True,
+        )
+        # Añadir al superusuario también a la UO legal
+        m_super = UserUOMembership.objects.create(
+            user=self.admin_user,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 1. Un no-superusuario no puede enviar is_superuser=True ni is_staff=True en UserManagementForm
+        form_unauth = UserManagementForm(
+            data={
+                "username": "intento_super",
+                "email": "intento@arcamitte.local",
+                "first_name": "Intento",
+                "last_name": "Hack",
+                "is_active": True,
+                "is_staff": True,
+                "is_superuser": True,
+            },
+            is_superuser=False,
+            current_user=uo_admin,
+        )
+        self.assertFalse(form_unauth.is_valid())
+        self.assertIn("Solo un superusuario global puede conceder privilegios", str(form_unauth.errors))
+
+        self.client.force_login(uo_admin)
+
+        # 2. Un no-superusuario NO puede editar a un superusuario global -> 403 Forbidden
+        resp_edit_super = self.client.get(reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id}))
+        self.assertEqual(resp_edit_super.status_code, 403)
+
+        # 3. Un no-superusuario NO puede resetear la contraseña de un superusuario -> 403 Forbidden
+        resp_reset_super = self.client.post(reverse("dashboard:user_reset_password", kwargs={"user_id": self.admin_user.id}))
+        self.assertEqual(resp_reset_super.status_code, 403)
+
+        # 4. En UO Members: Un no-superusuario NO puede degradar el rol de un superusuario
+        resp_demote = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "update_role", "membership_id": m_super.id, "role": UserUOMembership.Role.OPERATOR},
+            follow=True,
+        )
+        self.assertEqual(resp_demote.status_code, 200)
+        m_super.refresh_from_db()
+        self.assertEqual(m_super.role, UserUOMembership.Role.ADMIN)
+        self.assertContains(resp_demote, "No tiene privilegios suficientes para modificar el rol de un superusuario")
+
+        # 5. En UO Members: Un no-superusuario NO puede desactivar la membresía de un superusuario
+        resp_toggle = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "toggle_active", "membership_id": m_super.id},
+            follow=True,
+        )
+        self.assertEqual(resp_toggle.status_code, 200)
+        m_super.refresh_from_db()
+        self.assertTrue(m_super.is_active)
+        self.assertContains(resp_toggle, "No tiene privilegios suficientes para modificar el estado de un superusuario")
+
+        # 6. En UO Members: Un no-superusuario NO puede desvincular a un superusuario
+        resp_remove = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "remove_member", "membership_id": m_super.id},
+            follow=True,
+        )
+        self.assertEqual(resp_remove.status_code, 200)
+        self.assertTrue(UserUOMembership.objects.filter(pk=m_super.pk).exists())
+        self.assertContains(resp_remove, "No tiene privilegios suficientes para desvincular a un superusuario")
+
+    def test_uo_members_search_bar_and_json_data(self) -> None:
+        """Verifica que la vista de miembros de UO proporcione la barra de búsqueda interactiva y el JSON para filtro."""
+        self.client.force_login(self.admin_user)
+
+        # Crear un usuario disponible con nombre y apellidos
+        User.objects.create_user(
+            username="doctor_house",
+            first_name="Gregory",
+            last_name="House",
+            email="house@princeton.edu",
+            password="Password123!",
+        )
+
+        resp = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}))
+        self.assertEqual(resp.status_code, 200)
+
+        # Verificar presencia de la barra de búsqueda y campos en HTML
+        self.assertContains(resp, "member_search_input")
+        self.assertContains(resp, "available-users-json")
+        self.assertContains(resp, "doctor_house")
+        self.assertContains(resp, "Gregory")
+        self.assertContains(resp, "House")
+        self.assertContains(resp, "house@princeton.edu")
+
+    def test_uo_exclusivity_rule_and_occupied_members_detection(self) -> None:
+        """
+        Verifica que:
+        1. Los usuarios asignados activamente a otra UO se identifiquen como ocupados en el JSON.
+        2. No se permita vincular a un usuario ocupado a otra UO si no ha sido desvinculado previamente.
+        3. Tras ser desvinculado por su UO o superusuario, quede libre y pueda ser asignado a la nueva UO.
+        """
+        # Crear usuario asignado a SEGURIDAD
+        worker = User.objects.create_user(
+            username="analista_sec",
+            first_name="Ada",
+            last_name="Lovelace",
+            email="ada@arcamitte.local",
+            password="WorkerPassword123!",
+        )
+        membership_sec = UserUOMembership.objects.create(
+            user=worker,
+            uo=self.uo_security,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
+
+        # Crear usuario libre
+        free_user = User.objects.create_user(
+            username="usuario_libre",
+            first_name="Alan",
+            last_name="Turing",
+            email="alan@arcamitte.local",
+            password="FreePassword123!",
+        )
+
+        self.client.force_login(self.admin_user)
+
+        # 1. Comprobar GET en uo_members de LEGAL: worker debe salir marcado como ocupado
+        resp_get = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, "available-users-json")
+
+        json_data = resp_get.context["available_users_json"]
+        import json as py_json
+        parsed_users = py_json.loads(json_data)
+        worker_info = next((u for u in parsed_users if u["username"] == "analista_sec"), None)
+        free_info = next((u for u in parsed_users if u["username"] == "usuario_libre"), None)
+
+        self.assertIsNotNone(worker_info)
+        self.assertTrue(worker_info["is_occupied"])
+        self.assertEqual(worker_info["assigned_uo_alias"], self.uo_security.alias)
+
+        self.assertIsNotNone(free_info)
+        self.assertFalse(free_info["is_occupied"])
+        self.assertEqual(free_info["assigned_uo_alias"], "")
+
+        # 2. Intentar asignar worker a LEGAL mientras sigue activo en SEGURIDAD -> Bloqueado
+        resp_add_blocked = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "add_member", "user_id": worker.id, "role": UserUOMembership.Role.OPERATOR},
+            follow=True,
+        )
+        self.assertEqual(resp_add_blocked.status_code, 200)
+        self.assertFalse(UserUOMembership.objects.filter(user=worker, uo=self.uo_legal).exists())
+        self.assertContains(resp_add_blocked, "ya se encuentra asignado a la Unidad Organizativa")
+        self.assertContains(resp_add_blocked, "Debe ser desvinculado previamente")
+
+        # 3. Desvincular a worker de SEGURIDAD (dejarlo libre)
+        resp_remove = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_security.id}),
+            {"action": "remove_member", "membership_id": membership_sec.id},
+            follow=True,
+        )
+        self.assertEqual(resp_remove.status_code, 200)
+        self.assertFalse(UserUOMembership.objects.filter(user=worker, uo=self.uo_security).exists())
+
+        # 4. Ahora worker está libre: Asignarlo a LEGAL debe permitirse satisfactoriamente
+        resp_add_success = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "add_member", "user_id": worker.id, "role": UserUOMembership.Role.AUDITOR},
+            follow=True,
+        )
+        self.assertEqual(resp_add_success.status_code, 200)
+        self.assertTrue(UserUOMembership.objects.filter(user=worker, uo=self.uo_legal, is_active=True).exists())
+        m_legal = UserUOMembership.objects.get(user=worker, uo=self.uo_legal)
+        self.assertEqual(m_legal.role, UserUOMembership.Role.AUDITOR)
+
+    def test_dashboard_auditor_sees_audit_download_button_and_downloads_preserved(self) -> None:
+        """Verifica que el usuario Auditor vea el botón de descarga y pueda descargar la copia de auditoría."""
+        auditor_user = User.objects.create_user(
+            username="auditor_test",
+            email="auditor_test@arcamitte.local",
+            password="AuditorPassword123!",
+        )
+        UserUOMembership.objects.create(
+            user=auditor_user,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.AUDITOR,
+            is_active=True,
+        )
+
+        test_content = b"%PDF-1.4\nContenido confidencial para prueba forense\n%%EOF"
+        upload_file = SimpleUploadedFile("informe_auditoria.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["auditor_dest@external.org"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=auditor_user,
+            origin_uo=self.uo_legal,
+        )
+
+        self.client.force_login(auditor_user)
+
+        # 1. El auditor entra al detalle: debe ver el botón de Descarga de Auditoría y su rol "Auditor"
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertTrue(resp_detail.context["can_audit_download"])
+        self.assertContains(resp_detail, "Descarga de Auditoría")
+        self.assertContains(resp_detail, "Descargar copia de auditoría")
+        # Verificar visualización del rol en la barra/menú
+        self.assertContains(resp_detail, "Auditor")
+        self.assertContains(resp_detail, self.uo_legal.alias)
+
+        # 2. Descarga de auditoría efectiva
+        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        resp_download = self.client.get(audit_download_url)
+        self.assertEqual(resp_download.status_code, 200)
+        self.assertEqual(resp_download.content, test_content)
+        self.assertIn("informe_auditoria.pdf", resp_download["Content-Disposition"])
+
+        # 3. El documento NO debe quedar consumido ni destruido en disco
+        doc.refresh_from_db()
+        self.assertFalse(doc.is_consumed)
+        self.assertTrue(os.path.exists(doc.encrypted_file.path))
+
+        # 4. Comprobar que se ha registrado el log de auditoría
+        audit_log = DocumentAccessLog.objects.filter(
+            document=doc,
+            action=DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA,
+        ).first()
+        self.assertIsNotNone(audit_log)
+        self.assertIn("auditor_test", audit_log.details or "")
+
+    def test_dashboard_operator_cannot_audit_download(self) -> None:
+        """Verifica que un Operador no vea el botón de descarga de auditoría y no pueda ejecutarla."""
+        operator_user = User.objects.create_user(
+            username="operador_test",
+            email="operador_test@arcamitte.local",
+            password="OperatorPassword123!",
+        )
+        UserUOMembership.objects.create(
+            user=operator_user,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
+
+        test_content = b"%PDF-1.4\nArchivo operativo normal\n%%EOF"
+        upload_file = SimpleUploadedFile("operacion.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["operacion@external.org"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=operator_user,
+            origin_uo=self.uo_legal,
+        )
+
+        self.client.force_login(operator_user)
+
+        # 1. El operador no debe tener can_audit_download=True
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertFalse(resp_detail.context["can_audit_download"])
+        self.assertNotContains(resp_detail, "Descargar copia de auditoría")
+
+        # 2. Si intenta forzar la descarga de auditoría vía URL, debe ser denegado y redirigido
+        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        resp_download = self.client.get(audit_download_url, follow=True)
+        self.assertEqual(resp_download.status_code, 200)
+        self.assertContains(resp_download, "No tiene permisos de auditoría")
+
+    def test_physical_file_missing_auto_closes_asiento_with_vicisitud(self) -> None:
+        """Verifica que si el archivo físico en disco no existe, el asiento se clausura automáticamente con vicisitud."""
+        test_content = b"%PDF-1.4\nDocumento para prueba de perdida fisica\n%%EOF"
+        upload_file = SimpleUploadedFile("perdida_fisica.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["dest@empresa.com"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=self.admin_user,
+            origin_uo=self.uo_legal,
+        )
+
+        self.assertTrue(doc.is_active)
+        self.assertFalse(doc.is_consumed)
+        file_path = doc.encrypted_file.path
+        self.assertTrue(os.path.exists(file_path))
+
+        # Simular pérdida/eliminación física del archivo en disco
+        os.remove(file_path)
+        self.assertFalse(os.path.exists(file_path))
+
+        self.client.force_login(self.admin_user)
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp = self.client.get(detail_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context["file_exists_on_disk"])
+
+        # Verificar que el modelo se ha clausurado automáticamente
+        doc.refresh_from_db()
+        self.assertFalse(doc.is_active)
+        self.assertTrue(doc.is_consumed)
+        self.assertIsNotNone(doc.consumed_at)
+
+        # Verificar que se ha levantado una vicisitud formal
+        log_entry = DocumentAccessLog.objects.filter(
+            document=doc,
+            action=DocumentAccessLog.Action.FINALIZACION_MANUAL,
+        ).first()
+        self.assertIsNotNone(log_entry)
+        self.assertIn("Cierre automático del asiento", log_entry.details)
+
+    def test_actions_hidden_when_user_lacks_permissions(self) -> None:
+        """Verifica que si un usuario no tiene permisos para 'Terminar y Destruir', la acción no aparezca en la UI."""
+        operador = User.objects.create_user(
+            username="operador_ui_check",
+            email="operador_ui@arcamitte.local",
+            password="Password123!",
+        )
+        UserUOMembership.objects.create(
+            user=operador,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
+
+        test_content = b"%PDF-1.4\nDocumento para verificacion UI\n%%EOF"
+        upload_file = SimpleUploadedFile("ui_doc.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["ui_dest@empresa.com"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=self.admin_user,
+            origin_uo=self.uo_legal,
+        )
+
+        self.client.force_login(operador)
+
+        # 1. En el listado: el operador NO debe ver el botón de terminar (basurero rojo)
+        resp_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertNotIn(doc.id, resp_list.context["terminable_doc_ids"])
+
+        # 2. En el detalle: el operador NO debe tener can_terminate=True ni ver el botón 'Terminar y Destruir'
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertFalse(resp_detail.context["can_terminate"])
+        self.assertNotContains(resp_detail, "Terminar y Destruir")
+
+        # 3. En el menú lateral: el operador NO debe ver 'Usuarios y Accesos' ni 'Unidades Organizativas'
+        self.assertNotContains(resp_detail, "Usuarios y Accesos")
+        self.assertNotContains(resp_detail, "Unidades Organizativas")
+
+    def test_auditor_uploads_document_with_no_origin_uo_and_can_inspect(self) -> None:
+        """Verifica que un Auditor pueda subir un documento personal (sin UO origen) y pueda verlo sin PermissionDenied."""
+        auditor = User.objects.create_user(
+            username="auditor_personal",
+            email="auditor_personal@arcamitte.local",
+            password="AuditorPassword123!",
+        )
+        UserUOMembership.objects.create(
+            user=auditor,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.AUDITOR,
+            is_active=True,
+        )
+
+        test_content = b"%PDF-1.4\nDocumento personal sin UO\n%%EOF"
+        upload_file = SimpleUploadedFile("personal.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["auditor_dest@empresa.com"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=auditor,
+            origin_uo=None,
+            target_uo=self.uo_security,
+        )
+
+        self.client.force_login(auditor)
+
+        # Debe poder acceder al detalle sin PermissionDenied
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertTrue(resp_detail.context["can_audit_download"])
+        self.assertContains(resp_detail, "Descarga de Auditoría")
+
+        # Debe poder descargar la copia de auditoría
+        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        resp_download = self.client.get(audit_download_url)
+        self.assertEqual(resp_download.status_code, 200)
+        self.assertEqual(resp_download.content, test_content)
+
+    def test_auditor_strictly_scoped_to_assigned_uos(self) -> None:
+        """Verifica que el Auditor esté estrictamente delimitado a sus UOs asignadas y no pueda acceder a UOs ajenas."""
+        uo_other = OrganizationalUnit.objects.create(
+            numeric_code=1005,
+            alias="EXTERNAL",
+            name="Organización Externa",
+            email="external@arcamitte.local",
+            is_active=True,
+        )
+        auditor_user = User.objects.create_user(
+            username="auditor_scoped_test",
+            email="auditor_scoped@arcamitte.local",
+            password="Password123!",
+        )
+        UserUOMembership.objects.create(
+            user=auditor_user,
+            uo=self.uo_security,
+            role=UserUOMembership.Role.AUDITOR,
+            is_active=True,
+        )
+
+        # Documento entre LEGAL y EXTERNAL (sin relación con SEGURIDAD)
+        test_content = b"%PDF-1.4\nDocumento confidencial ajeno\n%%EOF"
+        upload_file = SimpleUploadedFile("unrelated.pdf", test_content, content_type="application/pdf")
+        doc = upload_and_encrypt_document(
+            original_file=upload_file,
+            allowed_emails=["dest@empresa.com"],
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            uploaded_by=self.admin_user,
+            origin_uo=self.uo_legal,
+            target_uo=uo_other,
+        )
+
+        self.client.force_login(auditor_user)
+
+        # 1. El auditor NO ve el documento ajeno en su listado
+        resp_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertNotIn(doc, resp_list.context["documents"])
+
+        # 2. El auditor NO puede inspeccionar el detalle (403 PermissionDenied)
+        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 403)
+
+        # 3. El auditor NO puede realizar la descarga de auditoría de UO ajena
+        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        resp_download = self.client.get(audit_download_url)
+        self.assertEqual(resp_download.status_code, 302)
+
+
+
 

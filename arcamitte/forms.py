@@ -156,6 +156,7 @@ class UserManagementForm(forms.ModelForm):
     """
     Formulario de administración de cuentas de usuario.
     Permite gestionar datos personales, estado activo y roles globales.
+    Incorpora salvaguardas estrictas contra auto-bloqueo y auto-degradación de privilegios.
     """
 
     class Meta:
@@ -169,22 +170,125 @@ class UserManagementForm(forms.ModelForm):
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
-    def __init__(self, *args: Any, is_superuser: bool = False, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        is_superuser: bool = False,
+        current_user: Any = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.is_superuser = is_superuser
+        self.current_user = current_user
+        self.is_self = bool(
+            self.instance
+            and getattr(self.instance, "pk", None)
+            and self.current_user
+            and getattr(self.current_user, "pk", None) == self.instance.pk
+        )
+
+        if "is_active" in self.fields:
+            self.fields["is_active"].label = _("Cuenta Activa / Operativa")
+            self.fields["is_active"].help_text = _(
+                "Determina si el usuario puede iniciar sesión y operar en la plataforma. Si se desmarca, se revocan todas sus sesiones activas."
+            )
+            if self.is_self:
+                self.fields["is_active"].disabled = True
+                self.fields["is_active"].help_text = _(
+                    "Protegido por seguridad: No puede desactivar su propia cuenta de usuario."
+                )
+
         if is_superuser:
             self.fields["is_staff"] = forms.BooleanField(
                 required=False,
-                label=_("Acceso administrativo (is_staff)"),
+                label=_("Acceso Administrativo Departamental"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
                 initial=getattr(self.instance, "is_staff", False),
+                help_text=_(
+                    "Permite acceder al panel de control. Los usuarios con este rol pueden gestionar las Unidades Organizativas donde tengan cargo asignado, tramitar documentos y administrar su personal. No otorga acceso a organizaciones ajenas."
+                ),
             )
             self.fields["is_superuser"] = forms.BooleanField(
                 required=False,
-                label=_("Superusuario global (is_superuser)"),
+                label=_("Superusuario Global del Sistema"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
                 initial=getattr(self.instance, "is_superuser", False),
+                help_text=_(
+                    "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global. Incluye automáticamente Acceso Administrativo."
+                ),
             )
+            if self.is_self:
+                if getattr(self.instance, "is_staff", False):
+                    self.fields["is_staff"].disabled = True
+                    self.fields["is_staff"].help_text = _(
+                        "Protegido por seguridad: No puede revocar su propio acceso administrativo."
+                    )
+                if getattr(self.instance, "is_superuser", False):
+                    self.fields["is_superuser"].disabled = True
+                    self.fields["is_superuser"].help_text = _(
+                        "Protegido por seguridad: No puede revocar sus propios privilegios de superusuario global."
+                    )
+
+    def clean_is_active(self) -> bool:
+        is_active = self.cleaned_data.get("is_active", True)
+        if self.is_self and not is_active:
+            raise ValidationError(
+                _("Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario.")
+            )
+        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_active:
+            other_superusers = (
+                User.objects.filter(is_superuser=True, is_active=True)
+                .exclude(pk=self.instance.pk)
+                .count()
+            )
+            if other_superusers == 0:
+                raise ValidationError(
+                    _("No es posible desactivar al único superusuario activo del sistema.")
+                )
+        return is_active
+
+    def clean_is_staff(self) -> bool:
+        is_staff = self.cleaned_data.get("is_staff", False)
+        if self.is_self and getattr(self.instance, "is_staff", False) and not is_staff:
+            raise ValidationError(
+                _("Por motivos de seguridad, no puede revocar su propio acceso administrativo.")
+            )
+        return is_staff
+
+    def clean_is_superuser(self) -> bool:
+        is_superuser = self.cleaned_data.get("is_superuser", False)
+        if self.is_self and getattr(self.instance, "is_superuser", False) and not is_superuser:
+            raise ValidationError(
+                _("Por motivos de seguridad, no puede revocar sus propios privilegios de superusuario global.")
+            )
+        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_superuser:
+            other_superusers = (
+                User.objects.filter(is_superuser=True, is_active=True)
+                .exclude(pk=self.instance.pk)
+                .count()
+            )
+            if other_superusers == 0:
+                raise ValidationError(
+                    _("No es posible revocar los privilegios al único superusuario activo del sistema.")
+                )
+        return is_superuser
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        # Restricción jerárquica estricta: Solo un superusuario puede otorgar is_superuser o is_staff
+        if not self.is_superuser:
+            if (
+                self.data.get("is_superuser")
+                or self.data.get("is_staff")
+                or cleaned_data.get("is_superuser")
+                or cleaned_data.get("is_staff")
+            ):
+                raise ValidationError(
+                    _("Solo un superusuario global puede conceder privilegios administrativos o de superusuario.")
+                )
+        elif cleaned_data.get("is_superuser"):
+            cleaned_data["is_staff"] = True
+        return cleaned_data
 
     def clean_email(self) -> str:
         raw_email = self.cleaned_data.get("email", "")
@@ -195,6 +299,13 @@ class UserManagementForm(forms.ModelForm):
         if self.is_superuser:
             user.is_staff = self.cleaned_data.get("is_staff", False)
             user.is_superuser = self.cleaned_data.get("is_superuser", False)
+            if user.is_superuser:
+                user.is_staff = True
+        else:
+            # Jerarquía: Si quien gestiona la cuenta no es superusuario, no puede elevar a staff ni superuser
+            if not user.pk:
+                user.is_staff = False
+                user.is_superuser = False
         if commit:
             user.save()
         return user

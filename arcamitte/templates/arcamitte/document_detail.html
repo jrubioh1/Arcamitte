@@ -26,7 +26,12 @@
 		<a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary">
 			&larr; {% trans "Volver al listado" %}
 		</a>
-		{% if doc.is_active and not doc.is_consumed and not doc.is_expired %}
+		{% if can_audit_download %}
+			<a href="{% url 'dashboard:document_audit_download' doc.file_hash %}" class="btn btn-warning text-dark shadow-sm">
+				<i data-feather="shield" style="width:16px;height:16px;" class="me-1"></i> {% trans "Descarga de Auditoría" %}
+			</a>
+		{% endif %}
+		{% if can_terminate %}
 			<a href="{% url 'dashboard:document_terminate' doc.file_hash %}" class="btn btn-danger">
 				<i data-feather="trash-2" style="width:16px;height:16px;" class="me-1"></i> {% trans "Terminar y Destruir" %}
 			</a>
@@ -95,9 +100,16 @@
 							<th>{% trans "Fichero en Disco:" %}</th>
 							<td>
 								{% if file_exists_on_disk %}
-									<span class="badge bg-success">
-										<i data-feather="check" style="width:12px;height:12px;" class="me-1"></i> {% trans "Presente cifrado" %}
-									</span>
+									<div class="d-flex align-items-center flex-wrap gap-2">
+										<span class="badge bg-success">
+											<i data-feather="check" style="width:12px;height:12px;" class="me-1"></i> {% trans "Presente cifrado" %}
+										</span>
+										{% if can_audit_download %}
+											<a href="{% url 'dashboard:document_audit_download' doc.file_hash %}" class="btn btn-sm btn-outline-warning text-dark py-0 px-2 fw-semibold" style="font-size:0.75rem;">
+												<i data-feather="download" style="width:12px;height:12px;" class="me-1"></i> {% trans "Descargar copia de auditoría" %}
+											</a>
+										{% endif %}
+									</div>
 								{% else %}
 									<span class="badge bg-secondary">
 										<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i> {% trans "Destruido" %}

@@ -14,10 +14,26 @@ Panel de control visual moderno con tema oscuro, desarrollado sobre Bootstrap 5 
 - **Gestor Documental:** Listado paginado con filtros por UO y estado, buscador en tiempo real por nombre de archivo o hash SHA-256.
 - **Subida Segura:** Asistente de custodia con cálculo de hash en cliente, selección de UO emisora/receptora y política de destrucción.
 - **Detalle y Auditoría:** Inspección de metadatos, línea temporal de eventos y finalización anticipada por vicisitud.
-- **Gestión de UOs y Miembros:** Alta y edición de unidades organizativas y asignación de usuarios con roles de Operador o Auditor.
+- **Gestión de UOs y Miembros:** Alta y edición de unidades organizativas y asignación de usuarios con roles de Operador, Auditor o Administrador de UO.
+- **Directorio de Usuarios:** Creación y modificación de cuentas con contraseñas temporales automáticas de alta entropía.
 - **Pasarela de Tokens API:** Generación de credenciales M2M con scopes específicos y revocación inmediata.
 
-### 1.2 Panel Django Clásico (`/admin/`)
+### 1.2 Matriz de Roles y Atribuciones
+
+| Rol | Cifrar y Tramitar | Consultar Asientos | Descarga de Auditoría Forense Preservada | Terminar y Destruir Asiento | Gestión de Personal UO | Gobernanza Global |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Operador** | ✅ Sí | ✅ Sí (de su UO) | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Auditor** | ✅ Sí | ✅ Sí (de su UO) | ✅ **Sí (Exclusivo UO)** | ❌ No | ❌ No | ❌ No |
+| **Admin de UO** | ✅ Sí | ✅ Sí (de su UO) | ✅ Sí (de su UO) | ✅ **Sí (Solo de su UO)** | ✅ Sí | ❌ No |
+| **Superusuario** | ✅ Sí | ✅ Sí (Global) | ✅ Sí (Global) | ✅ **Sí (Cualquier asiento)** | ✅ Sí | ✅ Sí |
+
+#### Claves Operativas de los Roles:
+- **Operador (`Role.OPERATOR`):** Cifra y envía trámites. No tiene acceso a descargas periciales ni a la destrucción manual anticipada de asientos.
+- **Auditor (`Role.AUDITOR`):** Puede realizar **Descargas de Auditoría Forense Preservadas** para peritajes o requerimientos legales sin consumir el asiento ni alterar el archivo en disco (evento `ADMIN_DESCARGA_PRESERVADA`).
+- **Administrador de UO (`Role.ADMIN`):** Administra el personal de su UO (altas, roles, reseteo de claves) y puede destruir/finalizar anticipadamente asientos de su UO.
+- **Superusuario:** Soberanía completa sin restricciones de departamento.
+
+### 1.3 Panel Django Clásico (`/admin/`)
 Panel administrativo oficial con controles reforzados para superusuarios:
 - **Importación Masiva JSON:** Carga conjunta de departamentos y usuarios.
 - **Inmutabilidad Reforzada:** Deshabilitación de borrados directos para garantizar la integridad probatoria y la cadena de custodia.
@@ -99,23 +115,62 @@ Si un emisor detecta un error en el archivo custodiado (ej. destinatario erróne
 
 ---
 
-## 4. Tareas Programadas y Mantenimiento (Cron Jobs)
+## 4. Tareas Programadas y Servicios Recurrentes (Daemons & Cron Jobs)
 
-Para garantizar la higiene criptográfica y el cumplimiento de las fechas de caducidad, configure las siguientes tareas periódicas en el `crontab` del sistema:
+Para garantizar la higiene criptográfica, el saneamiento de almacenamiento y el cumplimiento de las fechas de caducidad, Arcamitte incluye comandos de gestión diseñados para ejecutarse de forma desatendida mediante `crontab`, `systemd.timer` o tareas programadas de Celery/Dramatiq:
 
 ### 4.1 Cierre y Sanitización de Documentos Caducados
-Ejecutar cada hora:
+Ejecutar periódicamente (ej. cada 15 o 30 minutos):
 ```bash
-0 * * * * cd /opt/arcamitte && poetry run python manage.py close_expired_documents >> /var/log/arcamitte/cron_expired.log 2>&1
+*/15 * * * * cd /opt/arcamitte && poetry run python manage.py close_expired_documents >> /var/log/arcamitte/cron_expired.log 2>&1
 ```
-*Identifica todos los documentos cuya fecha `expires_at` haya sido superada, sobrescribe sus binarios y los marca como consumidos.*
+*Identifica todos los documentos cuya fecha `expires_at` haya sido superada, sobrescribe sus binarios con entropía aleatoria (`os.urandom`), desvincula el inodo (NIST SP 800-88) y asienta la vicisitud formal `EXPIRACION_AUTOMATICA`.*
 
 ### 4.2 Purga de Tokens OTP y Sesiones Caducadas
 Ejecutar diariamente a medianoche:
 ```bash
-0 0 * * * cd /opt/arcamitte && poetry run python manage.py purge_expired_tokens >> /var/log/arcamitte/cron_purge.log 2>&1
+0 0 * * * cd /opt/arcamitte && poetry run python manage.py purge_expired_tokens --days 1 >> /var/log/arcamitte/cron_purge.log 2>&1
 ```
-*Elimina de la base de datos los registros de verificación temporal cuya validez de 15 minutos haya expirado.*
+*Elimina de la base de datos los registros de verificación temporal cuya validez de 15 minutos haya expirado o ya hayan sido utilizados, evitando el engrosamiento innecesario de las tablas en alta concurrencia.*
+
+### 4.3 Configuración como Servicio y Temporizador en `systemd` (Recomendado en Producción)
+
+Para mayor robustez y trazabilidad en servidores Linux modernos (journalctl, autorestart), configure unidades de `systemd`:
+
+`/etc/systemd/system/arcamitte-expired.service`:
+```ini
+[Unit]
+Description=Arcamitte - Purga y Sanitizacion de Documentos Caducados
+After=network.target
+
+[Service]
+Type=oneshot
+User=arcamitte
+WorkingDirectory=/opt/arcamitte
+ExecStart=/usr/local/bin/poetry run python manage.py close_expired_documents
+StandardOutput=journal
+StandardError=journal
+```
+
+`/etc/systemd/system/arcamitte-expired.timer`:
+```ini
+[Unit]
+Description=Ejecutar Arcamitte Expired cada 15 minutos
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Habilitar el temporizador:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now arcamitte-expired.timer
+```
 
 ---
 

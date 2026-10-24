@@ -19,7 +19,31 @@
 
 ---
 
-## 1. Visión General del Sistema
+## 1. Etimología y Fundamento Filosófico: *Arca + Mittere*
+
+El nombre **Arcamitte** se construyó a partir de dos términos en latín clásico que describen de forma directa el funcionamiento técnico de la aplicación:
+
+### 1. La primera raíz: *Arca / Arcanum*
+- **Origen latino:**
+  - En su sentido material (*arca*), era el cofre de madera reforzada o hierro, la caja fuerte donde los romanos guardaban bajo llave el dinero, joyas y documentos de máximo valor.
+  - En su sentido abstracto (*arcanum*), dio origen a la palabra "arcano", que significa secreto profundo, misterio impenetrable o algo reservado únicamente para quien posee el conocimiento o la clave.
+- **Sentido técnico en Arcamitte:** Representa el archivo cifrado de extremo a extremo. Es el contenedor hermético donde los datos viajan sellados; si no se posee la clave efímera, es matemáticamente imposible abrirlo.
+
+### 2. La segunda raíz: *Mittere*
+- **Origen latino:**
+  - Es el verbo en latín que significa enviar, despachar, remitir o lanzar hacia un destino.
+  - De esta misma raíz derivan en español palabras como remitente, emisión, misión o transmitir.
+- **Sentido técnico en Arcamitte:** Representa el tránsito o envío seguro del archivo a través de la red hacia el destinatario legítimo.
+
+### El significado conjunto
+Al unir ambas piezas morfológicas (**Arca + Mittere**):
+> **Arcamitte** significa literalmente *"Enviar el arca"* o *"Despachar el secreto"*.
+
+Describe con exactitud técnica la arquitectura: el cliente cifra el contenido dentro de una "caja fuerte" (el arca) y el servidor actúa únicamente como transportista que la despacha (*mittere*) sin poder ver jamás qué contiene en su interior.
+
+---
+
+## 2. Visión General del Sistema
 
 **Arcamitte** es un microservicio autónomo y de alta seguridad diseñado para la **custodia criptográfica y entrega desatendida de documentos confidenciales**. Elimina de raíz la necesidad de contraseñas humanas legibles, transportes inseguros de binarios y almacenamiento indefinido de datos sensibles.
 
@@ -34,7 +58,7 @@
 
 ---
 
-## 2. Arquitectura de Cifrado y Flujo de Vida
+## 3. Arquitectura de Cifrado y Flujo de Vida
 
 ```mermaid
 sequenceDiagram
@@ -72,7 +96,31 @@ sequenceDiagram
 
 ---
 
-## 3. Puntos de Entrada e Interfaces
+## 4. Matriz de Roles y Modelo de Gobernanza Departamental
+
+Arcamitte implementa un modelo jerárquico inclusivo con separación de responsabilidades y soberanía departamental delegada:
+
+| Rol | Ámbito | Cifrar y Tramitar | Consultar Asientos | Descarga de Auditoría Forense Preservada | Terminar y Destruir Asiento | Gestión de Personal |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **Operador** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ❌ No | ❌ No | ❌ No |
+| **Auditor** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ✅ **Sí (Exclusivo UO)** | ❌ No | ❌ No |
+| **Admin de UO** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ✅ Sí (de su UO) | ✅ **Sí (Solo de su UO)** | ✅ Sí (Personal UO) |
+| **Superusuario** | Global | ✅ Sí | ✅ Sí (Global) | ✅ Sí (Global) | ✅ **Sí (Cualquier asiento)** | ✅ Sí (Global) |
+
+### Atribuciones y Distinciones Específicas:
+1. **Operador Departamental (`Role.OPERATOR`):** Cifra y remite trámites entre departamentos. Consulta el estado de canje de los asientos asignados a su Unidad Organizativa. No tiene acceso a descargas periciales ni a la destrucción manual anticipada de asientos.
+2. **Auditor Departamental (`Role.AUDITOR`):** Posee todas las capacidades del operador más la potestad exclusiva de realizar **Descargas de Auditoría Forense Preservadas**. Esto permite al auditor inspeccionar o descargar el documento descifrado para diligencias de control legal o pericial **sin consumir el asiento ni destruir el archivo físico del servidor**, asentando un registro inmutable en auditoría (`ADMIN_DESCARGA_PRESERVADA`).
+3. **Administrador de UO (`Role.ADMIN`):** Conduce la gobernanza departamental: gestiona los miembros de su UO (altas, bajas, roles, reseteo de claves) y tiene la potestad exclusiva de revocar y clausurar anticipadamente («Terminar y Destruir por Vicisitud») los asientos emitidos por su departamento.
+4. **Superusuario del Sistema:** Ostenta autoridad global sobre la configuración del sistema, alta de UOs, directorio maestro de usuarios, expedición de tokens M2M, trazabilidad forense completa y clausura de cualquier asiento.
+
+### Principios de Seguridad en la UI y el Backend:
+- **Ocultación Dinámica de Acciones:** Si un usuario no tiene facultades para una acción (ej. destruir un documento o acceder a la gobernanza), los botones correspondientes (papelera de destrucción, sección de gobernanza, tokens M2M) no se renderizan en la interfaz de usuario.
+- **Protección contra Bloqueos y Auto-Degradación:** Ningún administrador puede auto-revocarse privilegios ni desactivar su propia cuenta. Ningún usuario puede asignar a terceros un nivel de privilegio superior al suyo.
+- **Cierre Automático por Vicisitud Física:** Si el archivo cifrado desaparece del almacenamiento físico de forma sobrevenida, el sistema clausura formalmente el documento (`is_consumed=True`) y genera automáticamente un registro inmutable en `DocumentAccessLog` constatando la retirada física.
+
+---
+
+## 5. Puntos de Entrada e Interfaces
 
 Arcamitte proporciona tres interfaces diseñadas para distintos propósitos operativos:
 
@@ -85,7 +133,7 @@ Arcamitte proporciona tres interfaces diseñadas para distintos propósitos oper
 
 ---
 
-## 4. Requisitos y Dependencias
+## 6. Requisitos y Dependencias
 
 - **Python:** 3.12, 3.13 o 3.14
 - **Gestor de Paquetes:** [Poetry](https://python-poetry.org/) (o `pip`)
@@ -98,7 +146,7 @@ Arcamitte proporciona tres interfaces diseñadas para distintos propósitos oper
 
 ---
 
-## 5. Instalación y Configuración Rápida
+## 7. Instalación y Configuración Rápida
 
 ### Paso 1: Clonar el Repositorio
 ```bash
@@ -152,7 +200,7 @@ Acceda a:
 
 ---
 
-## 6. Configuración `arcamitte.ini`
+## 8. Configuración `arcamitte.ini`
 
 El microservicio utiliza un archivo INI como única fuente de verdad técnica:
 
@@ -183,7 +231,7 @@ api_access_consume_rate = 30/minute
 
 ---
 
-## 7. M2M API Gate (Integración con Sistemas Externos)
+## 9. M2M API Gate (Integración con Sistemas Externos)
 
 Los sistemas corporativos (CRM, ERP, Gestores Documentales) pueden automatizar la subida y custodia de archivos mediante la API REST v1.
 
@@ -222,9 +270,9 @@ curl -X GET http://127.0.0.1:8000/api/v1/documents/c5f590b2b80041d8e1f5f3e9c68c3
 
 ---
 
-## 8. Verificación de Seguridad y Pruebas Unitarias
+## 10. Verificación de Seguridad y Pruebas Unitarias
 
-La suite de pruebas incluye **109 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas y defensas anti-fuerza bruta:
+La suite de pruebas incluye **124 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica y defensas anti-fuerza bruta:
 
 ```bash
 poetry run pytest -v
@@ -232,7 +280,7 @@ poetry run pytest -v
 
 Resultado verificado:
 ```text
-============================= 109 passed in 26.32s =============================
+============================= 124 passed in 31.25s =============================
 ```
 
 ### Controles de Seguridad Verificados (SAST & SCA)
@@ -245,7 +293,7 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
 
 ---
 
-## 9. Cumplimiento de Estándares de Seguridad
+## 11. Cumplimiento de Estándares de Seguridad
 
 - **NIST SP 800-88 Rev. 1 (Media Sanitization):** Sobrescritura aleatoria de almacenamiento físico previa desvinculación de inodo.
 - **NIST SP 800-53 Rev. 5:**
@@ -260,7 +308,7 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
 
 ---
 
-## 10. Documentación Técnica Detallada
+## 12. Documentación Técnica Detallada
 
 Para consultar la documentación completa de cada subsistema:
 - [Guía de Arquitectura Criptográfica](docs/ARCHITECTURE.md)

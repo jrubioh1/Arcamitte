@@ -69,9 +69,9 @@
 						</td>
 						<td>
 							{% if u.is_superuser %}
-								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superadmin" %}</span>
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superusuario Global" %}</span>
 							{% elif u.is_staff %}
-								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal Staff" %}</span>
+								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal Administrativo" %}</span>
 							{% else %}
 								<span class="badge bg-light text-secondary border">{% trans "Usuario Estándar" %}</span>
 							{% endif %}
@@ -84,21 +84,27 @@
 							{% endif %}
 						</td>
 						<td class="text-end">
-							<div class="btn-group btn-group-sm" role="group">
-								<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar cuenta' %}">
-									<i data-feather="edit-2" style="width:14px;height:14px;"></i>
-									<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
-								</a>
+							{% if u.is_superuser and not request.user.is_superuser %}
+								<span class="badge bg-secondary-subtle text-muted border px-2 py-1" title="{% trans 'Solo administrable por un superusuario global' %}">
+									<i data-feather="lock" style="width:12px;height:12px;" class="me-1"></i>{% trans "Protegido" %}
+								</span>
+							{% else %}
+								<div class="btn-group btn-group-sm" role="group">
+									<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar cuenta' %}">
+										<i data-feather="edit-2" style="width:14px;height:14px;"></i>
+										<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
+									</a>
 
-								<form method="post" action="{% url 'dashboard:user_reset_password' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una nueva clave temporal y enviarla al correo de este usuario?' %}');">
-									{% csrf_token %}
-									<input type="hidden" name="next" value="{{ request.get_full_path }}">
-									<button type="submit" class="btn btn-outline-warning" title="{% trans 'Resetear y enviar clave temporal' %}">
-										<i data-feather="key" style="width:14px;height:14px;"></i>
-										<span class="d-none d-md-inline ms-1">{% trans "Reset" %}</span>
-									</button>
-								</form>
-							</div>
+									<form method="post" action="{% url 'dashboard:user_reset_password' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una nueva clave temporal y enviarla al correo de este usuario?' %}');">
+										{% csrf_token %}
+										<input type="hidden" name="next" value="{{ request.get_full_path }}">
+										<button type="submit" class="btn btn-outline-warning" title="{% trans 'Resetear y enviar clave temporal' %}">
+											<i data-feather="key" style="width:14px;height:14px;"></i>
+											<span class="d-none d-md-inline ms-1">{% trans "Reset" %}</span>
+										</button>
+									</form>
+								</div>
+							{% endif %}
 						</td>
 					</tr>
 				{% empty %}

@@ -96,7 +96,7 @@ class UserUOMembership(models.Model):
 
     class Role(models.TextChoices):
         OPERATOR = "OPERATOR", _("Operador (Emisión y consulta de trámites)")
-        AUDITOR = "AUDITOR", _("Auditor (Inspección y descarga legal preservada)")
+        AUDITOR = "AUDITOR", _("Auditor (Emisión, inspección y descarga legal preservada)")
         ADMIN = "ADMIN", _("Administrador de UO (Gestión de usuarios y documentos de la UO)")
 
     user = models.ForeignKey(
@@ -367,6 +367,13 @@ class EncryptedDocument(models.Model):
     def is_active(self) -> bool:
         """Indica si el documento está activo (no consumido y no expirado)."""
         return not self.is_consumed and not self.is_expired()
+
+    @property
+    def mime_type(self) -> str:
+        """Determina el tipo MIME del documento a partir de su nombre original."""
+        import mimetypes
+        guessed, _ = mimetypes.guess_type(self.original_filename or "")
+        return guessed or "application/octet-stream"
 
     def is_expired(self) -> bool:
         """Indica si el documento ha superado su plazo de caducidad."""

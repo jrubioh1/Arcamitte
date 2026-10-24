@@ -613,7 +613,7 @@ class BatchImportProvisioningTestCase(TestCase):
         self.assertTrue(auditor_user.is_staff)
         self.assertTrue(auditor_user.has_perm("arcamitte.view_encrypteddocument"))
         self.assertTrue(auditor_user.has_perm("arcamitte.can_audit_download"))
-        self.assertFalse(auditor_user.has_perm("arcamitte.add_encrypteddocument"))
+        self.assertTrue(auditor_user.has_perm("arcamitte.add_encrypteddocument"))
         self.assertFalse(auditor_user.has_perm("arcamitte.delete_encrypteddocument"))
 
     def test_staging_departmental_employee_admin_access_and_isolation(self) -> None:
@@ -665,7 +665,7 @@ class BatchImportProvisioningTestCase(TestCase):
         self.assertTrue(any(uo_rrhh.alias in str(label) for label in choice_labels))
         self.assertFalse(any(uo_legal.alias in str(label) for label in choice_labels))
 
-        # Auditor RRHH: tiene permiso de ver pero no de añadir documentos
+        # Auditor RRHH: en el modelo jerárquico tiene permiso de ver, añadir y auditar documentos
         auditor = User.objects.create_user(
             username="auditor_rrhh_test",
             email="auditor.rrhh@arcamitte.local",
@@ -684,5 +684,5 @@ class BatchImportProvisioningTestCase(TestCase):
         auditor_list = self.client.get(reverse("admin:arcamitte_encrypteddocument_changelist"))
         self.assertEqual(auditor_list.status_code, 200)
         auditor_add = self.client.get(reverse("admin:arcamitte_encrypteddocument_add"))
-        self.assertEqual(auditor_add.status_code, 403)
+        self.assertEqual(auditor_add.status_code, 200)
 

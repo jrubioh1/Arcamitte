@@ -4,6 +4,30 @@ Este documento detalla la arquitectura técnica, los componentes internos, el fl
 
 ---
 
+## 0. Etimología y Fundamento Arquitectónico: *Arca + Mittere*
+
+El nombre **Arcamitte** se construyó a partir de dos términos en latín clásico que describen de forma directa el funcionamiento técnico de la aplicación:
+
+### 1. La primera raíz: *Arca / Arcanum*
+- **Origen latino:**
+  - En su sentido material (*arca*), era el cofre de madera reforzada o hierro, la caja fuerte donde los romanos guardaban bajo llave el dinero, joyas y documentos de máximo valor.
+  - En su sentido abstracto (*arcanum*), dio origen a la palabra "arcano", que significa secreto profundo, misterio impenetrable o algo reservado únicamente para quien posee el conocimiento o la clave.
+- **Sentido técnico en Arcamitte:** Representa el archivo cifrado de extremo a extremo. Es el contenedor hermético donde los datos viajan sellados; si no se posee la clave efímera, es matemáticamente imposible abrirlo.
+
+### 2. La segunda raíz: *Mittere*
+- **Origen latino:**
+  - Es el verbo en latín que significa enviar, despachar, remitir o lanzar hacia un destino.
+  - De esta misma raíz derivan en español palabras como remitente, emisión, misión o transmitir.
+- **Sentido técnico en Arcamitte:** Representa el tránsito o envío seguro del archivo a través de la red hacia el destinatario legítimo.
+
+### El significado conjunto
+Al unir ambas piezas morfológicas (**Arca + Mittere**):
+> **Arcamitte** significa literalmente *"Enviar el arca"* o *"Despachar el secreto"*.
+
+Describe con exactitud técnica la arquitectura: el cliente cifra el contenido dentro de una "caja fuerte" (el arca) y el servidor actúa únicamente como transportista que la despacha (*mittere*) sin poder ver jamás qué contiene en su interior.
+
+---
+
 ## 1. Visión Arquitectónica y Capas de Servicio
 
 Arcamitte está concebido como un microservicio autónomo y desacoplado estructurado en capas estrictamente delimitadas:
@@ -105,17 +129,32 @@ Arcamitte organiza el acceso institucional mediante **Unidades Organizativas (UO
 - **UO Emisora (`origin_uo`):** El departamento que custodia y sube el archivo confidencial.
 - **UO Receptora (`target_uo`):** El departamento facultado para recibir, gestionar y auditar el documento.
 
-### 4.2 Roles y Privilegios en la UO
-Los usuarios se asocian a las UOs mediante la entidad `UserUOMembership`:
-- **Operador (`OPERADOR`):** Facultado para subir documentos, consultar estados y gestionar destinatarios de su departamento.
-- **Auditor (`AUDITOR`):** Facultado para descargar copias de auditoría descifradas en memoria (siempre que pertenezca a la UO Emisora o UO Receptora) generando un registro formal de trazabilidad forense.
+### 4.2 Modelo de Roles y Matriz de Atribuciones
+Los usuarios se asocian a las UOs mediante la entidad `UserUOMembership` definiendo su rol operativo:
 
-### 4.3 Aislamiento a Nivel de Fila (Row-Level Security)
+| Rol | Ámbito | Cifrar y Tramitar | Consultar Asientos | Descarga de Auditoría Forense Preservada | Terminar y Destruir Asiento | Gestión de Personal UO |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **Operador (`OPERATOR`)** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ❌ No | ❌ No | ❌ No |
+| **Auditor (`AUDITOR`)** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ✅ **Sí (Exclusivo UO)** | ❌ No | ❌ No |
+| **Admin de UO (`ADMIN`)** | UO Asignada | ✅ Sí | ✅ Sí (de su UO) | ✅ Sí (de su UO) | ✅ **Sí (Solo de su UO)** | ✅ Sí (Personal UO) |
+| **Superusuario** | Global | ✅ Sí | ✅ Sí (Global) | ✅ Sí (Global) | ✅ **Sí (Cualquier asiento)** | ✅ Sí (Global) |
+
+#### Distinciones Operativas Clave:
+1. **Operador:** Cifra y remite trámites entre departamentos. Consulta el estado de canje de los asientos asignados a su Unidad Organizativa. No tiene acceso a descargas periciales ni a la destrucción manual anticipada de asientos.
+2. **Auditor:** Posee todas las facultades del operador más la potestad exclusiva de realizar **Descargas de Auditoría Forense Preservadas**. Esto permite al auditor inspeccionar o descargar el documento descifrado para diligencias de control legal o pericial **sin consumir el asiento ni destruir el archivo físico del servidor**, asentando un registro inmutable en auditoría (`ADMIN_DESCARGA_PRESERVADA`).
+3. **Administrador de UO:** Conduce la gobernanza departamental: gestiona los miembros de su UO (altas, bajas, roles, reseteo de claves) y tiene la potestad exclusiva de revocar y clausurar anticipadamente («Terminar y Destruir por Vicisitud») los asientos emitidos por su departamento.
+4. **Superusuario del Sistema:** Ostenta autoridad global sobre la configuración del sistema, alta de UOs, directorio maestro de usuarios, expedición de tokens M2M, trazabilidad forense completa y clausura de cualquier asiento.
+
+### 4.3 Salvaguardas en la Interfaz de Usuario y Cierre Automático
+- **Ocultación Dinámica de Acciones:** Si un usuario carece de privilegios (ej. Operador o Auditor ante la destrucción de asientos), los controles visuales no se renderizan en la UI (`can_terminate`).
+- **Detección de Pérdida Física y Auto-Cierre:** Si un archivo físico deja de existir en disco, el servicio `check_and_auto_close_if_file_missing()` detecta la inconsistencia, clausura formalmente el documento (`is_consumed=True`) y asienta una vicisitud inmutable en `DocumentAccessLog`.
+
+### 4.4 Aislamiento a Nivel de Fila (Row-Level Security)
 Las consultas en el Dashboard y la API filtran automáticamente los documentos accesibles según la pertenencia del usuario solicitante:
 ```python
 if not user.is_superuser:
     user_uos = user.uo_memberships.values_list("organizational_unit_id", flat=True)
-    qs = qs.filter(Q(origin_uo_id__in=user_uos) | Q(target_uo_id__in=user_uos))
+    qs = qs.filter(Q(origin_uo_id__in=user_uos) | Q(target_uo_id__in=user_uos) | Q(uploaded_by=user))
 ```
 
 ---

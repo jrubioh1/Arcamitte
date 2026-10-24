@@ -510,6 +510,23 @@ def upload_and_encrypt_document(
     existing_doc = EncryptedDocument.objects.filter(file_hash=file_hash).first()
     if existing_doc:
         if reopen_existing:
+            # Comprobación de seguridad: El usuario debe pertenecer a la origin_uo del documento existente si no es superusuario
+            if uploaded_by is not None and hasattr(uploaded_by, "is_superuser") and not uploaded_by.is_superuser:
+                if existing_doc.origin_uo is not None:
+                    if not UserUOMembership.objects.filter(user=uploaded_by, uo=existing_doc.origin_uo, is_active=True).exists():
+                        raise ValidationError(
+                            _(
+                                "Ya existe un documento registrado con este mismo hash pero pertenece a otra Unidad Organizativa (%(alias)s). No tiene autorización para reactivarlo."
+                            )
+                            % {"alias": existing_doc.origin_uo.alias}
+                        )
+                elif existing_doc.uploaded_by != uploaded_by:
+                    raise ValidationError(
+                        _(
+                            "Ya existe un documento registrado con este mismo hash correspondiente a un asiento personal de otro usuario. No tiene autorización para reactivarlo."
+                        )
+                    )
+
             reactivated = reactivate_document(
                 document=existing_doc,
                 original_file=original_file,
@@ -522,6 +539,7 @@ def upload_and_encrypt_document(
                 admin_user=admin_user,
                 client_ip=client_ip,
                 user_agent=user_agent,
+                expires_at=expires_at,
             )
             reactivated._is_reactivated = True
             return reactivated
@@ -957,6 +975,58 @@ def consume_document_with_otp(
         return False, b"", "", _("Se produjo un error al procesar el descifrado del documento.")
 
 
+def check_and_auto_close_if_file_missing(
+    document: EncryptedDocument,
+    user_identifier: str = "sistema@arcamitte.local",
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+) -> bool:
+    """
+    Verifica la existencia física del archivo cifrado en disco.
+    Si el archivo no se encuentra y el documento aún figura como activo o no consumido,
+    clausura formalmente el asiento (is_active=False, is_consumed=True) y levanta
+    una vicisitud inmutable de auditoría en DocumentAccessLog.
+
+    Retorna True si el archivo existe en disco; False si no existe (y se clausuró).
+    """
+    file_exists = False
+    if document.encrypted_file:
+        try:
+            file_exists = os.path.exists(document.encrypted_file.path)
+        except Exception:
+            file_exists = False
+
+    if not file_exists and (document.is_active or not document.is_consumed):
+        document.is_consumed = True
+        if not document.consumed_at:
+            document.consumed_at = timezone.now()
+        document.save(update_fields=["is_consumed", "consumed_at"])
+
+        action = (
+            DocumentAccessLog.Action.CADUCIDAD_AUTOMATICA
+            if document.is_expired()
+            else DocumentAccessLog.Action.FINALIZACION_MANUAL
+        )
+        DocumentAccessLog.objects.create(
+            document=document,
+            email=user_identifier or "sistema@arcamitte.local",
+            action=action,
+            details=_(
+                "Cierre automático del asiento: el archivo físico cifrado ya no se encuentra en el almacenamiento seguro (retirada física consumada)."
+            ),
+            origin_uo=document.origin_uo,
+            target_uo=document.target_uo,
+            ip_address=client_ip or "127.0.0.1",
+            user_agent=user_agent or "Arcamitte-Integrity-Guard",
+        )
+        logger.warning(
+            f"[ARCAMITTE INTEGRITY] Asiento {document.file_hash[:12]} clausurado automáticamente: "
+            f"el archivo físico cifrado no existe en almacenamiento seguro."
+        )
+
+    return file_exists
+
+
 def admin_decrypt_document(
     document: EncryptedDocument,
     admin_user: Any = None,
@@ -968,6 +1038,15 @@ def admin_decrypt_document(
     Permite al personal de auditoría descargar una copia descifrada mientras el documento
     NO haya sido consumido, SIN destruir el archivo ni marcar is_consumed = True.
     """
+    file_present = check_and_auto_close_if_file_missing(
+        document=document,
+        user_identifier=getattr(admin_user, "email", None) or getattr(admin_user, "username", "admin"),
+        client_ip=client_ip,
+        user_agent=user_agent,
+    )
+    if not file_present:
+        return False, b"", "", _("El archivo físico no se encuentra disponible en almacenamiento seguro. El asiento ha sido clausurado con constancia de vicisitud.")
+
     if document.is_consumed:
         return False, b"", "", _("El documento ya ha sido consumido y destruido del servidor.")
 
@@ -980,21 +1059,30 @@ def admin_decrypt_document(
         and admin_user.is_authenticated
         and not getattr(admin_user, "is_superuser", False)
     ):
-        user_uos = list(
+        user_auditor_uos = list(
             UserUOMembership.objects.filter(
                 user=admin_user,
                 is_active=True,
                 role__in=[UserUOMembership.Role.AUDITOR, UserUOMembership.Role.ADMIN],
             ).values_list("uo_id", flat=True)
         )
-        is_authorized_uo = False
-        if document.origin_uo_id and document.origin_uo_id in user_uos or document.target_uo_id and document.target_uo_id in user_uos:
-            is_authorized_uo = True
-        elif not document.origin_uo_id and not document.target_uo_id:
-            # Documento sin UO asignada (legado / staging)
-            is_authorized_uo = True
+        is_origin_auditor = bool(document.origin_uo_id and document.origin_uo_id in user_auditor_uos)
+        is_target_auditor = bool(document.target_uo_id and document.target_uo_id in user_auditor_uos)
+        is_uploader = bool(
+            document.uploaded_by_id
+            and document.uploaded_by_id == getattr(admin_user, "id", None)
+        )
+        is_standalone_without_uo = (not document.origin_uo_id and not document.target_uo_id)
 
-        if not is_authorized_uo:
+        is_authorized = (
+            is_origin_auditor
+            or is_target_auditor
+            or (bool(user_auditor_uos) and is_uploader)
+            or (document.origin_uo_id is None and is_uploader)
+            or is_standalone_without_uo
+        )
+
+        if not is_authorized:
             return False, b"", "", _("No tiene permisos de auditoría en la UO asociada a este documento.")
 
     try:
@@ -1018,6 +1106,7 @@ def admin_decrypt_document(
             document=document,
             email=admin_identifier,
             action=DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA,
+            details=f"Descarga de auditoría legal preservada realizada por '{admin_identifier}'.",
             origin_uo=document.origin_uo,
             target_uo=document.target_uo,
             ip_address=client_ip,
@@ -1035,6 +1124,10 @@ def admin_decrypt_document(
         return False, b"", "", _("Error al descifrar el documento para auditoría.")
 
 
+decrypt_document_for_audit = admin_decrypt_document
+
+
+
 ROLE_PERMISSIONS_MAP: dict[str, list[str]] = {
     UserUOMembership.Role.OPERATOR: [
         "view_encrypteddocument",
@@ -1045,6 +1138,8 @@ ROLE_PERMISSIONS_MAP: dict[str, list[str]] = {
     ],
     UserUOMembership.Role.AUDITOR: [
         "view_encrypteddocument",
+        "add_encrypteddocument",
+        "change_encrypteddocument",
         "can_audit_download",
         "view_documentaccesslog",
         "view_organizationalunit",

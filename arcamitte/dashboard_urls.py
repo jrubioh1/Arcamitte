@@ -16,6 +16,7 @@ urlpatterns = [
     path("documentos/", dashboard_views.DashboardDocumentListView.as_view(), name="document_list"),
     path("documentos/nuevo/", dashboard_views.DashboardDocumentUploadView.as_view(), name="document_upload"),
     path("documentos/<str:file_hash>/", dashboard_views.DashboardDocumentDetailView.as_view(), name="document_detail"),
+    path("documentos/<str:file_hash>/auditar/", dashboard_views.DashboardDocumentAuditDownloadView.as_view(), name="document_audit_download"),
     path("documentos/<str:file_hash>/terminar/", dashboard_views.DashboardDocumentTerminateView.as_view(), name="document_terminate"),
     path("auditoria/", dashboard_views.DashboardAuditLogView.as_view(), name="audit_logs"),
     path("unidades-organizativas/", dashboard_views.DashboardUOListView.as_view(), name="uo_list"),

@@ -98,36 +98,125 @@
 						</div>
 					{% endif %}
 
-					<div class="row g-3 mb-4">
-						<div class="col-md-4">
-							<div class="form-check">
-								{{ form.is_active }}
-								<label class="form-check-label small fw-semibold" for="{{ form.is_active.id_for_label }}">
-									{{ form.is_active.label }}
-								</label>
+					{% if target_user and target_user == request.user %}
+						<div class="alert alert-info border-0 bg-info-subtle text-info-emphasis d-flex align-items-center gap-2 mb-4 py-2 px-3 small rounded-3">
+							<i data-feather="shield" style="width:18px;height:18px;" class="flex-shrink-0 text-info"></i>
+							<div>
+								<strong>{% trans "Editando su propia cuenta:" %}</strong>
+								{% trans "Por motivos de seguridad operativa y continuidad del servicio, las salvaguardas de la plataforma impiden que desactive su propia cuenta o que revoque sus privilegios de administración o superusuario." %}
 							</div>
 						</div>
-						{% if form.is_staff %}
-							<div class="col-md-4">
-								<div class="form-check">
-									{{ form.is_staff }}
-									<label class="form-check-label small fw-semibold" for="{{ form.is_staff.id_for_label }}">
-										{{ form.is_staff.label }}
+					{% endif %}
+
+					<!-- Estado Operativo de la Cuenta -->
+					<div class="card border rounded-3 p-3 mb-4 bg-light-subtle">
+						<div class="d-flex align-items-start justify-content-between">
+							<div class="me-3">
+								<div class="form-check form-switch mb-1">
+									{{ form.is_active }}
+									<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_active.id_for_label }}">
+										{{ form.is_active.label }}
 									</label>
 								</div>
+								<p class="text-muted small mb-0 ms-4">
+									{{ form.is_active.help_text }}
+								</p>
 							</div>
-						{% endif %}
-						{% if form.is_superuser %}
-							<div class="col-md-4">
-								<div class="form-check">
-									{{ form.is_superuser }}
-									<label class="form-check-label small fw-semibold" for="{{ form.is_superuser.id_for_label }}">
-										{{ form.is_superuser.label }}
-									</label>
-								</div>
-							</div>
-						{% endif %}
+							{% if form.is_active.value %}
+								<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+									<i data-feather="check-circle" style="width:12px;height:12px;" class="me-1"></i>{% trans "Cuenta Activa" %}
+								</span>
+							{% else %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+									<i data-feather="slash" style="width:12px;height:12px;" class="me-1"></i>{% trans "Cuenta Inactiva" %}
+								</span>
+							{% endif %}
+						</div>
 					</div>
+
+					<!-- Privilegios de Acceso y Roles de Gobernanza -->
+					{% if form.is_staff or form.is_superuser %}
+						<div class="mb-4">
+							<h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+								<i data-feather="lock" style="width:16px;height:16px;" class="text-primary"></i>
+								{% trans "Nivel de Privilegios y Gobernanza del Sistema" %}
+							</h6>
+							<p class="text-muted small mb-3">
+								{% trans "Defina las atribuciones operativas del usuario. A continuación se detallan las diferencias entre Acceso Administrativo y Superusuario Global:" %}
+							</p>
+
+							<div class="row g-3">
+								{% if form.is_staff %}
+									<div class="col-md-6">
+										<div class="card h-100 border rounded-3 p-3 {% if form.is_staff.value %}border-primary bg-primary-subtle bg-opacity-10{% endif %}">
+											<div class="d-flex justify-content-between align-items-start mb-2">
+												<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+													<i data-feather="users" style="width:12px;height:12px;" class="me-1"></i>{% trans "Nivel Departamental" %}
+												</span>
+											</div>
+											<div class="form-check mb-2">
+												{{ form.is_staff }}
+												<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_staff.id_for_label }}">
+													{% trans "Acceso Administrativo Departamental" %}
+												</label>
+											</div>
+											<div class="text-muted small flex-grow-1 ms-4">
+												<p class="mb-2">
+													{% trans "Habilita la autenticación en el panel interno. Permite operar en las Unidades Organizativas (UOs) donde el usuario esté expresamente asignado." %}
+												</p>
+												<ul class="ps-3 mb-0 text-secondary" style="font-size:0.8rem;">
+													<li>{% trans "Gestiona usuarios y personal exclusivamente de sus UOs." %}</li>
+													<li>{% trans "Cifra y tramita documentos departamentales." %}</li>
+													<li>{% trans "Sin visibilidad sobre organizaciones ajenas ni configuración global." %}</li>
+												</ul>
+											</div>
+											{% if form.is_staff.help_text and form.is_self %}
+												<div class="text-warning-emphasis small mt-2 ms-4 d-flex align-items-center gap-1">
+													<i data-feather="info" style="width:12px;height:12px;"></i>
+													<span>{{ form.is_staff.help_text }}</span>
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								{% endif %}
+
+								{% if form.is_superuser %}
+									<div class="col-md-6">
+										<div class="card h-100 border rounded-3 p-3 {% if form.is_superuser.value %}border-danger bg-danger-subtle bg-opacity-10{% endif %}">
+											<div class="d-flex justify-content-between align-items-start mb-2">
+												<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+													<i data-feather="shield" style="width:12px;height:12px;" class="me-1"></i>{% trans "Control Total / Soberano" %}
+												</span>
+											</div>
+											<div class="form-check mb-2">
+												{{ form.is_superuser }}
+												<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_superuser.id_for_label }}">
+													{% trans "Superusuario Global del Sistema" %}
+												</label>
+											</div>
+											<div class="text-muted small flex-grow-1 ms-4">
+												<p class="mb-2">
+													{% trans "Otorga soberanía y autoridad total sobre toda la plataforma Arcamitte sin ninguna restricción de Unidad Organizativa." %}
+												</p>
+												<ul class="ps-3 mb-0 text-secondary" style="font-size:0.8rem;">
+													<li>{% trans "Creación, modificación y baja de cualquier Unidad Organizativa." %}</li>
+													<li>{% trans "Administración de todos los usuarios y emisión de tokens M2M." %}</li>
+													<li>{% trans "Auditoría forense global de todas las transferencias de la red." %}</li>
+													<li><strong>{% trans "Incluye automáticamente Acceso Administrativo Departamental." %}</strong></li>
+												</ul>
+											</div>
+											{% if form.is_superuser.help_text and form.is_self %}
+												<div class="text-warning-emphasis small mt-2 ms-4 d-flex align-items-center gap-1">
+													<i data-feather="info" style="width:12px;height:12px;"></i>
+													<span>{{ form.is_superuser.help_text }}</span>
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								{% endif %}
+							</div>
+						</div>
+					{% endif %}
 
 					<div class="d-flex justify-content-end gap-2">
 						<a href="{% url 'dashboard:user_list' %}" class="btn btn-light border">
@@ -143,4 +232,24 @@
 		</div>
 	</div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+	var isSuperuserCheckbox = document.getElementById('{{ form.is_superuser.id_for_label }}');
+	var isStaffCheckbox = document.getElementById('{{ form.is_staff.id_for_label }}');
+
+	if (isSuperuserCheckbox && isStaffCheckbox) {
+		isSuperuserCheckbox.addEventListener('change', function() {
+			if (this.checked) {
+				isStaffCheckbox.checked = true;
+			}
+		});
+		isStaffCheckbox.addEventListener('change', function() {
+			if (!this.checked && isSuperuserCheckbox.checked) {
+				this.checked = true;
+			}
+		});
+	}
+});
+</script>
 {% endblock %}

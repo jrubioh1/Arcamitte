@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
-from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -40,6 +40,8 @@ from arcamitte.models import (
     get_or_create_user_profile,
 )
 from arcamitte.services import (
+    check_and_auto_close_if_file_missing,
+    decrypt_document_for_audit,
     get_user_administered_uos,
     is_uo_admin,
     reset_user_password_and_notify,
@@ -62,7 +64,7 @@ def get_user_accessible_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
     - Superusuarios: Todas las UOs activas.
     - Usuarios regulares: UOs en las que ostenta membresía activa.
     """
-    if user.is_superuser:
+    if getattr(user, "is_superuser", False):
         return OrganizationalUnit.objects.filter(is_active=True)
     return OrganizationalUnit.objects.filter(
         memberships__user=user,
@@ -74,16 +76,17 @@ def get_user_accessible_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
 def get_scoped_documents_queryset(user: Any) -> models.QuerySet[EncryptedDocument]:
     """
     Filtra los documentos según el perímetro departamental del usuario.
-    Si un documento carece de UO emisora (asiento personal), solo puede verlo su autor
-    (uploaded_by) o un superusuario.
+    - Superusuarios: ven todos los asientos de la red.
+    - Usuarios departamentales: ven los asientos de sus UOs (como origen o destino)
+      o cualquier asiento que hayan subido personalmente.
     """
-    if user.is_superuser:
+    if getattr(user, "is_superuser", False):
         return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
     user_uos = get_user_accessible_uos(user)
     return EncryptedDocument.objects.filter(
         models.Q(origin_uo__in=user_uos)
         | models.Q(target_uo__in=user_uos)
-        | models.Q(origin_uo__isnull=True, uploaded_by=user)
+        | models.Q(uploaded_by=user)
     ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
 
 
@@ -229,6 +232,25 @@ class DashboardDocumentListView(LoginRequiredMixin, ListView):
         context["active_nav"] = "documents"
         context["query"] = self.request.GET.get("q", "")
         context["status_filter"] = self.request.GET.get("status", "")
+
+        user = self.request.user
+        docs_list = context.get("documents") or []
+        if getattr(user, "is_superuser", False):
+            context["terminable_doc_ids"] = {d.id for d in docs_list}
+        else:
+            admin_uos = set(
+                UserUOMembership.objects.filter(
+                    user=user,
+                    role=UserUOMembership.Role.ADMIN,
+                    is_active=True,
+                ).values_list("uo_id", flat=True)
+            )
+            context["terminable_doc_ids"] = {
+                d.id
+                for d in docs_list
+                if (d.origin_uo_id and d.origin_uo_id in admin_uos)
+                or (d.origin_uo_id is None and d.uploaded_by_id == getattr(user, "id", None))
+            }
         return context
 
 
@@ -245,6 +267,9 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
         available_uos = get_user_accessible_uos(user)
         all_uos = OrganizationalUnit.objects.filter(is_active=True).order_by("name")
 
+        primary_membership = UserUOMembership.objects.filter(user=user, is_active=True).first()
+        default_origin_uo = str(primary_membership.uo_id) if primary_membership else ""
+
         context = {
             "active_nav": "upload",
             "available_origin_uos": available_uos,
@@ -254,7 +279,7 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
             "allowed_emails_list": [""],
             "allowed_emails_json": json.dumps([""]),
             "description_val": "",
-            "selected_origin_uo": "",
+            "selected_origin_uo": default_origin_uo,
             "selected_target_uo": "",
         }
         return render(request, self.template_name, context)
@@ -350,28 +375,54 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
             }
             return render(request, self.template_name, context, status=400)
 
-        # Proceder al cifrado seguro
+        # Proceder al cifrado seguro o reactivación automática de asiento existente
         client_ip = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
 
-        doc = upload_and_encrypt_document(
-            original_file=file_obj,
-            allowed_emails=validated_emails,
-            burn_policy=burn_policy,
-            description=description,
-            origin_uo=origin_uo,
-            target_uo=target_uo,
-            uploaded_by=user,
-            admin_user=user,
-            client_ip=client_ip,
-            user_agent=user_agent,
-            expires_at=expires_at,
-        )
+        try:
+            doc = upload_and_encrypt_document(
+                original_file=file_obj,
+                allowed_emails=validated_emails,
+                burn_policy=burn_policy,
+                description=description,
+                reopen_existing=True,
+                origin_uo=origin_uo,
+                target_uo=target_uo,
+                uploaded_by=user,
+                admin_user=user,
+                client_ip=client_ip,
+                user_agent=user_agent,
+                expires_at=expires_at,
+            )
+        except ValidationError as ve:
+            errors.extend(ve.messages if hasattr(ve, "messages") else [str(ve)])
+            context = {
+                "active_nav": "upload",
+                "available_origin_uos": available_uos,
+                "all_target_uos": all_uos,
+                "default_expires_at": raw_expires or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
+                "form_errors": errors,
+                "allowed_emails_list": split_emails or [""],
+                "allowed_emails_json": json.dumps(split_emails or [""]),
+                "description_val": description,
+                "selected_origin_uo": origin_uo_id,
+                "selected_target_uo": target_uo_id,
+            }
+            return render(request, self.template_name, context, status=400)
 
-        messages.success(
-            request,
-            _(f"Asiento cifrado con éxito. Hash SHA-256: {doc.file_hash}"),
-        )
+        if getattr(doc, "_is_reactivated", False):
+            messages.success(
+                request,
+                _(
+                    "Asiento existente reactivado con éxito. El archivo ha sido re-cifrado, se han actualizado los destinatarios y se ha preservado el registro histórico de auditoría. Hash SHA-256: %(hash)s"
+                )
+                % {"hash": doc.file_hash},
+            )
+        else:
+            messages.success(
+                request,
+                _("Asiento cifrado con éxito. Hash SHA-256: %(hash)s") % {"hash": doc.file_hash},
+            )
         return redirect("dashboard:document_detail", file_hash=doc.file_hash)
 
 
@@ -387,54 +438,180 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
         user = request.user
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
-        # Verificar autorización de acceso departamental o personal
+        # Verificar autorización de acceso departamental o de autor
         if not user.is_superuser:
             user_uos = get_user_accessible_uos(user)
             has_uo_access = (doc.origin_uo in user_uos) or (doc.target_uo in user_uos)
-            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
-            if not (has_uo_access or is_personal_owner):
+            is_uploader = bool(doc.uploaded_by_id and doc.uploaded_by_id == user.id)
+            if not (has_uo_access or is_uploader):
                 raise PermissionDenied(_("No tiene autorización para inspeccionar este documento."))
 
-        file_exists = False
-        if doc.encrypted_file:
-            try:
-                file_exists = os.path.exists(doc.encrypted_file.path)
-            except Exception:
-                file_exists = False
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
+        user_id_str = getattr(user, "email", None) or getattr(user, "username", "sistema@arcamitte.local")
+        file_exists = check_and_auto_close_if_file_missing(
+            document=doc,
+            user_identifier=user_id_str,
+            client_ip=client_ip,
+            user_agent=user_agent,
+        )
 
-        # Mapear estado de consumo por destinatario
-        consumed_dict = doc.consumed_recipients or {}
+        logs = DocumentAccessLog.objects.filter(document=doc).order_by("-created_at")
+
+        # Mapear estado de consumo por destinatario de forma totalmente defensiva
+        consumed_raw = doc.consumed_recipients or []
+        consumed_dict: dict[str, dict[str, Any]] = {}
+        consumed_emails: set[str] = set()
+
+        if isinstance(consumed_raw, dict):
+            for k, v in consumed_raw.items():
+                k_clean = str(k).strip().lower()
+                consumed_emails.add(k_clean)
+                if isinstance(v, dict):
+                    consumed_dict[k_clean] = v
+                else:
+                    consumed_dict[k_clean] = {}
+        elif isinstance(consumed_raw, (list, tuple, set)):
+            for item in consumed_raw:
+                if isinstance(item, str):
+                    consumed_emails.add(item.strip().lower())
+                elif isinstance(item, dict) and "email" in item:
+                    k_clean = str(item["email"]).strip().lower()
+                    consumed_emails.add(k_clean)
+                    consumed_dict[k_clean] = item
+
+        download_actions = {
+            DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN,
+            DocumentAccessLog.Action.DESCIFRADO_PARCIAL_PRESERVADO,
+        }
+        download_logs_by_email: dict[str, DocumentAccessLog] = {}
+        for log in logs:
+            log_email = (log.email or "").strip().lower()
+            if log.action in download_actions and log_email and log_email not in download_logs_by_email:
+                download_logs_by_email[log_email] = log
+
         recipient_status_list = []
-        for email in (doc.allowed_emails or []):
-            is_consumed = email in consumed_dict
-            info = consumed_dict.get(email, {}) if is_consumed else {}
+        for raw_email in (doc.allowed_emails or []):
+            if not isinstance(raw_email, str):
+                continue
+            email_clean = raw_email.strip().lower()
+            is_consumed = (
+                email_clean in consumed_emails
+                or doc.is_email_consumed(email_clean)
+                or email_clean in download_logs_by_email
+            )
+
+            info = consumed_dict.get(email_clean, {})
+            log_match = download_logs_by_email.get(email_clean)
+
             consumed_at = None
             if info.get("consumed_at"):
                 try:
-                    consumed_at = parse_datetime(info["consumed_at"])
+                    consumed_at = parse_datetime(str(info["consumed_at"]))
                 except Exception:
                     consumed_at = None
+            elif log_match:
+                consumed_at = log_match.created_at
+            elif doc.is_consumed and doc.consumed_at and (doc.consumed_by or "").strip().lower() == email_clean:
+                consumed_at = doc.consumed_at
+
+            consumed_ip = info.get("ip_address") or (log_match.ip_address if log_match else "") or ""
+
             recipient_status_list.append(
                 {
-                    "email": email,
+                    "email": raw_email,
                     "consumed": is_consumed,
                     "consumed_at": consumed_at,
-                    "consumed_ip": info.get("ip_address", ""),
+                    "consumed_ip": consumed_ip,
                 }
             )
 
-        logs = DocumentAccessLog.objects.filter(document=doc).order_by("-created_at")
+        can_audit_download = False
+        if file_exists and not doc.is_consumed:
+            if user.is_superuser:
+                can_audit_download = True
+            else:
+                user_auditor_uos = list(
+                    UserUOMembership.objects.filter(
+                        user=user,
+                        is_active=True,
+                        role__in=[UserUOMembership.Role.AUDITOR, UserUOMembership.Role.ADMIN],
+                    ).values_list("uo_id", flat=True)
+                )
+                is_auditor_user = bool(user_auditor_uos)
+                is_uo_match = (
+                    (doc.origin_uo_id and doc.origin_uo_id in user_auditor_uos)
+                    or (doc.target_uo_id and doc.target_uo_id in user_auditor_uos)
+                )
+                is_own_upload = bool(doc.uploaded_by_id and doc.uploaded_by_id == user.id)
+                if is_uo_match or (is_auditor_user and is_own_upload) or (doc.origin_uo_id is None and is_own_upload):
+                    can_audit_download = True
+
+        can_terminate = False
+        if file_exists and doc.is_active and not doc.is_consumed and not doc.is_expired():
+            if user.is_superuser:
+                can_terminate = True
+            elif doc.origin_uo_id:
+                can_terminate = UserUOMembership.objects.filter(
+                    user=user,
+                    uo_id=doc.origin_uo_id,
+                    role=UserUOMembership.Role.ADMIN,
+                    is_active=True,
+                ).exists()
+            elif doc.uploaded_by_id == user.id:
+                can_terminate = True
+
         public_url = request.build_absolute_uri(reverse("arcamitte:request-access"))
 
         context = {
             "active_nav": "documents",
             "doc": doc,
             "file_exists_on_disk": file_exists,
+            "can_audit_download": can_audit_download,
+            "can_terminate": can_terminate,
             "recipient_status_list": recipient_status_list,
             "access_logs": logs,
             "public_request_url": public_url,
         }
         return render(request, self.template_name, context)
+
+
+class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
+    """
+    Descarga administrativa y forense de auditoría de un documento activo en disco.
+    Exclusivo para Superusuarios y usuarios con rol Auditor o Administrador de la UO asociada.
+    No destruye el archivo en disco ni altera el ciclo de vida para los destinatarios.
+    """
+
+    login_url = "dashboard:login"
+
+    def get(self, request: HttpRequest, file_hash: str) -> HttpResponse:
+        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
+
+        success, decrypted_bytes, original_filename, msg = decrypt_document_for_audit(
+            document=doc,
+            admin_user=request.user,
+            client_ip=client_ip,
+            user_agent=user_agent,
+        )
+
+        if not success:
+            messages.error(request, msg)
+            return redirect("dashboard:document_detail", file_hash=doc.file_hash)
+
+        import mimetypes
+        safe_filename = original_filename or getattr(doc, "original_filename", "documento_auditado")
+        mtype = getattr(doc, "mime_type", None) or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream"
+        response = HttpResponse(
+            decrypted_bytes,
+            content_type=mtype,
+        )
+        response["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
+        response["Content-Length"] = len(decrypted_bytes)
+        return response
 
 
 class DashboardDocumentTerminateView(LoginRequiredMixin, View):
@@ -450,11 +627,20 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
         if not user.is_superuser:
-            user_uos = get_user_accessible_uos(user)
-            has_uo_access = (doc.origin_uo in user_uos)
-            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
-            if not (has_uo_access or is_personal_owner):
-                raise PermissionDenied(_("Solo la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."))
+            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by_id == user.id)
+            is_origin_admin = bool(
+                doc.origin_uo_id
+                and UserUOMembership.objects.filter(
+                    user=user,
+                    uo_id=doc.origin_uo_id,
+                    role=UserUOMembership.Role.ADMIN,
+                    is_active=True,
+                ).exists()
+            )
+            if not (is_origin_admin or is_personal_owner):
+                raise PermissionDenied(
+                    _("Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento.")
+                )
 
         if not doc.is_active:
             messages.warning(request, _("Este documento ya no se encuentra activo."))
@@ -471,11 +657,20 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
         if not user.is_superuser:
-            user_uos = get_user_accessible_uos(user)
-            has_uo_access = (doc.origin_uo in user_uos)
-            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
-            if not (has_uo_access or is_personal_owner):
-                raise PermissionDenied(_("Solo la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."))
+            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by_id == user.id)
+            is_origin_admin = bool(
+                doc.origin_uo_id
+                and UserUOMembership.objects.filter(
+                    user=user,
+                    uo_id=doc.origin_uo_id,
+                    role=UserUOMembership.Role.ADMIN,
+                    is_active=True,
+                ).exists()
+            )
+            if not (is_origin_admin or is_personal_owner):
+                raise PermissionDenied(
+                    _("Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento.")
+                )
 
         justification = request.POST.get("justification", "").strip()
         if not justification:
@@ -829,6 +1024,29 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             .order_by("username")
         )
 
+        # Mapear membresías activas en otras UOs para detectar usuarios ocupados
+        other_active_memberships = {
+            m.user_id: m.uo
+            for m in UserUOMembership.objects.filter(is_active=True)
+            .exclude(uo=uo)
+            .select_related("uo")
+        }
+
+        available_users_data = [
+            {
+                "id": u.id,
+                "username": u.username,
+                "first_name": u.first_name or "",
+                "last_name": u.last_name or "",
+                "full_name": u.get_full_name() or "",
+                "email": u.email or "",
+                "is_occupied": u.id in other_active_memberships,
+                "assigned_uo_alias": other_active_memberships[u.id].alias if u.id in other_active_memberships else "",
+                "assigned_uo_name": other_active_memberships[u.id].name if u.id in other_active_memberships else "",
+            }
+            for u in available_users
+        ]
+
         return render(
             request,
             self.template_name,
@@ -836,6 +1054,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 "uo": uo,
                 "memberships": memberships,
                 "available_users": available_users,
+                "available_users_json": json.dumps(available_users_data),
                 "roles": UserUOMembership.Role.choices,
                 "active_nav": "uos",
             },
@@ -849,6 +1068,25 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             user_id = request.POST.get("user_id")
             role = request.POST.get("role", UserUOMembership.Role.OPERATOR)
             target_user = get_object_or_404(User, pk=user_id)
+
+            # Salvaguarda de Exclusividad: Un usuario no puede asignarse si ya tiene otra UO activa asignada
+            existing_other = (
+                UserUOMembership.objects.filter(user=target_user, is_active=True)
+                .exclude(uo=uo)
+                .select_related("uo")
+                .first()
+            )
+            if existing_other:
+                messages.error(
+                    request,
+                    _(
+                        "El usuario %(username)s ya se encuentra asignado a la Unidad Organizativa %(alias)s. "
+                        "Debe ser desvinculado previamente por su UO correspondiente o por un superusuario para quedar libre."
+                    )
+                    % {"username": target_user.username, "alias": existing_other.uo.alias},
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
             membership, created = UserUOMembership.objects.get_or_create(
                 user=target_user,
                 uo=uo,
@@ -867,6 +1105,30 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             membership_id = request.POST.get("membership_id")
             new_role = request.POST.get("role")
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+
+            # Salvaguarda jerárquica: un no-superusuario no puede modificar el rol de un superusuario
+            if membership.user.is_superuser and not request.user.is_superuser:
+                messages.error(
+                    request,
+                    _("No tiene privilegios suficientes para modificar el rol de un superusuario del sistema."),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
+            # Salvaguarda: Un administrador no puede degradar su propio rol si es el único admin o sin ser superusuario
+            if (
+                membership.user == request.user
+                and membership.role == UserUOMembership.Role.ADMIN
+                and new_role != UserUOMembership.Role.ADMIN
+                and not request.user.is_superuser
+            ):
+                messages.error(
+                    request,
+                    _(
+                        "Por motivos de seguridad operativa, no puede revocar sus propios privilegios de administrador en esta Unidad Organizativa. Esta acción debe ser ejecutada por otro administrador o un superusuario."
+                    ),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
             if new_role in dict(UserUOMembership.Role.choices):
                 membership.role = new_role
                 membership.save(update_fields=["role"])
@@ -881,6 +1143,23 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
         elif action == "toggle_active":
             membership_id = request.POST.get("membership_id")
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+
+            # Salvaguarda jerárquica: un no-superusuario no puede desactivar la membresía de un superusuario
+            if membership.user.is_superuser and not request.user.is_superuser:
+                messages.error(
+                    request,
+                    _("No tiene privilegios suficientes para modificar el estado de un superusuario del sistema."),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
+            # Salvaguarda: No es posible desactivar la propia membresía
+            if membership.user == request.user and not request.user.is_superuser:
+                messages.error(
+                    request,
+                    _("Por motivos de seguridad operativa, no puede desactivar su propia membresía en esta Unidad Organizativa."),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
             membership.is_active = not membership.is_active
             membership.save(update_fields=["is_active"])
             state_str = _("activada") if membership.is_active else _("desactivada")
@@ -895,6 +1174,23 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
         elif action == "remove_member":
             membership_id = request.POST.get("membership_id")
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+
+            # Salvaguarda jerárquica: un no-superusuario no puede desvincular a un superusuario
+            if membership.user.is_superuser and not request.user.is_superuser:
+                messages.error(
+                    request,
+                    _("No tiene privilegios suficientes para desvincular a un superusuario del sistema."),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
+            # Salvaguarda: No es posible auto-expulsarse de la UO
+            if membership.user == request.user and not request.user.is_superuser:
+                messages.error(
+                    request,
+                    _("Por motivos de seguridad operativa, no puede auto-expulsarse de esta Unidad Organizativa. Solicite la retirada a otro administrador o a un superusuario."),
+                )
+                return redirect("dashboard:uo_members", uo_id=uo.id)
+
             username = membership.user.username
             membership.delete()
             messages.warning(
@@ -961,7 +1257,7 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
         if not request.user.is_superuser and not admin_uos.exists():
             raise PermissionDenied(_("No tiene permisos para crear usuarios."))
 
-        form = UserManagementForm(is_superuser=request.user.is_superuser)
+        form = UserManagementForm(is_superuser=request.user.is_superuser, current_user=request.user)
         return render(
             request,
             self.template_name,
@@ -979,10 +1275,18 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
         if not request.user.is_superuser and not admin_uos.exists():
             raise PermissionDenied(_("No tiene permisos para crear usuarios."))
 
-        form = UserManagementForm(request.POST, is_superuser=request.user.is_superuser)
+        form = UserManagementForm(
+            request.POST,
+            is_superuser=request.user.is_superuser,
+            current_user=request.user,
+        )
         if form.is_valid():
             user = form.save(commit=False)
             user.set_unusable_password()
+            # Jerarquía estricta: un no-superusuario no puede crear staff ni superusers
+            if not request.user.is_superuser:
+                user.is_staff = False
+                user.is_superuser = False
             user.save()
 
             uo_id = request.POST.get("initial_uo")
@@ -1040,6 +1344,9 @@ class DashboardUserEditView(LoginRequiredMixin, View):
         target = get_object_or_404(User, pk=user_id)
         if request.user.is_superuser:
             return target
+        # Restricción jerárquica estricta: un usuario que no es superusuario jamás puede editar a un superusuario
+        if target.is_superuser:
+            raise PermissionDenied(_("No tiene privilegios suficientes para administrar a un superusuario del sistema."))
         admin_uos = get_user_administered_uos(request.user)
         if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
             raise PermissionDenied(_("No tiene permisos para administrar a este usuario."))
@@ -1047,7 +1354,11 @@ class DashboardUserEditView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest, user_id: int) -> HttpResponse:
         target = self.get_target_user(request, user_id)
-        form = UserManagementForm(instance=target, is_superuser=request.user.is_superuser)
+        form = UserManagementForm(
+            instance=target,
+            is_superuser=request.user.is_superuser,
+            current_user=request.user,
+        )
         return render(
             request,
             self.template_name,
@@ -1065,6 +1376,7 @@ class DashboardUserEditView(LoginRequiredMixin, View):
             request.POST,
             instance=target,
             is_superuser=request.user.is_superuser,
+            current_user=request.user,
         )
         if form.is_valid():
             form.save()
@@ -1096,6 +1408,9 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
     def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
         target = get_object_or_404(User, pk=user_id)
         if not request.user.is_superuser:
+            # Restricción jerárquica estricta: un usuario que no es superusuario no puede resetear a un superusuario
+            if target.is_superuser:
+                raise PermissionDenied(_("No tiene privilegios suficientes para resetear la contraseña de un superusuario del sistema."))
             admin_uos = get_user_administered_uos(request.user)
             if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
                 raise PermissionDenied(_("No tiene permisos para resetear la contraseña de este usuario."))
