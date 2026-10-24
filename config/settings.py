@@ -82,6 +82,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Django REST Framework
     "rest_framework",
+    # OpenAPI 3 Documentation
+    "drf_spectacular",
     # Arcamitte Application
     "arcamitte.apps.ArcamitteConfig",
 ]
@@ -231,7 +233,7 @@ CACHES = {
     }
 }
 
-# Configuración DRF genérica con soporte para tokens de alta seguridad
+# Configuración DRF genérica con soporte para tokens de alta seguridad y OpenAPI 3
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "arcamitte.authentication.APITokenAuthentication",
@@ -248,6 +250,40 @@ REST_FRAMEWORK = {
         "anon": "100/minute",
         "access_request": config.get("throttling", "api_access_request_rate", fallback="15/minute"),
         "access_consume": config.get("throttling", "api_access_consume_rate", fallback="30/minute"),
+    },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Arcamitte Cryptographic Microservice API",
+    "DESCRIPTION": (
+        "Plataforma Autónoma de Custodia Criptográfica y Trámite Confidencial. "
+        "Autenticación M2M mediante cabecera 'X-API-Key: arca_live_...' o 'Authorization: Bearer arca_live_...'."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SECURITY": [
+        {"ApiKeyAuth": []},
+        {"BearerAuth": []},
+    ],
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+                "description": "Token de microservicio Arcamitte (arca_live_...)",
+            },
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "arca_live_",
+                "description": "Token Bearer Arcamitte (arca_live_...)",
+            },
+        }
     },
 }
 

@@ -15,7 +15,7 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpRe
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import escape, format_html, format_html_join
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
 from arcamitte.models import (
@@ -32,7 +32,6 @@ from arcamitte.services import (
     generate_corporate_email_text,
     process_batch_import_json,
     reactivate_document,
-    shred_and_delete_file,
     terminate_document_manually,
     upload_and_encrypt_document,
 )
@@ -1487,11 +1486,6 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
             '<a class="button" href="{}" style="background-color:#991b1b; color:white; padding:3px 8px; border-radius:4px; text-decoration:none; font-size:0.78rem; font-weight:bold; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="Finalizar asiento y destruir archivo físico">⏹️ Finalizar</a>',
             url,
         )
-
-    @admin.display(description=_("Eliminar"))
-    def delete_action_button(self, obj: EncryptedDocument) -> str:
-        """Mantiene compatibilidad redirigiendo al botón de finalización de asiento."""
-        return self.terminate_action_button(obj)
 
     def corporate_email_template_panel(self, obj: EncryptedDocument) -> str:
         """Panel con texto formal prediseñado listo para copiar o abrir en cliente de correo."""

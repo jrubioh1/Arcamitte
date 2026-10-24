@@ -17,6 +17,9 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
         return {
             "dashboard_mode": "operational",
             "user_is_uo_admin": False,
+            "user_is_auditor": False,
+            "user_can_view_audit_logs": False,
+            "user_can_view_analytics": False,
             "user_primary_role": None,
             "user_primary_role_display": "",
             "user_primary_uo_alias": "",
@@ -43,6 +46,13 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
     )
 
     can_view_audit_logs = user.is_superuser or is_admin or is_auditor
+    can_view_analytics = user.is_superuser or is_admin or is_auditor or (
+        UserUOMembership.objects.filter(
+            user=user,
+            is_active=True,
+            role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
+        ).exists()
+    )
 
     if user.is_superuser:
         user_primary_role = "SUPERUSER"
@@ -65,6 +75,7 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
         "user_is_uo_admin": is_admin,
         "user_is_auditor": is_auditor,
         "user_can_view_audit_logs": can_view_audit_logs,
+        "user_can_view_analytics": can_view_analytics,
         "user_primary_role": user_primary_role,
         "user_primary_role_display": user_primary_role_display,
         "user_primary_uo_alias": user_primary_uo_alias,

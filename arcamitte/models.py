@@ -568,9 +568,8 @@ class APIToken(models.Model):
 
     class Scope(models.TextChoices):
         DOCUMENTS_CREATE = "documents:create", _("Subir y registrar documentos cifrados")
-        DOCUMENTS_READ = "documents:read", _("Consultar estado de documentos")
-        DOCUMENTS_TERMINATE = "documents:terminate", _("Finalizar y destruir asientos documentales")
-        AUDIT_READ = "audit:read", _("Consultar registros de auditoría legal")
+        DOCUMENTS_READ = "documents:read", _("Consultar estado y metadatos de documentos")
+        UOS_READ = "uos:read", _("Consultar directorio de Unidades Organizativas")
 
     name = models.CharField(
         max_length=120,

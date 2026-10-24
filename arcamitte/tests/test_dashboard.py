@@ -607,7 +607,7 @@ class DashboardTestCase(TestCase):
         }
         resp_create = self.client.post(reverse("dashboard:api_tokens"), post_data, follow=True)
         self.assertEqual(resp_create.status_code, 200)
-        self.assertContains(resp_create, "fdec_live_")
+        self.assertContains(resp_create, "arca_live_")
         self.assertContains(resp_create, "Microservicio ERP Corporativo")
 
         token_obj = APIToken.objects.get(name="Microservicio ERP Corporativo")
@@ -1203,7 +1203,7 @@ class DashboardTestCase(TestCase):
         )
 
         # Crear usuario libre
-        free_user = User.objects.create_user(
+        User.objects.create_user(
             username="usuario_libre",
             first_name="Alan",
             last_name="Turing",

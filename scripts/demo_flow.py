@@ -11,12 +11,8 @@ Principios de diseño y reglas de oro validadas:
 """
 
 import hashlib
-import json
 import os
 import sys
-from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 import django
@@ -25,7 +21,6 @@ django.setup()
 from django.core.files.uploadedfile import SimpleUploadedFile
 from arcamitte.models import AccessVerificationToken, DocumentAccessLog, EncryptedDocument
 from arcamitte.services import (
-    admin_decrypt_document,
     consume_document_with_otp,
     request_document_access,
     upload_and_encrypt_document,
@@ -79,10 +74,10 @@ def main() -> None:
         original_file=sample_file,
         allowed_emails=allowed_emails,
     )
-    print(f"✓ Documento confidencial registrado y cifrado en el servidor.")
+    print("✓ Documento confidencial registrado y cifrado en el servidor.")
     print(f"✓ Hash SHA-256 (Prueba unívoca de trámite): {doc.file_hash}")
     print(f"✓ Archivo cifrado en reposo: {doc.encrypted_file.path}")
-    print(f"✓ Cero contraseñas humanas: DEK cifrada con settings.ARCAMITTE_FERNET_KEY")
+    print("✓ Cero contraseñas humanas: DEK cifrada con settings.ARCAMITTE_FERNET_KEY")
     print(f"✓ Destinatarios autorizados: {doc.allowed_emails}")
 
     # --------------------------------------------------------------------------
@@ -152,7 +147,7 @@ def main() -> None:
     print_step("PASO 4: Intento Posterior por Segundo Destinatario")
     print(f"Solicitante: {allowed_emails[1]} (intenta canjear tras destrucción)")
 
-    success_post, msg_post = request_document_access(
+    _success_post, msg_post = request_document_access(
         file_hash=doc.file_hash,
         email=allowed_emails[1],
         client_ip="192.168.1.51",
@@ -169,7 +164,7 @@ def main() -> None:
     # PASO 5: Mitigación de Enumeración y Ataques de Canal Lateral
     # --------------------------------------------------------------------------
     print_step("PASO 5: Mitigación Anti-Enumeración (Correo No Autorizado)")
-    success_unauth, msg_unauth = request_document_access(
+    _success_unauth, msg_unauth = request_document_access(
         file_hash=doc.file_hash,
         email="atacante@infiltrado.org",
         client_ip="192.168.1.99",

@@ -16,7 +16,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -1509,152 +1509,172 @@ def get_user_administered_uos(user: Any) -> Any:
     ).order_by("numeric_code").distinct()
 
 
-class DocumentManagementService:
+def get_scoped_documents_for_request(request: Any) -> models.QuerySet[EncryptedDocument]:
     """
-    Clase de servicio unificada para operaciones sobre documentos confidenciales.
+    Retorna el QuerySet de documentos confidenciales accesible para la petición dada,
+    aplicando estrictamente el principio de Menor Privilegio (Least Privilege) y
+    paridad total con las reglas de negocio de la interfaz de usuario:
+
+    1. Si la petición se autentica con APIToken (request.auth):
+       - Si el token tiene UO asignada: solo accede a asientos donde origin_uo o target_uo
+         coinciden con dicha UO.
+       - Si el token no tiene UO y su emisor es Superusuario (Token Maestro): acceso global.
+       - En cualquier otro caso: restringido a su emisor o UO.
+    2. Si la petición se autentica con usuario Django (request.user):
+       - Superusuario: acceso global a toda la malla.
+       - Miembro de UO: asientos donde sus UOs activas son origin_uo o target_uo, o subidos por él.
+       - Asiento personal sin UO: únicamente asientos subidos personalmente.
+    3. No autenticado: QuerySet vacío.
     """
+    from arcamitte.models import APIToken, EncryptedDocument
 
-    def upload_and_encrypt_document(
-        self,
-        original_file: Any,
-        allowed_emails: list[str] | str | Any,
-        burn_policy: str = EncryptedDocument.BurnPolicy.FIRST_ACCESS,
-        description: str | None = None,
-        reopen_existing: bool = False,
-        origin_uo: OrganizationalUnit | None = None,
-        target_uo: OrganizationalUnit | None = None,
-        uploaded_by: Any = None,
-        admin_user: Any = None,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-        **kwargs: Any,
-    ) -> EncryptedDocument:
-        return upload_and_encrypt_document(
-            original_file=original_file,
-            allowed_emails=allowed_emails,
-            burn_policy=burn_policy,
-            description=description,
-            reopen_existing=reopen_existing,
-            origin_uo=origin_uo,
-            target_uo=target_uo,
-            uploaded_by=uploaded_by,
-            admin_user=admin_user,
-            client_ip=client_ip,
-            user_agent=user_agent,
-        )
+    # 1. Autenticación M2M mediante APIToken
+    token = getattr(request, "auth", None)
+    if token and isinstance(token, APIToken) and token.is_valid():
+        if token.uo:
+            return EncryptedDocument.objects.filter(
+                models.Q(origin_uo=token.uo) | models.Q(target_uo=token.uo)
+            ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
+        if token.created_by and token.created_by.is_superuser:
+            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
+        if token.created_by:
+            return EncryptedDocument.objects.filter(
+                uploaded_by=token.created_by
+            ).select_related("origin_uo", "target_uo", "uploaded_by")
 
-    def reactivate_document(
-        self,
-        document: EncryptedDocument,
-        original_file: Any,
-        new_emails: list[str] | str | Any = None,
-        burn_policy: str | None = None,
-        new_description: str | None = None,
-        origin_uo: OrganizationalUnit | None = None,
-        target_uo: OrganizationalUnit | None = None,
-        uploaded_by: Any = None,
-        admin_user: Any = None,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-    ) -> EncryptedDocument:
-        return reactivate_document(
-            document=document,
-            original_file=original_file,
-            new_emails=new_emails,
-            burn_policy=burn_policy,
-            new_description=new_description,
-            origin_uo=origin_uo,
-            target_uo=target_uo,
-            uploaded_by=uploaded_by,
-            admin_user=admin_user,
-            client_ip=client_ip,
-            user_agent=user_agent,
-        )
+    # 2. Autenticación interactiva de usuario
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        if getattr(user, "is_superuser", False):
+            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
 
-    def generate_corporate_email_text(
-        self,
-        document: EncryptedDocument,
-        base_url: str | None = None,
-    ) -> str:
-        return generate_corporate_email_text(document=document, base_url=base_url)
+        from arcamitte.models import UserUOMembership
+        user_uos = OrganizationalUnit.objects.filter(
+            memberships__user=user,
+            memberships__is_active=True,
+            is_active=True,
+        ).distinct()
 
-    def request_document_access(
-        self,
-        file_hash: str,
-        email: str,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-        base_url: str | None = None,
-        **kwargs: Any,
-    ) -> tuple[bool, str]:
-        return request_document_access(
-            file_hash=file_hash,
-            email=email,
-            client_ip=client_ip,
-            user_agent=user_agent,
-            base_url=base_url,
-        )
+        return EncryptedDocument.objects.filter(
+            models.Q(origin_uo__in=user_uos)
+            | models.Q(target_uo__in=user_uos)
+            | models.Q(uploaded_by=user)
+        ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
 
-    def consume_document_with_otp(
-        self,
-        file_hash: str,
-        email: str,
-        entered_otp: str,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-    ) -> tuple[bool, bytes, str, str]:
-        return consume_document_with_otp(
-            file_hash=file_hash,
-            email=email,
-            entered_otp=entered_otp,
-            client_ip=client_ip,
-            user_agent=user_agent,
-        )
+    return EncryptedDocument.objects.none()
 
-    def admin_decrypt_document(
-        self,
-        document: EncryptedDocument,
-        admin_user: Any = None,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-    ) -> tuple[bool, bytes, str, str]:
-        return admin_decrypt_document(
-            document=document,
-            admin_user=admin_user,
-            client_ip=client_ip,
-            user_agent=user_agent,
-        )
 
-    def terminate_document_manually(
-        self,
-        document: EncryptedDocument,
-        admin_user: Any,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-        reason: str = "",
-    ) -> tuple[bool, str]:
-        return terminate_document_manually(
-            document=document,
-            admin_user=admin_user,
-            client_ip=client_ip,
-            user_agent=user_agent,
-            reason=reason,
-        )
+def can_user_or_token_terminate_document(request: Any, document: EncryptedDocument) -> bool:
+    """
+    Comprueba si la entidad peticionaria (usuario o token M2M) dispone de potestad
+    para terminar/revocar deliberadamente un asiento documental:
+    - Superusuario / Token Maestro global: Sí.
+    - Token de UO con scope 'documents:terminate': Sí, siempre que origin_uo == token.uo.
+    - Usuario de sesión: Sí, si es Superusuario o Administrador de la UO emisora (origin_uo).
+    """
+    from arcamitte.models import APIToken, UserUOMembership
 
-    def check_and_expire_document(
-        self,
-        document: EncryptedDocument,
-        client_ip: str | None = None,
-        user_agent: str | None = None,
-    ) -> bool:
-        return check_and_expire_document(
-            document=document,
-            client_ip=client_ip,
-            user_agent=user_agent,
-        )
+    token = getattr(request, "auth", None)
+    if token and isinstance(token, APIToken) and token.is_valid():
+        if not token.has_scope("documents:terminate"):
+            return False
+        if not token.uo and token.created_by and token.created_by.is_superuser:
+            return True
+        return bool(token.uo and document.origin_uo_id == token.uo_id)
 
-    def process_expired_documents(self) -> int:
-        return process_expired_documents()
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        if user.is_superuser:
+            return True
+        if document.origin_uo_id:
+            return UserUOMembership.objects.filter(
+                user=user,
+                uo_id=document.origin_uo_id,
+                role=UserUOMembership.Role.ADMIN,
+                is_active=True,
+            ).exists()
+        # Asiento personal sin UO: el emisor original puede terminarlo
+        return document.uploaded_by_id == user.id
 
-    def shred_and_delete_file(self, file_field: Any) -> bool:
-        return shred_and_delete_file(file_field)
+    return False
+
+
+def can_user_or_token_decrypt_for_audit(request: Any, document: EncryptedDocument) -> bool:
+    """
+    Comprueba si la entidad peticionaria dispone de permiso de descifrado pericial
+    para inspección legal / auditoría (sin activar la destrucción por lectura):
+    - Superusuario / Token Maestro con scope 'documents:admin_decrypt': Sí.
+    - Token de UO con scope 'documents:admin_decrypt': Sí, si su UO es origin_uo o target_uo.
+    - Usuario de sesión: Sí, si es Superusuario, o Administrador/Auditor de origin_uo o target_uo.
+    """
+    from arcamitte.models import APIToken, UserUOMembership
+
+    token = getattr(request, "auth", None)
+    if token and isinstance(token, APIToken) and token.is_valid():
+        if not token.has_scope("documents:admin_decrypt"):
+            return False
+        if not token.uo and token.created_by and token.created_by.is_superuser:
+            return True
+        return bool(token.uo and (document.origin_uo_id == token.uo_id or document.target_uo_id == token.uo_id))
+
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        if user.is_superuser:
+            return True
+        uo_ids = [uid for uid in (document.origin_uo_id, document.target_uo_id) if uid is not None]
+        if uo_ids:
+            return UserUOMembership.objects.filter(
+                user=user,
+                uo_id__in=uo_ids,
+                role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
+                is_active=True,
+            ).exists()
+        return document.uploaded_by_id == user.id
+
+    return False
+
+
+def get_scoped_audit_logs_for_request(request: Any) -> models.QuerySet[DocumentAccessLog]:
+    """
+    Retorna el QuerySet de registros de auditoría accesibles para la petición:
+    - Superusuario / Token Maestro sin UO con scope 'audit:read': todos los registros.
+    - Token de UO con scope 'audit:read': registros vinculados a documentos de su UO o con origin_uo == token.uo.
+    - Usuario en sesión: si es Superusuario ve todo; si es Administrador o Auditor de UO ve los de sus UOs.
+    """
+    from arcamitte.models import APIToken, DocumentAccessLog, UserUOMembership
+
+    token = getattr(request, "auth", None)
+    if token and isinstance(token, APIToken) and token.is_valid():
+        if not token.has_scope("audit:read"):
+            return DocumentAccessLog.objects.none()
+        if not token.uo and token.created_by and token.created_by.is_superuser:
+            return DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo")
+        if token.uo:
+            return DocumentAccessLog.objects.filter(
+                models.Q(origin_uo=token.uo)
+                | models.Q(target_uo=token.uo)
+                | models.Q(document__origin_uo=token.uo)
+                | models.Q(document__target_uo=token.uo)
+            ).select_related("document", "origin_uo", "target_uo").distinct()
+
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        if user.is_superuser:
+            return DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo")
+
+        administered_or_audited_uos = OrganizationalUnit.objects.filter(
+            memberships__user=user,
+            memberships__role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
+            memberships__is_active=True,
+            is_active=True,
+        ).distinct()
+
+        return DocumentAccessLog.objects.filter(
+            models.Q(origin_uo__in=administered_or_audited_uos)
+            | models.Q(target_uo__in=administered_or_audited_uos)
+            | models.Q(document__origin_uo__in=administered_or_audited_uos)
+            | models.Q(document__target_uo__in=administered_or_audited_uos)
+        ).select_related("document", "origin_uo", "target_uo").distinct()
+
+    return DocumentAccessLog.objects.none()
+

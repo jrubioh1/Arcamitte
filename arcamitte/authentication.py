@@ -36,7 +36,7 @@ class APITokenAuthentication(authentication.BaseAuthentication):
             return None
 
         clean_token = raw_token.strip()
-        if not clean_token.startswith(("arca_live_", "fdec_live_")):
+        if not clean_token.startswith("arca_live_"):
             raise exceptions.AuthenticationFailed(
                 _("Formato de token de API inválido. Debe comenzar con 'arca_live_'."),
                 code="invalid_token_format",
@@ -91,3 +91,24 @@ class APITokenAuthentication(authentication.BaseAuthentication):
                 return parts[1]
 
         return None
+
+
+try:
+    from drf_spectacular.extensions import OpenApiAuthenticationExtension
+
+    class APITokenScheme(OpenApiAuthenticationExtension):
+        target_class = "arcamitte.authentication.APITokenAuthentication"
+        name = "ApiKeyAuth"
+
+        def get_security_requirement(self, auto_schema: Any) -> list[dict[str, list[str]]]:
+            return [{"ApiKeyAuth": []}, {"BearerAuth": []}]
+
+        def get_security_definition(self, auto_schema: Any) -> dict[str, Any]:
+            return {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+                "description": "Token de microservicio Arcamitte (arca_live_...)",
+            }
+except ImportError:
+    pass

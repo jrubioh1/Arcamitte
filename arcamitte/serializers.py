@@ -5,6 +5,7 @@ from typing import Any, List, Optional
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from arcamitte.models import EncryptedDocument, OrganizationalUnit, default_document_expiry
@@ -22,6 +23,32 @@ def _format_error_message(exc: Exception) -> str:
     if hasattr(exc, "messages") and exc.messages:
         return str(exc.messages[0])
     return str(exc).strip("[]'\"")
+
+
+@extend_schema_field(serializers.ListField(child=serializers.EmailField()))
+class EmailListField(serializers.Field):
+    """
+    Campo flexible que valida y normaliza listas de correos electrónicos en
+    formatos múltiples: array JSON, string separado por comas o punto y coma.
+    """
+
+    def to_internal_value(self, data: Any) -> list[str]:
+        if data is None:
+            return []
+        try:
+            return normalize_and_validate_email_list(data)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(_format_error_message(exc))
+
+    def to_representation(self, value: Any) -> list[str]:
+        if isinstance(value, list):
+            return value
+        if not value:
+            return []
+        try:
+            return normalize_and_validate_email_list(value)
+        except Exception:
+            return [str(value)]
 
 
 class PublicAccessRequestSerializer(serializers.Serializer):
@@ -121,9 +148,9 @@ class APIDocumentUploadSerializer(serializers.Serializer):
         default="Documento confidencial tramitado a través de la pasarela segura Arcamitte.",
         help_text="Descripción informativa o motivo confidencial del trámite.",
     )
-    allowed_emails = serializers.JSONField(
+    allowed_emails = EmailListField(
         required=True,
-        help_text="Lista de correos autorizados (ej. ['destinatario@empresa.com']) o cadena separada por comas.",
+        help_text="Lista de correos autorizados (ej. ['destinatario@empresa.com'] o cadena separada por comas).",
     )
     burn_policy = serializers.ChoiceField(
         choices=EncryptedDocument.BurnPolicy.choices,
@@ -146,6 +173,18 @@ class APIDocumentUploadSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="Alias o código numérico de la UO receptora (opcional).",
     )
+    validity_hours = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=8760,
+        help_text="Plazo de caducidad en horas a partir del momento de subida (opcional).",
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        hours = attrs.pop("validity_hours", None)
+        if hours is not None and "expires_at" not in attrs:
+            attrs["expires_at"] = timezone.now() + timezone.timedelta(hours=hours)
+        return attrs
 
     def validate_original_file(self, value: Any) -> Any:
         try:
@@ -189,3 +228,131 @@ class APIDocumentUploadSerializer(serializers.Serializer):
                 _(f"No existe ninguna Unidad Organizativa activa con alias o código '{val_str}'.")
             )
         return uo
+
+
+class APIDocumentCheckHashSerializer(serializers.Serializer):
+    """
+    Serializador para comprobación preliminar (pre-flight check) de hash SHA-256.
+    """
+
+    file_hash = serializers.CharField(
+        required=True,
+        max_length=64,
+        min_length=64,
+        trim_whitespace=True,
+        help_text="Hash SHA-256 (64 hex) a comprobar.",
+    )
+
+    def validate_file_hash(self, value: str) -> str:
+        clean = (value or "").strip().lower()
+        if not HASH_REGEX.match(clean):
+            raise serializers.ValidationError(
+                _("El hash SHA-256 debe componerse exactamente de 64 caracteres hexadecimales.")
+            )
+        return clean
+
+
+class APIDocumentListSerializer(serializers.ModelSerializer):
+    """
+    Serializador conciso para listados paginados de documentos en la API v1.
+    """
+
+    origin_uo_alias = serializers.CharField(source="origin_uo.alias", read_only=True, default=None)
+    target_uo_alias = serializers.CharField(source="target_uo.alias", read_only=True, default=None)
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EncryptedDocument
+        fields = [
+            "file_hash",
+            "original_filename",
+            "burn_policy",
+            "is_consumed",
+            "status",
+            "origin_uo_alias",
+            "target_uo_alias",
+            "created_at",
+            "expires_at",
+        ]
+
+    def get_status(self, obj: EncryptedDocument) -> str:
+        if obj.is_consumed:
+            return "consumed"
+        if obj.is_expired():
+            return "expired"
+        return "active"
+
+
+class APIDocumentDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializador exhaustivo de metadatos de un asiento confidencial.
+    """
+
+    origin_uo_alias = serializers.CharField(source="origin_uo.alias", read_only=True, default=None)
+    origin_uo_name = serializers.CharField(source="origin_uo.name", read_only=True, default=None)
+    target_uo_alias = serializers.CharField(source="target_uo.alias", read_only=True, default=None)
+    target_uo_name = serializers.CharField(source="target_uo.name", read_only=True, default=None)
+    status = serializers.SerializerMethodField()
+    recipients_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EncryptedDocument
+        fields = [
+            "file_hash",
+            "original_filename",
+            "description",
+            "burn_policy",
+            "is_consumed",
+            "consumed_at",
+            "consumed_by",
+            "status",
+            "allowed_emails",
+            "recipients_count",
+            "origin_uo_alias",
+            "origin_uo_name",
+            "target_uo_alias",
+            "target_uo_name",
+            "created_at",
+            "expires_at",
+        ]
+
+    def get_status(self, obj: EncryptedDocument) -> str:
+        if obj.is_consumed:
+            return "consumed"
+        if obj.is_expired():
+            return "expired"
+        return "active"
+
+    def get_recipients_count(self, obj: EncryptedDocument) -> int:
+        return len(obj.allowed_emails or [])
+
+
+class APIOUListSerializer(serializers.ModelSerializer):
+    """
+    Serializador del directorio de Unidades Organizativas (UO Mesh).
+    """
+
+    class Meta:
+        model = OrganizationalUnit
+        fields = [
+            "id",
+            "numeric_code",
+            "alias",
+            "name",
+            "description",
+            "email",
+            "is_active",
+        ]
+
+
+class APIOURecipientSerializer(serializers.Serializer):
+    """
+    Serializador para miembros autorizados de una UO destinataria.
+    """
+
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    role = serializers.CharField(read_only=True)
+

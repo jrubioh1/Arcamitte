@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import io
 import logging
 from typing import Any, Optional, Tuple
@@ -7,33 +8,47 @@ from typing import Any, Optional, Tuple
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
+from django.db import models
 from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import activate, check_for_language, gettext as _
 from django.views import View
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import status
-from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from arcamitte.authentication import APITokenAuthentication
 from arcamitte.forms import RedeemOtpForm, RequestAccessForm
-from arcamitte.models import APIToken, EncryptedDocument
+from arcamitte.models import APIToken, DocumentAccessLog, EncryptedDocument, OrganizationalUnit
 from arcamitte.permissions import (
     HasDocumentsCreateScope,
     HasDocumentsReadScope,
+    HasUOsReadScope,
     IsAuthenticatedOrToken,
 )
 from arcamitte.serializers import (
+    APIDocumentCheckHashSerializer,
+    APIDocumentDetailSerializer,
+    APIDocumentListSerializer,
     APIDocumentUploadSerializer,
+    APIOUListSerializer,
+    APIOURecipientSerializer,
     PublicAccessRequestSerializer,
     PublicConsumeSerializer,
 )
 from arcamitte.services import (
     consume_document_with_otp,
+    generate_corporate_email_text,
+    get_scoped_documents_for_request,
+    get_uo_recipient_emails,
     request_document_access,
     upload_and_encrypt_document,
 )
@@ -360,6 +375,12 @@ class PublicAccessRequestView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AccessRequestRateThrottle]
 
+    @extend_schema(
+        summary="Solicitud de código OTP para descarga",
+        description="Emite y remite un OTP criptográfico al buzón de un destinatario autorizado.",
+        request=PublicAccessRequestSerializer,
+        responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+    )
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
         serializer = PublicAccessRequestSerializer(data=request.data)
         if not serializer.is_valid():
@@ -392,6 +413,12 @@ class PublicConsumeView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AccessConsumeRateThrottle]
 
+    @extend_schema(
+        summary="Canje de OTP y descarga confidencial (Burn-After-Read)",
+        description="Verifica el código OTP y entrega el flujo binario descifrado, ejecutando la política de destrucción.",
+        request=PublicConsumeSerializer,
+        responses={(200, "application/octet-stream"): OpenApiTypes.BINARY, 400: OpenApiTypes.OBJECT},
+    )
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         serializer = PublicConsumeSerializer(data=request.data)
         if not serializer.is_valid():
@@ -420,17 +447,69 @@ class PublicConsumeView(APIView):
         return response
 
 
-class APIDocumentUploadView(APIView):
+class APIDocumentRootView(APIView):
     """
-    Endpoint de alta seguridad para subir y cifrar documentos confidenciales desde
-    microservicios y aplicaciones externas (Machine-to-Machine).
-    Requiere autenticación con APIToken y scope 'documents:create'.
+    Endpoint raíz para documentos confidenciales (M2M y Sesión):
+    - GET: Listado paginado y filtrable de asientos dentro del perímetro de la UO (scope 'documents:read').
+    - POST: Alta y cifrado de nuevo asiento confidencial mediante envelope encryption (scope 'documents:create').
     """
 
     authentication_classes = [APITokenAuthentication]
-    permission_classes = [IsAuthenticatedOrToken, HasDocumentsCreateScope]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_permissions(self) -> list[Any]:
+        if self.request.method == "POST":
+            return [IsAuthenticatedOrToken(), HasDocumentsCreateScope()]
+        return [IsAuthenticatedOrToken(), HasDocumentsReadScope()]
+
+    @extend_schema(
+        summary="Listado paginado de documentos de la UO",
+        description="Retorna los asientos confidenciales dentro del perímetro autorizado con filtros y paginación.",
+        parameters=[
+            OpenApiParameter("status", str, description="Filtro por estado: 'active', 'consumed', 'expired'"),
+            OpenApiParameter("burn_policy", str, description="Filtro por política: 'FIRST_ACCESS', 'ALL_RECIPIENTS'"),
+            OpenApiParameter("search", str, description="Búsqueda por nombre de archivo o hash"),
+            OpenApiParameter("page", int, description="Número de página"),
+        ],
+        responses={200: APIDocumentListSerializer(many=True)},
+    )
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
+        qs = get_scoped_documents_for_request(request)
+        now = timezone.now()
+
+        status_filter = request.query_params.get("status")
+        if status_filter == "consumed":
+            qs = qs.filter(is_consumed=True)
+        elif status_filter == "active":
+            qs = qs.filter(is_consumed=False).filter(models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True))
+        elif status_filter == "expired":
+            qs = qs.filter(is_consumed=False, expires_at__lte=now)
+
+        burn_policy = request.query_params.get("burn_policy")
+        if burn_policy:
+            qs = qs.filter(burn_policy=burn_policy)
+
+        search = request.query_params.get("search")
+        if search:
+            search_clean = search.strip()
+            qs = qs.filter(
+                models.Q(original_filename__icontains=search_clean)
+                | models.Q(file_hash__icontains=search_clean)
+            )
+
+        qs = qs.order_by("-created_at")
+        paginator = PageNumberPagination()
+        paginator.page_size = 25
+        page = paginator.paginate_queryset(qs, request)
+        serializer = APIDocumentListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    @extend_schema(
+        summary="Alta y cifrado de nuevo documento confidencial",
+        description="Registra y cifra un documento con clave simétrica única DEK envuelta en Fernet (Zero-Knowledge Storage).",
+        request=APIDocumentUploadSerializer,
+        responses={201: OpenApiTypes.OBJECT},
+    )
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
         serializer = APIDocumentUploadSerializer(data=request.data)
         if not serializer.is_valid():
@@ -477,6 +556,11 @@ class APIDocumentUploadView(APIView):
         )
 
 
+# Alias para retrocompatibilidad interna de nombres de vista
+APIDocumentUploadView = APIDocumentRootView
+APIDocumentListView = APIDocumentRootView
+
+
 class APIDocumentStatusView(APIView):
     """
     Endpoint para consultar el estado del trámite de un documento por su hash SHA-256.
@@ -486,6 +570,11 @@ class APIDocumentStatusView(APIView):
     authentication_classes = [APITokenAuthentication]
     permission_classes = [IsAuthenticatedOrToken, HasDocumentsReadScope]
 
+    @extend_schema(
+        summary="Consulta de estado de trámite por hash SHA-256",
+        description="Retorna el estado de custodia, vigencia y consumo del expediente identificado por su hash.",
+        responses={200: APIDocumentDetailSerializer, 403: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+    )
     def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
         clean_hash = (file_hash or "").strip().lower()
         doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
@@ -516,4 +605,272 @@ class APIDocumentStatusView(APIView):
                 "created_at": doc.created_at.isoformat() if doc.created_at else None,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class APIDocumentCheckHashView(APIView):
+    """
+    Comprobación preliminar (pre-flight check) de hash SHA-256.
+    Permite a los microservicios emisores verificar si un documento ya fue registrado
+    o consumido antes de transmitir el binario grande por la red.
+    """
+
+    authentication_classes = [APITokenAuthentication]
+    permission_classes = [IsAuthenticatedOrToken, HasDocumentsCreateScope]
+
+    @extend_schema(
+        summary="Pre-flight check de hash SHA-256",
+        description="Comprueba si una huella SHA-256 ya existe en el sistema o si está disponible para alta.",
+        request=APIDocumentCheckHashSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
+        serializer = APIDocumentCheckHashSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_hash = serializer.validated_data["file_hash"]
+        scoped_doc = get_scoped_documents_for_request(request).filter(file_hash=clean_hash).first()
+        exists_globally = EncryptedDocument.objects.filter(file_hash=clean_hash).exists()
+
+        if exists_globally and not scoped_doc:
+            return Response(
+                {
+                    "file_hash": clean_hash,
+                    "exists": True,
+                    "accessible": False,
+                    "message": _("El documento existe pero pertenece a otra Unidad Organizativa fuera de su perímetro."),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        if scoped_doc:
+            return Response(
+                {
+                    "file_hash": clean_hash,
+                    "exists": True,
+                    "accessible": True,
+                    "original_filename": scoped_doc.original_filename,
+                    "is_consumed": scoped_doc.is_consumed,
+                    "is_expired": scoped_doc.is_expired(),
+                    "burn_policy": scoped_doc.burn_policy,
+                    "created_at": scoped_doc.created_at.isoformat() if scoped_doc.created_at else None,
+                    "expires_at": scoped_doc.expires_at.isoformat() if scoped_doc.expires_at else None,
+                    "can_reactivate": scoped_doc.is_consumed or scoped_doc.is_expired(),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "file_hash": clean_hash,
+                "exists": False,
+                "accessible": True,
+                "message": _("Huella SHA-256 no registrada. Asiento documental libre para su alta."),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class APIDocumentDetailView(APIView):
+    """
+    Consulta detallada de metadatos de un asiento documental confidencial.
+    """
+
+    authentication_classes = [APITokenAuthentication]
+    permission_classes = [IsAuthenticatedOrToken, HasDocumentsReadScope]
+
+    @extend_schema(
+        summary="Metadatos detallados del documento",
+        description="Devuelve todos los metadatos y trazabilidad de consumo del documento indicado.",
+        responses={200: APIDocumentDetailSerializer},
+    )
+    def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
+        clean_hash = (file_hash or "").strip().lower()
+        doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
+        if not doc:
+            return Response(
+                {"error": _("No se encontró ningún documento con el hash especificado.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        scoped_qs = get_scoped_documents_for_request(request)
+        if not scoped_qs.filter(pk=doc.pk).exists():
+            return Response(
+                {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = APIDocumentDetailSerializer(doc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class APIDocumentEmailTemplateView(APIView):
+    """
+    Genera el texto corporativo de notificación con el enlace de canje directo.
+    Permite que sistemas externos de mensajería (CRM, ticketing, correo institucional)
+    despachen el aviso oficial al destinatario.
+    """
+
+    authentication_classes = [APITokenAuthentication]
+    permission_classes = [IsAuthenticatedOrToken, HasDocumentsReadScope]
+
+    @extend_schema(
+        summary="Plantilla de correo de notificación formal",
+        description="Genera el texto institucional y enlaces de canje para el documento indicado.",
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
+        clean_hash = (file_hash or "").strip().lower()
+        doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
+        if not doc:
+            return Response(
+                {"error": _("No se encontró ningún documento con el hash especificado.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        scoped_qs = get_scoped_documents_for_request(request)
+        if not scoped_qs.filter(pk=doc.pk).exists():
+            return Response(
+                {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        base_url = request.build_absolute_uri("/").rstrip("/")
+        email_text = generate_corporate_email_text(doc, base_url=base_url)
+        return Response(
+            {
+                "file_hash": doc.file_hash,
+                "subject": f"Documento disponible para su descarga: {doc.original_filename}",
+                "body": email_text,
+                "allowed_emails": doc.allowed_emails,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class APIOUListView(APIView):
+    """
+    Directorio de Unidades Organizativas (UO Mesh).
+    Permite consultar las dependencias activas del sistema para el enrutamiento interdepartamental.
+    """
+
+    authentication_classes = [APITokenAuthentication]
+    permission_classes = [IsAuthenticatedOrToken, HasUOsReadScope]
+
+    @extend_schema(
+        summary="Directorio de Unidades Organizativas activas",
+        description="Devuelve el catálogo de Unidades Organizativas activas para routing de expedientes.",
+        responses={200: APIOUListSerializer(many=True)},
+    )
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
+        uos = OrganizationalUnit.objects.filter(is_active=True).order_by("numeric_code")
+        serializer = APIOUListSerializer(uos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class APIOURecipientsView(APIView):
+    """
+    Buzones y miembros autorizados de una Unidad Organizativa destinataria.
+    """
+
+    authentication_classes = [APITokenAuthentication]
+    permission_classes = [IsAuthenticatedOrToken, HasUOsReadScope]
+
+    @extend_schema(
+        summary="Miembros y buzones autorizados de una UO",
+        description="Consulta los integrantes y buzones institucionales de una dependencia para auto-completado de destinatarios.",
+        responses={200: APIOURecipientSerializer(many=True)},
+    )
+    def get(self, request: HttpRequest, identifier: str, *args: Any, **kwargs: Any) -> Response:
+        val_str = str(identifier).strip()
+        uo = OrganizationalUnit.objects.filter(alias__iexact=val_str, is_active=True).first()
+        if not uo and val_str.isdigit():
+            uo = OrganizationalUnit.objects.filter(
+                models.Q(numeric_code=int(val_str)) | models.Q(id=int(val_str)),
+                is_active=True,
+            ).first()
+
+        if not uo:
+            return Response(
+                {"error": _(f"No existe ninguna Unidad Organizativa activa identificada como '{val_str}'.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from arcamitte.models import UserUOMembership
+        memberships = (
+            UserUOMembership.objects.filter(uo=uo, is_active=True, user__is_active=True)
+            .exclude(user__email="")
+            .select_related("user")
+            .order_by("user__first_name", "user__last_name", "user__username")
+        )
+
+        results = [
+            {
+                "id": m.user.id,
+                "username": m.user.username,
+                "email": m.user.email,
+                "full_name": m.user.get_full_name() or m.user.username,
+                "role": m.role,
+            }
+            for m in memberships
+        ]
+        return Response(results, status=status.HTTP_200_OK)
+
+
+class APIHealthCheckView(APIView):
+    """
+    Sonda técnica de salud y disponibilidad (Liveness / Readiness Probe).
+    Apta para chequeos periódicos de orquestadores Docker / Kubernetes.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Sonda de salud técnica y observabilidad",
+        description="Verifica conectividad con base de datos, motor de cifrado Fernet y almacenamiento de medios.",
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> Response:
+        health_status = "healthy"
+        details: dict[str, Any] = {}
+
+        # 1. Base de datos
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            details["database"] = "ok"
+        except Exception as exc:
+            health_status = "unhealthy"
+            details["database"] = f"error: {exc}"
+
+        # 2. Motor de Cifrado Fernet
+        try:
+            from cryptography.fernet import Fernet
+            key = settings.ARCAMITTE_FERNET_KEY
+            f = Fernet(key.encode("utf-8") if isinstance(key, str) else key)
+            test_token = f.encrypt(b"arcamitte_health_check")
+            f.decrypt(test_token)
+            details["cryptography_fernet"] = "ok"
+        except Exception as exc:
+            health_status = "unhealthy"
+            details["cryptography_fernet"] = f"error: {exc}"
+
+        # 3. Almacenamiento multimedia
+        try:
+            import os
+            media_path = settings.MEDIA_ROOT
+            details["media_storage_writable"] = os.access(media_path, os.W_OK)
+        except Exception as exc:
+            details["media_storage_writable"] = f"error: {exc}"
+
+        code = status.HTTP_200_OK if health_status == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+        return Response(
+            {
+                "status": health_status,
+                "timestamp": timezone.now().isoformat(),
+                "details": details,
+            },
+            status=code,
         )

@@ -4,7 +4,6 @@
 
 <head>
 	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 	<meta name="description" content="Arcamitte - Plataforma Autónoma de Custodia Criptográfica y Trámite Confidencial">
 	<meta name="author" content="Arcamitte">
@@ -58,6 +57,12 @@
 				{% if user_can_view_audit_logs and dashboard_mode != 'operational' %}
 				<li class="arca-nav-header">
 					{% trans "Seguridad y Auditoría" %}
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'analytics' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:analytics' %}">
+						<i data-feather="bar-chart-2"></i> <span>{% trans "Analítica y Métricas" %}</span>
+					</a>
 				</li>
 
 				<li class="arca-nav-item {% if active_nav == 'audit' %}active{% endif %}">

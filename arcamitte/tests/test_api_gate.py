@@ -62,7 +62,7 @@ class APITokenGateTestCase(TestCase):
         self.assertEqual(token_auth_bearer, token_obj)
 
     def test_invalid_token_format_raises_error(self):
-        """Rechaza tokens sin el prefijo requerido fdec_live_."""
+        """Rechaza tokens sin el prefijo requerido arca_live_."""
         request = self.factory.post("/api/v1/documents/", HTTP_X_API_KEY="invalid_prefix_12345")
         with self.assertRaises(AuthenticationFailed):
             self.auth.authenticate(request)

@@ -22,11 +22,8 @@ from arcamitte.models import (
     UserUOMembership,
 )
 from arcamitte.services import (
-    check_and_expire_document,
     consume_document_with_otp,
-    process_expired_documents,
     request_document_access,
-    terminate_document_manually,
     upload_and_encrypt_document,
 )
 
@@ -271,12 +268,12 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         )
 
     # --------------------------------------------------------------------------
-    # 4. ENDPOINTS API REST (DRF)
+    # 4. ENDPOINTS API REST (DRF v1)
     # --------------------------------------------------------------------------
-    def test_api_public_request_and_consume_flow(self):
-        """Flujo completo vía API REST: request-access y consume con OTP."""
+    def test_api_v1_request_and_consume_flow(self):
+        """Flujo completo vía API REST v1: request-access y consume con OTP."""
         # 1. Solicitar OTP
-        api_req_url = reverse("arcamitte:api-public-request-access")
+        api_req_url = reverse("arcamitte:api-v1-request-access")
         resp1 = self.client.post(
             api_req_url,
             {"file_hash": self.document.file_hash, "email": self.allowed_email},
@@ -289,7 +286,7 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         token = AccessVerificationToken.objects.get(document=self.document, email=self.allowed_email)
 
         # 3. Consumir vía API
-        api_consume_url = reverse("arcamitte:api-public-consume")
+        api_consume_url = reverse("arcamitte:api-v1-consume")
         resp2 = self.client.post(
             api_consume_url,
             {
@@ -302,15 +299,15 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         self.assertEqual(resp2.status_code, 200)
         self.assertEqual(resp2.content, self.test_content)
 
-    def test_api_public_access_request_rate_limiting(self):
-        """El endpoint REST aplica rate limiting (429) al superar el umbral de throttle."""
+    def test_api_v1_access_request_rate_limiting(self):
+        """El endpoint REST v1 aplica rate limiting (429) al superar el umbral de throttle."""
         from arcamitte.views import AccessRequestRateThrottle
 
         original_rate = AccessRequestRateThrottle.rate
         try:
             AccessRequestRateThrottle.rate = "2/minute"
             cache.clear()
-            api_req_url = reverse("arcamitte:api-public-request-access")
+            api_req_url = reverse("arcamitte:api-v1-request-access")
             payload = {"file_hash": self.document.file_hash, "email": self.allowed_email}
 
             resp1 = self.client.post(api_req_url, payload, content_type="application/json")

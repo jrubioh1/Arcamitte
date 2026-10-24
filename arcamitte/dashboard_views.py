@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import json
 import logging
-import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -1504,5 +1503,675 @@ class DashboardPasswordChangeView(LoginRequiredMixin, View):
                 "is_mandatory": is_mandatory,
             },
         )
+
+
+def get_user_analytics_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
+    """
+    Retorna el conjunto de Unidades Organizativas sobre las que el usuario puede ver métricas analíticas.
+    Superusuarios: todas las UOs activas.
+    Admins o Auditores de UO: sus UOs asignadas.
+    """
+    if not user or not user.is_authenticated:
+        return OrganizationalUnit.objects.none()
+    if getattr(user, "is_superuser", False):
+        return OrganizationalUnit.objects.filter(is_active=True).order_by("numeric_code")
+    return OrganizationalUnit.objects.filter(
+        memberships__user=user,
+        memberships__role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
+        memberships__is_active=True,
+        is_active=True,
+    ).order_by("numeric_code").distinct()
+
+
+class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
+    """
+    Panel de visualización analítica avanzada con Apache ECharts.
+    Accesible para Superusuarios y Administradores / Auditores de UO.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/analytics.html"
+
+    def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        if not request.user.is_authenticated:
+            return redirect(self.login_url)
+        analytics_uos = get_user_analytics_uos(request.user)
+        if not request.user.is_superuser and not analytics_uos.exists():
+            raise PermissionDenied(_("No dispone de privilegios de analítica en ninguna Unidad Organizativa."))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        analytics_uos = get_user_analytics_uos(self.request.user)
+        context["active_nav"] = "analytics"
+        context["analytics_uos"] = analytics_uos
+        context["is_superuser"] = self.request.user.is_superuser
+        context["selected_uo"] = self.request.GET.get("uo", "")
+        context["selected_uo_role"] = self.request.GET.get("uo_role", "all")
+        context["selected_range"] = self.request.GET.get("range", "14d")
+        context["selected_burn_policy"] = self.request.GET.get("burn_policy", "")
+        context["selected_status"] = self.request.GET.get("status", "")
+        context["selected_date_from"] = self.request.GET.get("date_from", "")
+        context["selected_date_to"] = self.request.GET.get("date_to", "")
+        context["burn_policy_choices"] = EncryptedDocument.BurnPolicy.choices
+        return context
+
+
+def filter_analytics_querysets(
+    request: HttpRequest,
+    analytics_uos: models.QuerySet[OrganizationalUnit],
+) -> tuple[
+    models.QuerySet[EncryptedDocument] | None,
+    models.QuerySet[DocumentAccessLog] | None,
+    OrganizationalUnit | None,
+    dict[str, Any],
+    JsonResponse | None,
+]:
+    """
+    Delimita los QuerySets de Documentos y Logs según la matriz de autorización,
+    filtros departamentales, política de destrucción BAR, estado y ventanas temporales.
+    Retorna (docs_qs, logs_qs, target_uo_obj, meta, error_response).
+    """
+    requested_uo = request.GET.get("uo", "").strip().upper()
+    target_uo_obj: OrganizationalUnit | None = None
+
+    if requested_uo:
+        target_uo_obj = OrganizationalUnit.objects.filter(alias__iexact=requested_uo, is_active=True).first()
+        if not target_uo_obj and requested_uo.isdigit():
+            target_uo_obj = OrganizationalUnit.objects.filter(numeric_code=int(requested_uo), is_active=True).first()
+        if not target_uo_obj:
+            return None, None, None, {}, JsonResponse({"error": _("Unidad Organizativa no encontrada.")}, status=404)
+
+        if not request.user.is_superuser and not analytics_uos.filter(pk=target_uo_obj.pk).exists():
+            return None, None, None, {}, JsonResponse({"error": _("No tiene permisos sobre la Unidad Organizativa solicitada.")}, status=403)
+
+    docs_qs = EncryptedDocument.objects.select_related("origin_uo", "target_uo").all()
+    logs_qs = DocumentAccessLog.objects.select_related("document", "origin_uo", "target_uo").all()
+
+    # 1. Filtro Perimetral UO y Rol
+    uo_role = request.GET.get("uo_role", "all").strip().lower()
+    if target_uo_obj:
+        if uo_role == "origin":
+            docs_qs = docs_qs.filter(origin_uo=target_uo_obj)
+            logs_qs = logs_qs.filter(models.Q(origin_uo=target_uo_obj) | models.Q(document__origin_uo=target_uo_obj))
+        elif uo_role == "target":
+            docs_qs = docs_qs.filter(target_uo=target_uo_obj)
+            logs_qs = logs_qs.filter(models.Q(target_uo=target_uo_obj) | models.Q(document__target_uo=target_uo_obj))
+        else:
+            docs_qs = docs_qs.filter(models.Q(origin_uo=target_uo_obj) | models.Q(target_uo=target_uo_obj))
+            logs_qs = logs_qs.filter(
+                models.Q(origin_uo=target_uo_obj)
+                | models.Q(target_uo=target_uo_obj)
+                | models.Q(document__origin_uo=target_uo_obj)
+                | models.Q(document__target_uo=target_uo_obj)
+            )
+    elif not request.user.is_superuser:
+        docs_qs = docs_qs.filter(models.Q(origin_uo__in=analytics_uos) | models.Q(target_uo__in=analytics_uos))
+        logs_qs = logs_qs.filter(
+            models.Q(origin_uo__in=analytics_uos)
+            | models.Q(target_uo__in=analytics_uos)
+            | models.Q(document__origin_uo__in=analytics_uos)
+            | models.Q(document__target_uo__in=analytics_uos)
+        )
+
+    # 2. Filtro Política BAR
+    burn_policy = request.GET.get("burn_policy", "").strip().upper()
+    if burn_policy in [EncryptedDocument.BurnPolicy.FIRST_ACCESS, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS]:
+        docs_qs = docs_qs.filter(burn_policy=burn_policy)
+        logs_qs = logs_qs.filter(document__burn_policy=burn_policy)
+
+    # 3. Filtro Estado Documental
+    now = timezone.now()
+    status_val = request.GET.get("status", "").strip().lower()
+    if status_val == "active":
+        docs_qs = docs_qs.filter(is_consumed=False, expires_at__gt=now)
+    elif status_val == "consumed":
+        docs_qs = docs_qs.filter(is_consumed=True)
+    elif status_val == "expired":
+        docs_qs = docs_qs.filter(is_consumed=False, expires_at__lte=now)
+
+    # 4. Filtro Temporal
+    range_val = request.GET.get("range", "14d").strip().lower()
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+
+    start_date: datetime.date | None = None
+    end_date: datetime.date | None = now.date()
+
+    if date_from_str and date_to_str:
+        try:
+            start_date = datetime.date.fromisoformat(date_from_str)
+            end_date = datetime.date.fromisoformat(date_to_str)
+            if start_date > end_date:
+                start_date, end_date = end_date, start_date
+            range_val = "custom"
+        except ValueError:
+            start_date = None
+            end_date = now.date()
+
+    if not start_date and range_val != "all":
+        days_map = {
+            "7d": 7,
+            "14d": 14,
+            "30d": 30,
+            "90d": 90,
+            "180d": 180,
+            "365d": 365,
+            "1y": 365,
+        }
+        days = days_map.get(range_val, 14)
+        start_date = (now - datetime.timedelta(days=days - 1)).date()
+        end_date = now.date()
+
+    start_dt = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min)) if start_date else None
+    end_dt = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max)) if end_date else None
+
+    if start_dt:
+        docs_qs = docs_qs.filter(created_at__gte=start_dt)
+        logs_qs = logs_qs.filter(created_at__gte=start_dt)
+    if end_dt:
+        docs_qs = docs_qs.filter(created_at__lte=end_dt)
+        logs_qs = logs_qs.filter(created_at__lte=end_dt)
+
+    meta = {
+        "range": range_val,
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "date_label": (
+            f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"
+            if start_date and end_date
+            else str(_("Histórico Completo"))
+        ),
+        "uo": requested_uo,
+        "uo_role": uo_role,
+        "burn_policy": burn_policy,
+        "status": status_val,
+    }
+
+    return docs_qs, logs_qs, target_uo_obj, meta, None
+
+
+class DashboardAnalyticsDataView(LoginRequiredMixin, View):
+    """
+    Endpoint JSON para proveer los datos agregados y series temporales a Apache ECharts.
+    Aplica filtros multicriterio y aislamiento estricto por UO.
+    """
+
+    login_url = "dashboard:login"
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
+        analytics_uos = get_user_analytics_uos(request.user)
+        if not request.user.is_superuser and not analytics_uos.exists():
+            return JsonResponse({"error": _("Acceso no autorizado a métricas analíticas.")}, status=403)
+
+        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(request, analytics_uos)
+        if err_resp:
+            return err_resp
+
+        assert docs_qs is not None
+        assert logs_qs is not None
+
+        now = timezone.now()
+        total_docs = docs_qs.count()
+        consumed_docs = docs_qs.filter(is_consumed=True).count()
+        active_docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).count()
+        expired_docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).count()
+
+        burn_rate = round((consumed_docs / total_docs * 100), 1) if total_docs > 0 else 0.0
+
+        # Timeline adaptativo según rango de fechas
+        from django.db.models.functions import TruncDate
+        start_date = datetime.date.fromisoformat(meta["start_date"]) if meta["start_date"] else None
+        end_date = datetime.date.fromisoformat(meta["end_date"]) if meta["end_date"] else now.date()
+
+        if start_date and end_date:
+            num_days = (end_date - start_date).days + 1
+            if num_days <= 90:
+                date_range = [start_date + datetime.timedelta(days=i) for i in range(num_days)]
+                date_labels = [d.strftime("%d/%m") for d in date_range]
+
+                created_counts = dict(
+                    docs_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                    .annotate(day=TruncDate("created_at"))
+                    .values("day")
+                    .annotate(count=models.Count("id"))
+                    .values_list("day", "count")
+                )
+                consumed_counts = dict(
+                    docs_qs.filter(is_consumed=True, consumed_at__date__gte=start_date, consumed_at__date__lte=end_date)
+                    .annotate(day=TruncDate("consumed_at"))
+                    .values("day")
+                    .annotate(count=models.Count("id"))
+                    .values_list("day", "count")
+                )
+                timeline_created = [created_counts.get(d, 0) for d in date_range]
+                timeline_consumed = [consumed_counts.get(d, 0) for d in date_range]
+            else:
+                from django.db.models.functions import TruncMonth
+                created_items = list(
+                    docs_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                    .annotate(month=TruncMonth("created_at"))
+                    .values("month")
+                    .annotate(count=models.Count("id"))
+                    .order_by("month")
+                )
+                consumed_items = list(
+                    docs_qs.filter(is_consumed=True, consumed_at__date__gte=start_date, consumed_at__date__lte=end_date)
+                    .annotate(month=TruncMonth("consumed_at"))
+                    .values("month")
+                    .annotate(count=models.Count("id"))
+                    .order_by("month")
+                )
+                cur = datetime.date(start_date.year, start_date.month, 1)
+                months: list[datetime.date] = []
+                while cur <= end_date:
+                    months.append(cur)
+                    if cur.month == 12:
+                        cur = datetime.date(cur.year + 1, 1, 1)
+                    else:
+                        cur = datetime.date(cur.year, cur.month + 1, 1)
+                date_labels = [m.strftime("%b %y") for m in months]
+                c_map = {item["month"].date().replace(day=1): item["count"] for item in created_items if item["month"]}
+                d_map = {item["month"].date().replace(day=1): item["count"] for item in consumed_items if item["month"]}
+                timeline_created = [c_map.get(m, 0) for m in months]
+                timeline_consumed = [d_map.get(m, 0) for m in months]
+        else:
+            from django.db.models.functions import TruncMonth
+            created_items = list(
+                docs_qs.annotate(month=TruncMonth("created_at"))
+                .values("month")
+                .annotate(count=models.Count("id"))
+                .order_by("month")
+            )
+            consumed_items = list(
+                docs_qs.filter(is_consumed=True)
+                .annotate(month=TruncMonth("consumed_at"))
+                .values("month")
+                .annotate(count=models.Count("id"))
+                .order_by("month")
+            )
+            all_months = sorted(list({item["month"].date().replace(day=1) for item in (created_items + consumed_items) if item.get("month")}))
+            if not all_months:
+                date_labels = [now.strftime("%b %y")]
+                timeline_created = [0]
+                timeline_consumed = [0]
+            else:
+                date_labels = [m.strftime("%b %y") for m in all_months]
+                c_map = {item["month"].date().replace(day=1): item["count"] for item in created_items if item["month"]}
+                d_map = {item["month"].date().replace(day=1): item["count"] for item in consumed_items if item["month"]}
+                timeline_created = [c_map.get(m, 0) for m in all_months]
+                timeline_consumed = [d_map.get(m, 0) for m in all_months]
+
+        # 3. Flujo entre UOs (Inter-UO Mesh)
+        all_uos_map = {uo.id: uo.alias for uo in OrganizationalUnit.objects.filter(is_active=True)}
+        flow_raw = (
+            docs_qs.values("origin_uo_id", "target_uo_id")
+            .annotate(count=models.Count("id"))
+            .order_by("-count")[:15]
+        )
+        flows: list[dict[str, Any]] = []
+        for item in flow_raw:
+            orig = all_uos_map.get(item["origin_uo_id"], str(_("Desconocida / Personal")))
+            targ = all_uos_map.get(item["target_uo_id"], str(_("Destinatarios Externos")))
+            flows.append({
+                "source": orig,
+                "target": targ,
+                "value": item["count"],
+            })
+
+        # Top UOs por volumen entrante y saliente
+        uo_aliases = list(analytics_uos.values_list("alias", flat=True)[:8])
+        outbound_series: list[int] = []
+        inbound_series: list[int] = []
+        for alias in uo_aliases:
+            outbound_series.append(docs_qs.filter(origin_uo__alias=alias).count())
+            inbound_series.append(docs_qs.filter(target_uo__alias=alias).count())
+
+        # 4. Estado de Custodia y Políticas BAR (Donut)
+        custody_breakdown = [
+            {"name": str(_("En Custodia Activa")), "value": active_docs},
+            {"name": str(_("Destruido por Canje (BAR)")), "value": consumed_docs},
+            {"name": str(_("Caducado sin Acceso")), "value": expired_docs},
+        ]
+
+        policy_first_access = docs_qs.filter(burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS).count()
+        policy_all_recipients = docs_qs.filter(burn_policy=EncryptedDocument.BurnPolicy.ALL_RECIPIENTS).count()
+        policy_breakdown = [
+            {"name": str(_("Primer Acceso (FIRST_ACCESS)")), "value": policy_first_access},
+            {"name": str(_("Múltiples Destinatarios (ALL_RECIPIENTS)")), "value": policy_all_recipients},
+        ]
+
+        # 5. Incidentes y Bloqueos de Seguridad
+        log_counts = dict(
+            logs_qs.values("action")
+            .annotate(count=models.Count("id"))
+            .values_list("action", "count")
+        )
+        security_metrics = {
+            "otp_solicitados": log_counts.get(DocumentAccessLog.Action.SOLICITUD_OTP, 0),
+            "otp_enviados": log_counts.get(DocumentAccessLog.Action.OTP_ENVIADO, 0),
+            "descargas_exitosas": (
+                log_counts.get(DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN, 0)
+                + log_counts.get(DocumentAccessLog.Action.DESCIFRADO_PARCIAL_PRESERVADO, 0)
+            ),
+            "intentos_post_consumo": log_counts.get(DocumentAccessLog.Action.INTENTO_POST_CONSUMO, 0),
+            "otp_bloqueados": log_counts.get(DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO, 0),
+            "finalizaciones_manuales": log_counts.get(DocumentAccessLog.Action.FINALIZACION_MANUAL, 0),
+            "auditorias_periciales": log_counts.get(DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA, 0),
+        }
+        total_security_alerts = security_metrics["intentos_post_consumo"] + security_metrics["otp_bloqueados"]
+
+        return JsonResponse({
+            "kpis": {
+                "total_documents": total_docs,
+                "active_documents": active_docs,
+                "consumed_documents": consumed_docs,
+                "expired_documents": expired_docs,
+                "burn_rate": burn_rate,
+                "total_events": logs_qs.count(),
+                "security_alerts": total_security_alerts,
+            },
+            "timeline": {
+                "labels": date_labels,
+                "created": timeline_created,
+                "consumed": timeline_consumed,
+            },
+            "uo_mesh": {
+                "categories": uo_aliases,
+                "outbound": outbound_series,
+                "inbound": inbound_series,
+                "flows": flows,
+            },
+            "custody": custody_breakdown,
+            "policies": policy_breakdown,
+            "security": security_metrics,
+            "meta": meta,
+            "scope_info": {
+                "is_global": request.user.is_superuser and not target_uo_obj,
+                "uo_alias": (
+                    target_uo_obj.alias
+                    if target_uo_obj
+                    else (
+                        str(_("Global (Toda la Organización)"))
+                        if request.user.is_superuser
+                        else (
+                            analytics_uos.first().alias
+                            if analytics_uos.count() == 1
+                            else "Mis UOs"
+                        )
+                    )
+                ),
+            },
+        })
+
+
+class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
+    """
+    Endpoint JSON para obtener el listado nominal de registros al hacer clic en gráficos o tarjetas KPI.
+    Soporta filtros de rango temporal, UO, política BAR, estado y búsqueda de texto en vivo.
+    """
+
+    login_url = "dashboard:login"
+
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
+        analytics_uos = get_user_analytics_uos(request.user)
+        if not request.user.is_superuser and not analytics_uos.exists():
+            return JsonResponse({"error": _("Acceso no autorizado.")}, status=403)
+
+        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(request, analytics_uos)
+        if err_resp:
+            return err_resp
+
+        assert docs_qs is not None
+        assert logs_qs is not None
+
+        # Filtro de búsqueda de texto en vivo
+        q = request.GET.get("q", "").strip()
+        if q:
+            docs_qs = docs_qs.filter(
+                models.Q(original_filename__icontains=q)
+                | models.Q(file_hash__icontains=q)
+                | models.Q(description__icontains=q)
+                | models.Q(origin_uo__alias__icontains=q)
+                | models.Q(target_uo__alias__icontains=q)
+            )
+            logs_qs = logs_qs.filter(
+                models.Q(ip_address__icontains=q)
+                | models.Q(email__icontains=q)
+                | models.Q(details__icontains=q)
+                | models.Q(document__original_filename__icontains=q)
+                | models.Q(document__file_hash__icontains=q)
+            )
+
+        drill_type = request.GET.get("type", "").strip().lower()
+        filter_val = request.GET.get("filter", "").strip()
+        now = timezone.now()
+
+        # 1. Asientos en Custodia Activa
+        if drill_type in ["active", "en custodia activa"]:
+            docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).order_by("-created_at")[:100]
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": str(_("Documentos en Custodia Activa")),
+                "subtitle": str(_("Archivos cifrados disponibles actualmente para canje seguro")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 2. Asientos Consumidos / Incinerados
+        elif drill_type in ["consumed", "destruido por canje (bar)", "destruido"]:
+            docs = docs_qs.filter(is_consumed=True).order_by("-consumed_at")[:100]
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": str(_("Documentos Incinerados / Canjeados (BAR)")),
+                "subtitle": str(_("Archivos destruidos físicamente de disco tras su descarga conforme a política")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 3. Asientos Caducados sin Acceso
+        elif drill_type in ["expired", "caducado sin acceso", "caducado"]:
+            docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).order_by("-expires_at")[:100]
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": str(_("Documentos Caducados sin Acceso")),
+                "subtitle": str(_("Plazo de vigencia vencido sin haberse completado el canje")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 4. Total de Asientos
+        elif drill_type in ["total", "total_docs", "trámites totales"]:
+            docs = docs_qs.order_by("-created_at")[:100]
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": str(_("Total de Trámites en Custodia")),
+                "subtitle": str(_("Todos los asientos bajo el perímetro y filtros seleccionados")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 5. Incidentes y Bloqueos de Seguridad
+        elif drill_type in ["security_alerts", "bloqueos", "sondas", "incidentes", "alertas"]:
+            alert_actions = [
+                DocumentAccessLog.Action.INTENTO_POST_CONSUMO,
+                DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO,
+            ]
+            logs = logs_qs.filter(action__in=alert_actions).order_by("-created_at")[:100]
+            items = [self._format_log(l) for l in logs]
+            return JsonResponse({
+                "mode": "logs",
+                "title": str(_("Incidencias y Bloqueos de Seguridad")),
+                "subtitle": str(_("Intentos sobre archivos ya quemados (BAR) y bloqueos por claves erróneas")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 6. Métrica de Seguridad específica
+        elif drill_type == "security_metric":
+            val_lower = filter_val.lower()
+            if "post-consumo" in val_lower or "intento" in val_lower or "post" in val_lower:
+                action_filter = DocumentAccessLog.Action.INTENTO_POST_CONSUMO
+                title = str(_("Intentos de Acceso Post-Consumo"))
+                subtitle = str(_("Accesos a documentos que ya fueron incinerados conforme a la política BAR"))
+            elif "bloqueado" in val_lower or "fallido" in val_lower or "otp" in val_lower:
+                action_filter = DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO
+                title = str(_("Bloqueos por Intentos OTP Fallidos"))
+                subtitle = str(_("Peticiones bloqueadas por reiteración de claves erróneas (protección anti-fuerza bruta)"))
+            elif "auditoría" in val_lower or "pericial" in val_lower:
+                action_filter = DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA
+                title = str(_("Descargas Periciales de Auditoría Legal"))
+                subtitle = str(_("Acceso administrativo especial registrado por inspectores o auditores"))
+            elif "descarga" in val_lower or "ok" in val_lower:
+                action_filter = DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN
+                title = str(_("Descargas Exitosas y Canjes"))
+                subtitle = str(_("Entregas confidenciales completadas legítimamente"))
+            elif "enviado" in val_lower:
+                action_filter = DocumentAccessLog.Action.OTP_ENVIADO
+                title = str(_("Códigos OTP Enviados"))
+                subtitle = str(_("Verificaciones remitidas a buzones autorizados"))
+            else:
+                action_filter = None
+                title = str(_("Registros Forenses de Seguridad"))
+                subtitle = str(_("Trazabilidad perimetral del sistema"))
+
+            if action_filter:
+                logs = logs_qs.filter(action=action_filter).order_by("-created_at")[:100]
+            else:
+                logs = logs_qs.order_by("-created_at")[:100]
+            items = [self._format_log(l) for l in logs]
+            return JsonResponse({
+                "mode": "logs",
+                "title": title,
+                "subtitle": subtitle,
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 7. Flujos entre UOs
+        elif drill_type in ["uo_outbound", "uo_inbound"]:
+            uo_alias = filter_val.upper()
+            if drill_type == "uo_outbound":
+                docs = docs_qs.filter(origin_uo__alias=uo_alias).order_by("-created_at")[:100]
+                title = f"{_('Trámites Emitidos por UO')}: {uo_alias}"
+                subtitle = str(_("Documentos originados en este departamento hacia otras áreas o terceros"))
+            else:
+                docs = docs_qs.filter(target_uo__alias=uo_alias).order_by("-created_at")[:100]
+                title = f"{_('Trámites Recibidos por UO')}: {uo_alias}"
+                subtitle = str(_("Documentos dirigidos hacia esta dependencia organizativa"))
+
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": title,
+                "subtitle": subtitle,
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # 8. Actividad en fecha específica (Timeline)
+        elif drill_type == "timeline_date":
+            date_str = filter_val
+            target_date: datetime.date | None = None
+            if "/" in date_str:
+                parts = date_str.split("/")
+                current_year = now.year
+                try:
+                    target_date = datetime.date(current_year, int(parts[1]), int(parts[0]))
+                except (ValueError, IndexError):
+                    target_date = None
+            elif "-" in date_str:
+                try:
+                    target_date = datetime.date.fromisoformat(date_str)
+                except ValueError:
+                    target_date = None
+
+            if target_date:
+                docs = docs_qs.filter(
+                    models.Q(created_at__date=target_date) | models.Q(consumed_at__date=target_date)
+                ).order_by("-created_at")[:100]
+            else:
+                docs = docs_qs.order_by("-created_at")[:100]
+
+            items = [self._format_doc(d) for d in docs]
+            return JsonResponse({
+                "mode": "documents",
+                "title": f"{_('Actividad Documental del')} {filter_val}",
+                "subtitle": str(_("Asientos creados o consumidos en esta fecha")),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            })
+
+        # Por defecto
+        docs = docs_qs.order_by("-created_at")[:100]
+        items = [self._format_doc(d) for d in docs]
+        return JsonResponse({
+            "mode": "documents",
+            "title": str(_("Listado Nominal de Documentos")),
+            "subtitle": str(_("Asientos registrados bajo el perímetro y filtros seleccionados")),
+            "count": len(items),
+            "items": items,
+            "meta": meta,
+        })
+
+    def _format_doc(self, doc: EncryptedDocument) -> dict[str, Any]:
+        now = timezone.now()
+        if doc.is_consumed:
+            status_text = str(_("Destruido por Canje"))
+            status_badge = "secondary"
+        elif doc.expires_at <= now:
+            status_text = str(_("Caducado"))
+            status_badge = "danger"
+        else:
+            status_text = str(_("En Custodia Activa"))
+            status_badge = "success"
+
+        return {
+            "id": doc.pk,
+            "filename": doc.original_filename,
+            "file_hash": doc.file_hash,
+            "file_hash_short": f"{doc.file_hash[:10]}...{doc.file_hash[-6:]}",
+            "origin_uo": doc.origin_uo.alias if doc.origin_uo else str(_("Sin UO")),
+            "target_uo": doc.target_uo.alias if doc.target_uo else str(_("Destinatario Externo")),
+            "status_text": status_text,
+            "status_badge": status_badge,
+            "burn_policy": doc.get_burn_policy_display(),
+            "created_at": timezone.localtime(doc.created_at).strftime("%d/%m/%Y %H:%M"),
+            "expires_at": timezone.localtime(doc.expires_at).strftime("%d/%m/%Y %H:%M"),
+            "consumed_at": timezone.localtime(doc.consumed_at).strftime("%d/%m/%Y %H:%M") if doc.consumed_at else "-",
+            "detail_url": reverse("dashboard:document_detail", args=[doc.file_hash]),
+        }
+
+    def _format_log(self, log: DocumentAccessLog) -> dict[str, Any]:
+        is_alert = log.action in [
+            DocumentAccessLog.Action.INTENTO_POST_CONSUMO,
+            DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO,
+        ]
+        return {
+            "id": log.pk,
+            "action_display": str(log.get_action_display() or log.action),
+            "action_badge": "danger" if is_alert else ("warning" if "admin" in log.action else "info"),
+            "is_alert": is_alert,
+            "ip_address": log.ip_address or "-",
+            "email": log.email or "-",
+            "document_filename": log.document.original_filename if log.document else str(_("Sin documento")),
+            "document_hash_short": f"{log.document.file_hash[:10]}..." if log.document else "-",
+            "document_url": reverse("dashboard:document_detail", args=[log.document.file_hash]) if log.document else None,
+            "created_at": timezone.localtime(log.created_at).strftime("%d/%m/%Y %H:%M:%S"),
+            "details": log.details or "-",
+            "origin_uo": log.origin_uo.alias if log.origin_uo else "-",
+        }
 
 

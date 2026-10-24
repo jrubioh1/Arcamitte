@@ -52,9 +52,5 @@ class HasDocumentsReadScope(HasTokenScope):
     required_scope = "documents:read"
 
 
-class HasDocumentsTerminateScope(HasTokenScope):
-    required_scope = "documents:terminate"
-
-
-class HasAuditReadScope(HasTokenScope):
-    required_scope = "audit:read"
+class HasUOsReadScope(HasTokenScope):
+    required_scope = "uos:read"

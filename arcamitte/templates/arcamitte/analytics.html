@@ -1,0 +1,1241 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Analítica y Métricas" %}{% endblock %}
+
+{% block extra_head %}
+<style>
+	.spin-animation {
+		animation: spin 1s linear infinite;
+	}
+	@keyframes spin {
+		100% { transform: rotate(360deg); }
+	}
+	.arca-chart-container {
+		width: 100%;
+		height: 350px;
+		position: relative;
+	}
+	.chart-loading-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(255, 255, 255, 0.75);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 10;
+		transition: opacity 0.2s ease;
+	}
+	.burn-progress-bar {
+		height: 6px;
+		border-radius: 3px;
+		background-color: #e2e8f0;
+		overflow: hidden;
+	}
+	.burn-progress-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #2563eb, #e11d48);
+		transition: width 0.6s ease;
+	}
+	.clickable-stat-card {
+		cursor: pointer;
+		transition: transform 0.18s ease, box-shadow 0.18s ease;
+	}
+	.clickable-stat-card:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+	}
+	.filter-pill-active {
+		background-color: #2563eb !important;
+		color: #ffffff !important;
+		border-color: #2563eb !important;
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Cabecera de Página -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+	<div>
+		<div class="d-flex align-items-center gap-2 mb-1">
+			<h1 class="h3 fw-bold mb-0">{% trans "Analítica y Métricas de Custodia" %}</h1>
+			<span id="scopeBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle">
+				{% if is_superuser and not selected_uo %}
+					{% trans "Global (Toda la Organización)" %}
+				{% elif selected_uo %}
+					UO: {{ selected_uo }}
+				{% else %}
+					{% trans "Mis Departamentos" %}
+				{% endif %}
+			</span>
+		</div>
+		<p class="text-muted small mb-0">
+			{% trans "Explotación visual de datos, ciclo de vida de asientos, canjes irreversibles (BAR) y sondas de seguridad. Pinche en cualquier tarjeta o gráfico para consultar los nominales." %}
+		</p>
+	</div>
+</div>
+
+<!-- Panel de Explotación de Datos y Filtros Multicriterio -->
+<div class="card shadow-sm mb-4 border-0">
+	<div class="card-body p-3 bg-white rounded">
+		<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+			<div class="d-flex align-items-center gap-2">
+				<span class="badge bg-primary text-white d-flex align-items-center gap-1 py-1 px-2">
+					<i data-feather="sliders" style="width:13px;height:13px;"></i>
+					<span class="small fw-bold">{% trans "Filtros de Explotación" %}</span>
+				</span>
+				<span id="activeFiltersSummary" class="text-muted small">
+					<!-- Resumen dinámico -->
+				</span>
+			</div>
+			<div class="d-flex align-items-center gap-2">
+				<button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 shadow-sm" type="button" title="{% trans 'Restablecer todos los filtros a valores por defecto' %}">
+					<i data-feather="rotate-ccw" style="width:13px;height:13px;"></i>
+					<span class="d-none d-sm-inline">{% trans "Limpiar Filtros" %}</span>
+				</button>
+				<button id="refreshBtn" class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm" type="button" title="{% trans 'Recargar métricas con los filtros activos' %}">
+					<i data-feather="refresh-cw" id="refreshIcon" style="width:13px;height:13px;"></i>
+					<span>{% trans "Actualizar" %}</span>
+				</button>
+			</div>
+		</div>
+
+		<!-- Selector de Rango Temporal Rápido -->
+		<div class="d-flex flex-wrap align-items-center gap-2 mb-3 pb-2 border-bottom">
+			<span class="text-muted small fw-semibold text-uppercase" style="font-size: 0.75rem; min-width: 80px;">
+				<i data-feather="calendar" style="width:13px;height:13px;" class="me-1"></i>{% trans "Período" %}:
+			</span>
+			<div class="btn-group btn-group-sm" role="group" id="rangeButtonGroup">
+				<button type="button" class="btn btn-outline-primary" data-range="7d">7D</button>
+				<button type="button" class="btn btn-outline-primary active" data-range="14d">14D</button>
+				<button type="button" class="btn btn-outline-primary" data-range="30d">30D</button>
+				<button type="button" class="btn btn-outline-primary" data-range="90d">90D</button>
+				<button type="button" class="btn btn-outline-primary" data-range="180d">6M</button>
+				<button type="button" class="btn btn-outline-primary" data-range="365d">1A</button>
+				<button type="button" class="btn btn-outline-primary" data-range="all">{% trans "Todo" %}</button>
+				<button type="button" class="btn btn-outline-secondary" data-range="custom" id="customRangeToggleBtn">
+					<i data-feather="calendar" style="width:12px;height:12px;"></i> {% trans "Rango Manual" %}
+				</button>
+			</div>
+
+			<!-- Rango Manual personalizado (visible si se pulsa Rango Manual) -->
+			<div id="customDateContainer" class="d-none d-flex align-items-center gap-2 ms-auto">
+				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 140px;" placeholder="Desde" title="Fecha Inicio">
+				<span class="text-muted small">&rarr;</span>
+				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 140px;" placeholder="Hasta" title="Fecha Fin">
+				<button type="button" id="applyCustomDateBtn" class="btn btn-sm btn-outline-primary py-1 px-2">
+					{% trans "Aplicar Rango" %}
+				</button>
+			</div>
+		</div>
+
+		<!-- Filtros de Departamento, Política BAR y Estado -->
+		<div class="row g-2">
+			<!-- Selector de UO -->
+			<div class="col-md-4 col-sm-6">
+				<label class="form-label text-muted small fw-semibold mb-1">
+					<i data-feather="grid" style="width:12px;height:12px;" class="me-1"></i>{% trans "Unidad Organizativa" %}
+				</label>
+				<select id="uoFilterSelect" class="form-select form-select-sm">
+					{% if is_superuser %}
+						<option value="" {% if not selected_uo %}selected{% endif %}>
+							-- {% trans "Toda la Organización (Global)" %} --
+						</option>
+					{% else %}
+						<option value="" {% if not selected_uo %}selected{% endif %}>
+							-- {% trans "Todas mis UOs autorizadas" %} --
+						</option>
+					{% endif %}
+					{% for uo in analytics_uos %}
+						<option value="{{ uo.alias }}" {% if selected_uo == uo.alias %}selected{% endif %}>
+							{{ uo.alias }} - {{ uo.name }}
+						</option>
+					{% endfor %}
+				</select>
+			</div>
+
+			<!-- Rol en el Trámite (Origen / Destino) -->
+			<div class="col-md-2 col-sm-6">
+				<label class="form-label text-muted small fw-semibold mb-1">
+					<i data-feather="repeat" style="width:12px;height:12px;" class="me-1"></i>{% trans "Intervención UO" %}
+				</label>
+				<select id="uoRoleFilterSelect" class="form-select form-select-sm">
+					<option value="all" {% if selected_uo_role == "all" %}selected{% endif %}>{% trans "Origen o Destino" %}</option>
+					<option value="origin" {% if selected_uo_role == "origin" %}selected{% endif %}>{% trans "Solo Emisora (Origen)" %}</option>
+					<option value="target" {% if selected_uo_role == "target" %}selected{% endif %}>{% trans "Solo Receptora (Destino)" %}</option>
+				</select>
+			</div>
+
+			<!-- Política BAR -->
+			<div class="col-md-3 col-sm-6">
+				<label class="form-label text-muted small fw-semibold mb-1">
+					<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i>{% trans "Política Destrucción (BAR)" %}
+				</label>
+				<select id="burnPolicyFilterSelect" class="form-select form-select-sm">
+					<option value="">-- {% trans "Todas las políticas" %} --</option>
+					{% for val, label in burn_policy_choices %}
+						<option value="{{ val }}" {% if selected_burn_policy == val %}selected{% endif %}>{{ label }}</option>
+					{% endfor %}
+				</select>
+			</div>
+
+			<!-- Estado Documental -->
+			<div class="col-md-3 col-sm-6">
+				<label class="form-label text-muted small fw-semibold mb-1">
+					<i data-feather="check-circle" style="width:12px;height:12px;" class="me-1"></i>{% trans "Estado Documental" %}
+				</label>
+				<select id="statusFilterSelect" class="form-select form-select-sm">
+					<option value="" {% if not selected_status %}selected{% endif %}>-- {% trans "Todos los estados" %} --</option>
+					<option value="active" {% if selected_status == "active" %}selected{% endif %}>{% trans "En Custodia Activa" %}</option>
+					<option value="consumed" {% if selected_status == "consumed" %}selected{% endif %}>{% trans "Destruidos por Canje (BAR)" %}</option>
+					<option value="expired" {% if selected_status == "expired" %}selected{% endif %}>{% trans "Caducados sin Acceso" %}</option>
+				</select>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Fila de Tarjetas KPI Interactivas (Clic para ver Nominales) -->
+<div class="row g-3 mb-4">
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3 h-100 clickable-stat-card" data-drill="total" title="{% trans 'Pincha para ver el listado nominal de todos los trámites' %}">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Trámites Totales" %}</div>
+					<h2 class="fw-bold my-1" id="kpiTotalDocs">-</h2>
+					<div class="text-muted small">
+						<span class="text-success fw-semibold" id="kpiActiveDocs">-</span> {% trans "activos en custodia" %}
+					</div>
+				</div>
+				<div class="arca-stat-icon primary">
+					<i data-feather="database"></i>
+				</div>
+			</div>
+			<div class="mt-2 text-primary small d-flex align-items-center gap-1" style="font-size: 0.75rem;">
+				<i data-feather="list" style="width:12px;height:12px;"></i>
+				<span>{% trans "Ver listado nominal" %} &rarr;</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3 h-100 clickable-stat-card" data-drill="consumed" title="{% trans 'Pincha para ver los documentos incinerados / canjeados (BAR)' %}">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Tasa de Destrucción (BAR)" %}</div>
+					<h2 class="fw-bold my-1 text-primary" id="kpiBurnRate">-%</h2>
+					<div class="text-muted small">
+						<span class="text-dark fw-semibold" id="kpiConsumedDocs">-</span> {% trans "canjeados e incinerados" %}
+					</div>
+				</div>
+				<div class="arca-stat-icon warning">
+					<i data-feather="flame"></i>
+				</div>
+			</div>
+			<div class="burn-progress-bar mt-2">
+				<div id="burnProgressBar" class="burn-progress-fill" style="width: 0%;"></div>
+			</div>
+			<div class="mt-2 text-muted small d-flex align-items-center gap-1" style="font-size: 0.75rem;">
+				<i data-feather="list" style="width:12px;height:12px;"></i>
+				<span>{% trans "Ver asientos destruidos" %} &rarr;</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3 h-100 clickable-stat-card" data-drill="active" title="{% trans 'Pincha para ver los documentos actualmente en custodia activa' %}">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "En Custodia Activa" %}</div>
+					<h2 class="fw-bold my-1 text-success" id="kpiActiveCardDocs">-</h2>
+					<div class="text-muted small">
+						{% trans "Disponibles para canje" %}
+					</div>
+				</div>
+				<div class="arca-stat-icon success">
+					<i data-feather="check-circle"></i>
+				</div>
+			</div>
+			<div class="mt-2 text-success small d-flex align-items-center gap-1" style="font-size: 0.75rem;">
+				<i data-feather="list" style="width:12px;height:12px;"></i>
+				<span>{% trans "Ver asientos activos" %} &rarr;</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3 h-100 clickable-stat-card" data-drill="security_alerts" title="{% trans 'Pincha para ver las incidencias forenses y accesos bloqueados' %}">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Incidencias y Bloqueos" %}</div>
+					<h2 class="fw-bold my-1 text-danger" id="kpiSecurityAlerts">-</h2>
+					<div class="text-muted small">
+						{% trans "Intentos post-consumo / OTPs" %}
+					</div>
+				</div>
+				<div class="arca-stat-icon danger">
+					<i data-feather="alert-octagon"></i>
+				</div>
+			</div>
+			<div class="mt-2 text-danger small d-flex align-items-center gap-1" style="font-size: 0.75rem;">
+				<i data-feather="shield" style="width:12px;height:12px;"></i>
+				<span>{% trans "Ver incidencias de seguridad" %} &rarr;</span>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Fila Principal de Gráficos: Timeline y Custodia Donut -->
+<div class="row g-3 mb-4">
+	<div class="col-lg-8">
+		<div class="card shadow-sm h-100">
+			<div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+				<div>
+					<h6 class="fw-bold mb-0 text-dark">
+						<i data-feather="activity" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+						{% trans "Ciclo de Vida Documental" %} <span id="timelineRangeBadge" class="badge bg-light text-muted border ms-1 small">14D</span>
+					</h6>
+					<small class="text-muted">{% trans "Evolución de altas frente a canjes definitivos (BAR). Pinche en una fecha para ver los asientos nominales." %}</small>
+				</div>
+			</div>
+			<div class="card-body p-3 position-relative">
+				<div id="timelineChart" class="arca-chart-container"></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-4">
+		<div class="card shadow-sm h-100">
+			<div class="card-header bg-white border-bottom py-3">
+				<h6 class="fw-bold mb-0 text-dark">
+					<i data-feather="pie-chart" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+					{% trans "Estado de Custodia Criptográfica" %}
+				</h6>
+				<small class="text-muted">{% trans "Pinche en cualquier sector para ver el listado nominal correspondiente" %}</small>
+			</div>
+			<div class="card-body p-3 position-relative">
+				<div id="custodyChart" class="arca-chart-container"></div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Segunda Fila de Gráficos: Flujos Inter-UO y Sondas de Seguridad -->
+<div class="row g-3 mb-4">
+	<div class="col-lg-7">
+		<div class="card shadow-sm h-100">
+			<div class="card-header bg-white border-bottom py-3">
+				<h6 class="fw-bold mb-0 text-dark">
+					<i data-feather="shuffle" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+					{% trans "Malla de Tráfico Interdepartamental" %}
+				</h6>
+				<small class="text-muted">{% trans "Pinche en la barra de una UO para inspeccionar los documentos emitidos o recibidos" %}</small>
+			</div>
+			<div class="card-body p-3 position-relative">
+				<div id="meshChart" class="arca-chart-container"></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-5">
+		<div class="card shadow-sm h-100">
+			<div class="card-header bg-white border-bottom py-3">
+				<h6 class="fw-bold mb-0 text-dark">
+					<i data-feather="shield-alert" style="width:16px;height:16px;" class="me-1 text-danger"></i>
+					{% trans "Incidencias de Seguridad y Verificación" %}
+				</h6>
+				<small class="text-muted">{% trans "Intentos sobre archivos ya quemados (BAR), bloqueos OTP y canjes legítimos" %}</small>
+			</div>
+			<div class="card-body p-3 position-relative">
+				<div id="securityChart" class="arca-chart-container"></div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Modal de Drilldown Nominal con Filtro y Exportación CSV -->
+<div class="modal fade" id="drilldownModal" tabindex="-1" aria-labelledby="drilldownModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+		<div class="modal-content shadow-lg border-0">
+			<div class="modal-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+				<div>
+					<div class="d-flex align-items-center gap-2">
+						<h5 class="modal-title fw-bold text-dark mb-0" id="drilldownModalLabel">
+							<i data-feather="list" style="width:18px;height:18px;" class="me-1 text-primary"></i>
+							<span id="drilldownTitle">{% trans "Registros Nominales" %}</span>
+						</h5>
+						<span id="drilldownCountBadge" class="badge bg-primary rounded-pill">0</span>
+					</div>
+					<small id="drilldownSubtitle" class="text-muted"></small>
+				</div>
+				<div class="d-flex align-items-center gap-2">
+					<button type="button" id="exportNominalsCsvBtn" class="btn btn-sm btn-outline-success d-flex align-items-center gap-1 shadow-sm" title="{% trans 'Exportar los registros de esta tabla a un archivo CSV (Excel)' %}">
+						<i data-feather="download" style="width:13px;height:13px;"></i>
+						<span class="d-none d-sm-inline">{% trans "Exportar CSV" %}</span>
+					</button>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+			</div>
+
+			<!-- Buscador en tiempo real dentro del modal -->
+			<div class="bg-white px-3 py-2 border-bottom d-flex align-items-center gap-2">
+				<div class="input-group input-group-sm">
+					<span class="input-group-text bg-light text-muted border-end-0">
+						<i data-feather="search" style="width:13px;height:13px;"></i>
+					</span>
+					<input type="search" id="drilldownSearchInput" class="form-control form-control-sm border-start-0" placeholder="{% trans 'Filtrar rápidamente en estos registros por nombre, hash, departamento, IP...' %}">
+				</div>
+				<span id="drilldownFilterCounter" class="text-muted small text-nowrap"></span>
+			</div>
+
+			<div class="modal-body p-0 position-relative" style="min-height: 280px; max-height: 65vh;">
+				<div id="drilldownLoading" class="chart-loading-overlay" style="display:none;">
+					<div class="d-flex flex-column align-items-center gap-2">
+						<div class="spinner-border text-primary" role="status">
+							<span class="visually-hidden">{% trans "Cargando..." %}</span>
+						</div>
+						<span class="text-muted small">{% trans "Obteniendo registros nominales..." %}</span>
+					</div>
+				</div>
+				<div class="table-responsive" id="drilldownTableContainer"></div>
+				<div id="drilldownEmpty" class="text-center py-5 text-muted" style="display:none;">
+					<i data-feather="inbox" style="width:40px;height:40px;" class="mb-2 text-muted"></i>
+					<p class="mb-0 fw-semibold">{% trans "No se encontraron registros nominales para este criterio." %}</p>
+					<small class="text-muted">{% trans "No existen asientos o eventos forenses en el perímetro y filtros seleccionados." %}</small>
+				</div>
+			</div>
+
+			<div class="modal-footer bg-light py-2 d-flex justify-content-between align-items-center">
+				<span class="text-muted small" style="font-size: 0.78rem;">
+					<i data-feather="info" style="width:13px;height:13px;" class="me-1 text-primary"></i>
+					{% trans "Mostrando los asientos o eventos coincidentes bajo el perímetro de gobernanza autorizado." %}
+				</span>
+				<div class="d-flex gap-2">
+					<button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">
+						{% trans "Cerrar" %}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Apache ECharts 5.5.1 -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+	// 1. Instancias de Apache ECharts
+	const timelineDom = document.getElementById("timelineChart");
+	const custodyDom = document.getElementById("custodyChart");
+	const meshDom = document.getElementById("meshChart");
+	const securityDom = document.getElementById("securityChart");
+
+	const timelineChart = echarts.init(timelineDom);
+	const custodyChart = echarts.init(custodyDom);
+	const meshChart = echarts.init(meshDom);
+	const securityChart = echarts.init(securityDom);
+
+	const allCharts = [timelineChart, custodyChart, meshChart, securityChart];
+
+	// Paleta corporativa Arcamitte
+	const colors = {
+		primary: "#2563eb",
+		primaryLight: "rgba(37, 99, 235, 0.15)",
+		success: "#059669",
+		successLight: "rgba(5, 150, 105, 0.15)",
+		danger: "#e11d48",
+		dangerLight: "rgba(225, 29, 72, 0.15)",
+		warning: "#d97706",
+		info: "#0284c7",
+		gray: "#64748b",
+		dark: "#0f172a"
+	};
+
+	// Modal de Drilldown
+	const drilldownModalEl = document.getElementById("drilldownModal");
+	let drilldownModal = null;
+	if (drilldownModalEl && window.bootstrap) {
+		drilldownModal = new bootstrap.Modal(drilldownModalEl);
+	}
+
+	// Estado activo de los filtros
+	let activeFilters = {
+		range: "{{ selected_range|default:'14d' }}",
+		uo: "{{ selected_uo|default:'' }}",
+		uo_role: "{{ selected_uo_role|default:'all' }}",
+		burn_policy: "{{ selected_burn_policy|default:'' }}",
+		status: "{{ selected_status|default:'' }}",
+		date_from: "{{ selected_date_from|default:'' }}",
+		date_to: "{{ selected_date_to|default:'' }}"
+	};
+
+	// Caché de registros nominales actualmente abiertos en el modal
+	let currentDrilldownData = {
+		mode: "documents",
+		title: "",
+		items: []
+	};
+
+	// Helper para armar Query String de filtros
+	function buildQueryString(extraParams) {
+		const params = new URLSearchParams();
+		if (activeFilters.range) params.set("range", activeFilters.range);
+		if (activeFilters.uo) params.set("uo", activeFilters.uo);
+		if (activeFilters.uo_role && activeFilters.uo_role !== "all") params.set("uo_role", activeFilters.uo_role);
+		if (activeFilters.burn_policy) params.set("burn_policy", activeFilters.burn_policy);
+		if (activeFilters.status) params.set("status", activeFilters.status);
+		if (activeFilters.range === "custom") {
+			if (activeFilters.date_from) params.set("date_from", activeFilters.date_from);
+			if (activeFilters.date_to) params.set("date_to", activeFilters.date_to);
+		}
+		if (extraParams) {
+			Object.keys(extraParams).forEach(k => {
+				if (extraParams[k]) params.set(k, extraParams[k]);
+			});
+		}
+		return params.toString();
+	}
+
+	function updateSummaryBadge(meta) {
+		const summaryEl = document.getElementById("activeFiltersSummary");
+		if (!summaryEl) return;
+		let parts = [];
+		if (meta && meta.date_label) parts.push(meta.date_label);
+		if (activeFilters.uo) parts.push("UO: " + activeFilters.uo);
+		if (activeFilters.burn_policy) parts.push("Política: " + activeFilters.burn_policy);
+		if (activeFilters.status) {
+			const statusLabels = { active: "Activos", consumed: "Destruidos (BAR)", expired: "Caducados" };
+			parts.push("Estado: " + (statusLabels[activeFilters.status] || activeFilters.status));
+		}
+		summaryEl.innerHTML = parts.length > 0
+			? parts.map(p => `<span class="badge bg-light text-dark border me-1">${p}</span>`).join("")
+			: `<span class="text-muted">Sin filtros activos</span>`;
+
+		const timelineRangeBadge = document.getElementById("timelineRangeBadge");
+		if (timelineRangeBadge && meta && meta.range) {
+			timelineRangeBadge.textContent = meta.range.toUpperCase();
+		}
+	}
+
+	// Responsive resize
+	window.addEventListener("resize", function() {
+		allCharts.forEach(c => c.resize());
+	});
+
+	// 2. Fetch y Render de Datos ECharts
+	function fetchAnalyticsData() {
+		const refreshIcon = document.getElementById("refreshIcon");
+		if (refreshIcon) refreshIcon.classList.add("spin-animation");
+		allCharts.forEach(c => c.showLoading({ text: "Cargando métricas...", color: colors.primary }));
+
+		const qs = buildQueryString();
+		const url = "{% url 'dashboard:analytics_data' %}" + (qs ? "?" + qs : "");
+
+		// Actualizar URL del navegador
+		const newUrl = new URL(window.location);
+		newUrl.search = qs;
+		window.history.pushState({}, "", newUrl);
+
+		fetch(url, {
+			headers: { "X-Requested-With": "XMLHttpRequest" }
+		})
+		.then(response => {
+			if (!response.ok) throw new Error("HTTP error " + response.status);
+			return response.json();
+		})
+		.then(data => {
+			allCharts.forEach(c => c.hideLoading());
+			if (refreshIcon) refreshIcon.classList.remove("spin-animation");
+			updateKPIs(data.kpis, data.scope_info);
+			updateSummaryBadge(data.meta);
+			renderTimeline(data.timeline);
+			renderCustody(data.custody);
+			renderMesh(data.uo_mesh);
+			renderSecurity(data.security);
+		})
+		.catch(err => {
+			console.error("Error al obtener analítica:", err);
+			allCharts.forEach(c => c.hideLoading());
+			if (refreshIcon) refreshIcon.classList.remove("spin-animation");
+		});
+	}
+
+	// 3. Actualizar KPIs
+	function updateKPIs(kpis, scopeInfo) {
+		if (!kpis) return;
+		document.getElementById("kpiTotalDocs").textContent = kpis.total_documents.toLocaleString();
+		document.getElementById("kpiActiveDocs").textContent = kpis.active_documents.toLocaleString();
+		const kpiActiveCard = document.getElementById("kpiActiveCardDocs");
+		if (kpiActiveCard) kpiActiveCard.textContent = kpis.active_documents.toLocaleString();
+		document.getElementById("kpiConsumedDocs").textContent = kpis.consumed_documents.toLocaleString();
+		document.getElementById("kpiBurnRate").textContent = kpis.burn_rate + "%";
+		document.getElementById("kpiSecurityAlerts").textContent = kpis.security_alerts.toLocaleString();
+
+		const progressBar = document.getElementById("burnProgressBar");
+		if (progressBar) {
+			progressBar.style.width = Math.min(kpis.burn_rate, 100) + "%";
+		}
+
+		const scopeBadge = document.getElementById("scopeBadge");
+		if (scopeBadge && scopeInfo) {
+			scopeBadge.textContent = scopeInfo.uo_alias;
+		}
+	}
+
+	// 4. Render Gráfico 1: Timeline con dataZoom adaptativo
+	function renderTimeline(timeline) {
+		if (!timeline) return;
+		const showZoom = timeline.labels.length > 20;
+
+		const option = {
+			tooltip: {
+				trigger: "axis",
+				backgroundColor: "#ffffff",
+				borderColor: "#e2e8f0",
+				textStyle: { color: "#1e293b", fontSize: 12 },
+				axisPointer: { type: "cross", label: { backgroundColor: "#64748b" } }
+			},
+			legend: {
+				data: ["Asientos Cifrados (Altas)", "Canjes Efectivos (BAR)"],
+				bottom: showZoom ? 26 : 0,
+				icon: "circle",
+				textStyle: { color: "#64748b", fontSize: 12 }
+			},
+			grid: {
+				top: "10%",
+				left: "3%",
+				right: "4%",
+				bottom: showZoom ? "20%" : "12%",
+				containLabel: true
+			},
+			dataZoom: showZoom ? [
+				{ type: "inside", start: 0, end: 100 },
+				{ type: "slider", bottom: 2, height: 16, start: 0, end: 100, borderColor: "#cbd5e1" }
+			] : [],
+			xAxis: {
+				type: "category",
+				boundaryGap: false,
+				data: timeline.labels,
+				axisLine: { lineStyle: { color: "#cbd5e1" } },
+				axisLabel: { color: "#64748b", fontSize: 11, interval: "auto" }
+			},
+			yAxis: {
+				type: "value",
+				minInterval: 1,
+				splitLine: { lineStyle: { color: "#f1f5f9" } },
+				axisLabel: { color: "#64748b", fontSize: 11 }
+			},
+			series: [
+				{
+					name: "Asientos Cifrados (Altas)",
+					type: "line",
+					smooth: true,
+					data: timeline.created,
+					itemStyle: { color: colors.primary },
+					areaStyle: {
+						color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+							{ offset: 0, color: colors.primaryLight },
+							{ offset: 1, color: "rgba(37, 99, 235, 0.0)" }
+						])
+					}
+				},
+				{
+					name: "Canjes Efectivos (BAR)",
+					type: "line",
+					smooth: true,
+					data: timeline.consumed,
+					itemStyle: { color: colors.danger },
+					areaStyle: {
+						color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+							{ offset: 0, color: colors.dangerLight },
+							{ offset: 1, color: "rgba(225, 29, 72, 0.0)" }
+						])
+					}
+				}
+			]
+		};
+		timelineChart.setOption(option);
+	}
+
+	// 5. Render Gráfico 2: Custodia (Donut)
+	function renderCustody(custody) {
+		if (!custody) return;
+		const option = {
+			tooltip: {
+				trigger: "item",
+				formatter: "{b}: <b>{c}</b> ({d}%)<br><span style='font-size:11px;color:#94a3b8;'>Pinche para ver registros nominales</span>",
+				backgroundColor: "#ffffff",
+				borderColor: "#e2e8f0",
+				textStyle: { color: "#1e293b", fontSize: 12 }
+			},
+			legend: {
+				bottom: 0,
+				icon: "circle",
+				textStyle: { color: "#64748b", fontSize: 11 }
+			},
+			color: [colors.success, colors.primary, colors.gray],
+			series: [
+				{
+					name: "Custodia",
+					type: "pie",
+					radius: ["48%", "72%"],
+					center: ["50%", "45%"],
+					avoidLabelOverlap: false,
+					itemStyle: {
+						borderRadius: 6,
+						borderColor: "#ffffff",
+						borderWidth: 2
+					},
+					label: { show: false, position: "center" },
+					emphasis: {
+						label: {
+							show: true,
+							fontSize: 14,
+							fontWeight: "bold",
+							formatter: "{b}\n{d}%"
+						}
+					},
+					labelLine: { show: false },
+					data: custody
+				}
+			]
+		};
+		custodyChart.setOption(option);
+	}
+
+	// 6. Render Gráfico 3: Flujo Inter-UO
+	function renderMesh(uoMesh) {
+		if (!uoMesh) return;
+		const categories = uoMesh.categories && uoMesh.categories.length > 0 ? uoMesh.categories : ["Sin actividad"];
+		const outbound = uoMesh.outbound || [];
+		const inbound = uoMesh.inbound || [];
+
+		const option = {
+			tooltip: {
+				trigger: "axis",
+				axisPointer: { type: "shadow" },
+				backgroundColor: "#ffffff",
+				borderColor: "#e2e8f0",
+				textStyle: { color: "#1e293b", fontSize: 12 }
+			},
+			legend: {
+				data: ["Emitidos (Salientes)", "Recibidos (Entrantes)"],
+				bottom: 0,
+				icon: "circle",
+				textStyle: { color: "#64748b", fontSize: 11 }
+			},
+			grid: {
+				top: "10%",
+				left: "3%",
+				right: "4%",
+				bottom: "12%",
+				containLabel: true
+			},
+			xAxis: {
+				type: "value",
+				minInterval: 1,
+				splitLine: { lineStyle: { color: "#f1f5f9" } },
+				axisLabel: { color: "#64748b", fontSize: 11 }
+			},
+			yAxis: {
+				type: "category",
+				data: categories,
+				axisLine: { lineStyle: { color: "#cbd5e1" } },
+				axisLabel: { color: "#1e293b", fontSize: 11, fontWeight: 500 }
+			},
+			series: [
+				{
+					name: "Emitidos (Salientes)",
+					type: "bar",
+					data: outbound,
+					itemStyle: { color: colors.primary, borderRadius: [0, 4, 4, 0] }
+				},
+				{
+					name: "Recibidos (Entrantes)",
+					type: "bar",
+					data: inbound,
+					itemStyle: { color: colors.info, borderRadius: [0, 4, 4, 0] }
+				}
+			]
+		};
+		meshChart.setOption(option);
+	}
+
+	// 7. Render Gráfico 4: Incidencias de Seguridad y Verificación
+	function renderSecurity(security) {
+		if (!security) return;
+		const indicators = [
+			{ name: "Descargas OK", max: Math.max(security.descargas_exitosas * 1.3, 10) },
+			{ name: "OTP Enviados", max: Math.max(security.otp_enviados * 1.3, 10) },
+			{ name: "Post-Consumo (BAR)", max: Math.max(security.intentos_post_consumo * 2, 5) },
+			{ name: "OTP Bloqueados", max: Math.max(security.otp_bloqueados * 2, 5) },
+			{ name: "Auditoría Legal", max: Math.max(security.auditorias_periciales * 2, 5) }
+		];
+		const values = [
+			security.descargas_exitosas,
+			security.otp_enviados,
+			security.intentos_post_consumo,
+			security.otp_bloqueados,
+			security.auditorias_periciales
+		];
+
+		const option = {
+			tooltip: {
+				trigger: "axis",
+				backgroundColor: "#ffffff",
+				borderColor: "#e2e8f0",
+				textStyle: { color: "#1e293b", fontSize: 12 },
+				formatter: function(params) {
+					let str = "<b>Incidencias y Accesos</b><br/>";
+					str += "• Descargas OK: " + security.descargas_exitosas + "<br/>";
+					str += "• OTP Enviados: " + security.otp_enviados + "<br/>";
+					str += "<span style='color:#e11d48;'>• Intentos Post-Consumo: " + security.intentos_post_consumo + "</span><br/>";
+					str += "<span style='color:#e11d48;'>• Códigos OTP Bloqueados: " + security.otp_bloqueados + "</span><br/>";
+					str += "• Auditorías Periciales: " + security.auditorias_periciales + "<br/>";
+					str += "<span style='font-size:11px;color:#64748b;'>Pinche para ver el detalle forense</span>";
+					return str;
+				}
+			},
+			radar: {
+				indicator: indicators,
+				shape: "polygon",
+				splitNumber: 4,
+				axisName: { color: "#64748b", fontSize: 11 },
+				splitLine: { lineStyle: { color: "#e2e8f0" } },
+				splitArea: {
+					show: true,
+					areaStyle: {
+						color: ["rgba(255, 255, 255, 0.5)", "rgba(241, 245, 249, 0.5)"]
+					}
+				},
+				axisLine: { lineStyle: { color: "#cbd5e1" } }
+			},
+			series: [
+				{
+					name: "Incidencias de Seguridad",
+					type: "radar",
+					data: [
+						{
+							value: values,
+							name: "Métricas de Seguridad",
+							itemStyle: { color: colors.danger },
+							areaStyle: { color: "rgba(225, 29, 72, 0.25)" }
+						}
+					]
+				}
+			]
+		};
+		securityChart.setOption(option);
+	}
+
+	// 8. Drilldown Modal Handler: Carga de Registros Nominales
+	function openDrilldown(type, filterVal) {
+		if (!drilldownModal) return;
+
+		const loadingEl = document.getElementById("drilldownLoading");
+		const containerEl = document.getElementById("drilldownTableContainer");
+		const emptyEl = document.getElementById("drilldownEmpty");
+		const titleEl = document.getElementById("drilldownTitle");
+		const subtitleEl = document.getElementById("drilldownSubtitle");
+		const badgeEl = document.getElementById("drilldownCountBadge");
+		const searchInput = document.getElementById("drilldownSearchInput");
+		const filterCounter = document.getElementById("drilldownFilterCounter");
+
+		if (searchInput) searchInput.value = "";
+		if (filterCounter) filterCounter.textContent = "";
+
+		loadingEl.style.display = "flex";
+		containerEl.innerHTML = "";
+		emptyEl.style.display = "none";
+		badgeEl.textContent = "...";
+		titleEl.textContent = "Cargando registros...";
+		subtitleEl.textContent = "Consultando base de datos criptográfica";
+
+		drilldownModal.show();
+
+		const qs = buildQueryString({ type: type, filter: filterVal || "" });
+		const url = "{% url 'dashboard:analytics_drilldown' %}?" + qs;
+
+		fetch(url, {
+			headers: { "X-Requested-With": "XMLHttpRequest" }
+		})
+		.then(response => {
+			if (!response.ok) throw new Error("HTTP error " + response.status);
+			return response.json();
+		})
+		.then(data => {
+			loadingEl.style.display = "none";
+			titleEl.textContent = data.title;
+			subtitleEl.textContent = data.subtitle;
+			badgeEl.textContent = data.count + " registros";
+
+			currentDrilldownData = {
+				mode: data.mode,
+				title: data.title,
+				items: data.items || []
+			};
+
+			if (data.count === 0) {
+				emptyEl.style.display = "block";
+				return;
+			}
+
+			renderDrilldownRows(currentDrilldownData.items);
+		})
+		.catch(err => {
+			console.error("Error al cargar registros nominales:", err);
+			loadingEl.style.display = "none";
+			titleEl.textContent = "Error de consulta";
+			subtitleEl.textContent = "No se pudieron obtener los registros nominales.";
+			emptyEl.style.display = "block";
+		});
+	}
+
+	function renderDrilldownRows(itemsToRender) {
+		const containerEl = document.getElementById("drilldownTableContainer");
+		const emptyEl = document.getElementById("drilldownEmpty");
+		const filterCounter = document.getElementById("drilldownFilterCounter");
+
+		if (!itemsToRender || itemsToRender.length === 0) {
+			containerEl.innerHTML = "";
+			emptyEl.style.display = "block";
+			if (filterCounter) filterCounter.textContent = "0 encontrados";
+			return;
+		}
+
+		emptyEl.style.display = "none";
+		if (filterCounter) {
+			filterCounter.textContent = `Mostrando ${itemsToRender.length} de ${currentDrilldownData.items.length}`;
+		}
+
+		if (currentDrilldownData.mode === "documents") {
+			renderDocumentsTable(containerEl, itemsToRender);
+		} else {
+			renderLogsTable(containerEl, itemsToRender);
+		}
+		if (window.feather) feather.replace();
+	}
+
+	function renderDocumentsTable(container, items) {
+		let html = `
+			<table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+				<thead class="table-light">
+					<tr>
+						<th>{% trans "Documento / Trámite" %}</th>
+						<th>{% trans "Hash SHA-256" %}</th>
+						<th>{% trans "Flujo UO" %}</th>
+						<th>{% trans "Estado" %}</th>
+						<th>{% trans "Fecha Alta" %}</th>
+						<th class="text-end">{% trans "Acciones" %}</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		items.forEach(doc => {
+			html += `
+				<tr>
+					<td>
+						<a href="${doc.detail_url}" class="fw-bold text-dark text-decoration-none">
+							<i data-feather="file-text" style="width:14px;height:14px;" class="me-1 text-primary"></i>
+							${escapeHtml(doc.filename)}
+						</a>
+						<div class="text-muted small">${escapeHtml(doc.burn_policy)}</div>
+					</td>
+					<td>
+						<code class="font-mono small text-secondary">${escapeHtml(doc.file_hash_short)}</code>
+					</td>
+					<td>
+						<span class="badge bg-light text-dark border">${escapeHtml(doc.origin_uo)}</span>
+						<span class="text-muted">&rarr;</span>
+						<span class="badge bg-light text-dark border">${escapeHtml(doc.target_uo)}</span>
+					</td>
+					<td>
+						<span class="badge bg-${doc.status_badge}-subtle text-${doc.status_badge} border border-${doc.status_badge}-subtle">
+							${escapeHtml(doc.status_text)}
+						</span>
+					</td>
+					<td class="text-muted small">${escapeHtml(doc.created_at)}</td>
+					<td class="text-end">
+						<a href="${doc.detail_url}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.78rem;">
+							{% trans "Ver Asiento" %} &rarr;
+						</a>
+					</td>
+				</tr>
+			`;
+		});
+		html += `</tbody></table>`;
+		container.innerHTML = html;
+	}
+
+	function renderLogsTable(container, items) {
+		let html = `
+			<table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+				<thead class="table-light">
+					<tr>
+						<th>{% trans "Fecha y Hora" %}</th>
+						<th>{% trans "Incidencia / Evento" %}</th>
+						<th>{% trans "Asiento Afectado" %}</th>
+						<th>{% trans "IP / Solicitante" %}</th>
+						<th>{% trans "Detalles Forenses" %}</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		items.forEach(log => {
+			html += `
+				<tr>
+					<td class="font-mono small text-muted text-nowrap">${escapeHtml(log.created_at)}</td>
+					<td>
+						<span class="badge bg-${log.action_badge}-subtle text-${log.action_badge} border border-${log.action_badge}-subtle">
+							${escapeHtml(log.action_display)}
+						</span>
+					</td>
+					<td>
+						${log.document_url ? `
+							<a href="${log.document_url}" class="text-decoration-none fw-semibold">
+								${escapeHtml(log.document_filename)}
+							</a>
+							<div class="font-mono text-muted small">${escapeHtml(log.document_hash_short)}</div>
+						` : `<span class="text-muted small">-</span>`}
+					</td>
+					<td class="font-mono small">
+						<div>${escapeHtml(log.ip_address)}</div>
+						<div class="text-muted small">${escapeHtml(log.email)}</div>
+					</td>
+					<td class="small text-muted text-break">${escapeHtml(log.details)}</td>
+				</tr>
+			`;
+		});
+		html += `</tbody></table>`;
+		container.innerHTML = html;
+	}
+
+	// 9. Filtrado en tiempo real dentro del modal de nominales
+	const drilldownSearchInput = document.getElementById("drilldownSearchInput");
+	if (drilldownSearchInput) {
+		drilldownSearchInput.addEventListener("input", function() {
+			const query = this.value.toLowerCase().trim();
+			if (!query) {
+				renderDrilldownRows(currentDrilldownData.items);
+				return;
+			}
+
+			const filtered = currentDrilldownData.items.filter(item => {
+				if (currentDrilldownData.mode === "documents") {
+					return (
+						(item.filename && item.filename.toLowerCase().includes(query)) ||
+						(item.file_hash && item.file_hash.toLowerCase().includes(query)) ||
+						(item.origin_uo && item.origin_uo.toLowerCase().includes(query)) ||
+						(item.target_uo && item.target_uo.toLowerCase().includes(query)) ||
+						(item.status_text && item.status_text.toLowerCase().includes(query))
+					);
+				} else {
+					return (
+						(item.action_display && item.action_display.toLowerCase().includes(query)) ||
+						(item.document_filename && item.document_filename.toLowerCase().includes(query)) ||
+						(item.ip_address && item.ip_address.toLowerCase().includes(query)) ||
+						(item.email && item.email.toLowerCase().includes(query)) ||
+						(item.details && item.details.toLowerCase().includes(query))
+					);
+				}
+			});
+
+			renderDrilldownRows(filtered);
+		});
+	}
+
+	// 10. Exportación a CSV de los registros nominales
+	const exportNominalsCsvBtn = document.getElementById("exportNominalsCsvBtn");
+	if (exportNominalsCsvBtn) {
+		exportNominalsCsvBtn.addEventListener("click", function() {
+			if (!currentDrilldownData.items || currentDrilldownData.items.length === 0) {
+				alert("No hay registros nominales para exportar.");
+				return;
+			}
+
+			let csvContent = "\uFEFF"; // BOM UTF-8 para Excel
+			if (currentDrilldownData.mode === "documents") {
+				csvContent += "ID;Nombre de Archivo;Hash SHA-256;UO Origen;UO Destino;Estado;Política BAR;Fecha Alta;Fecha Expiración;Fecha Canje\r\n";
+				currentDrilldownData.items.forEach(doc => {
+					csvContent += `"${doc.id}";"${doc.filename.replace(/"/g, '""')}";"${doc.file_hash}";"${doc.origin_uo}";"${doc.target_uo}";"${doc.status_text}";"${doc.burn_policy}";"${doc.created_at}";"${doc.expires_at}";"${doc.consumed_at}"\r\n`;
+				});
+			} else {
+				csvContent += "ID;Fecha y Hora;Acción / Evento;Documento;Hash;IP Solicitante;Correo;Detalles Forenses;UO\r\n";
+				currentDrilldownData.items.forEach(log => {
+					csvContent += `"${log.id}";"${log.created_at}";"${log.action_display.replace(/"/g, '""')}";"${(log.document_filename || '').replace(/"/g, '""')}";"${log.document_hash_short}";"${log.ip_address}";"${log.email}";"${(log.details || '').replace(/"/g, '""')}";"${log.origin_uo}"\r\n`;
+				});
+			}
+
+			const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.setAttribute("href", url);
+			const filename = `arcamitte_nominales_${currentDrilldownData.mode}_${new Date().toISOString().slice(0, 10)}.csv`;
+			link.setAttribute("download", filename);
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		});
+	}
+
+	function escapeHtml(text) {
+		if (text === null || text === undefined) return "";
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#039;");
+	}
+
+	// 11. Eventos en los Gráficos de ECharts
+	custodyChart.on("click", function(params) {
+		if (params && params.name) openDrilldown(params.name);
+	});
+
+	timelineChart.on("click", function(params) {
+		if (params && params.name) openDrilldown("timeline_date", params.name);
+	});
+
+	meshChart.on("click", function(params) {
+		if (params && params.name) {
+			const dir = params.seriesName && params.seriesName.includes("Emitidos") ? "uo_outbound" : "uo_inbound";
+			openDrilldown(dir, params.name);
+		}
+	});
+
+	securityChart.on("click", function(params) {
+		openDrilldown("security_alerts");
+	});
+
+	// Clic en las Tarjetas KPI
+	document.querySelectorAll(".clickable-stat-card").forEach(card => {
+		card.addEventListener("click", function() {
+			const drillType = this.getAttribute("data-drill");
+			if (drillType) openDrilldown(drillType);
+		});
+	});
+
+	// 12. Listeners de la Barra de Filtros
+	// Rango Temporal rápido (botones)
+	const rangeButtons = document.querySelectorAll("#rangeButtonGroup button[data-range]");
+	const customDateContainer = document.getElementById("customDateContainer");
+
+	rangeButtons.forEach(btn => {
+		btn.addEventListener("click", function() {
+			const selectedRange = this.getAttribute("data-range");
+			rangeButtons.forEach(b => b.classList.remove("active"));
+			this.classList.add("active");
+
+			if (selectedRange === "custom") {
+				if (customDateContainer) customDateContainer.classList.remove("d-none");
+				activeFilters.range = "custom";
+			} else {
+				if (customDateContainer) customDateContainer.classList.add("d-none");
+				activeFilters.range = selectedRange;
+				activeFilters.date_from = "";
+				activeFilters.date_to = "";
+				fetchAnalyticsData();
+			}
+		});
+	});
+
+	// Rango Manual (Aplicar)
+	const applyCustomDateBtn = document.getElementById("applyCustomDateBtn");
+	if (applyCustomDateBtn) {
+		applyCustomDateBtn.addEventListener("click", function() {
+			const dFrom = document.getElementById("dateFromInput").value;
+			const dTo = document.getElementById("dateToInput").value;
+			if (!dFrom || !dTo) {
+				alert("Por favor, seleccione ambas fechas (Desde y Hasta).");
+				return;
+			}
+			activeFilters.range = "custom";
+			activeFilters.date_from = dFrom;
+			activeFilters.date_to = dTo;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Filtro UO
+	const uoFilterSelect = document.getElementById("uoFilterSelect");
+	if (uoFilterSelect) {
+		uoFilterSelect.addEventListener("change", function() {
+			activeFilters.uo = this.value;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Filtro Rol UO
+	const uoRoleFilterSelect = document.getElementById("uoRoleFilterSelect");
+	if (uoRoleFilterSelect) {
+		uoRoleFilterSelect.addEventListener("change", function() {
+			activeFilters.uo_role = this.value;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Filtro Política BAR
+	const burnPolicyFilterSelect = document.getElementById("burnPolicyFilterSelect");
+	if (burnPolicyFilterSelect) {
+		burnPolicyFilterSelect.addEventListener("change", function() {
+			activeFilters.burn_policy = this.value;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Filtro Estado Documental
+	const statusFilterSelect = document.getElementById("statusFilterSelect");
+	if (statusFilterSelect) {
+		statusFilterSelect.addEventListener("change", function() {
+			activeFilters.status = this.value;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Botón Refrescar
+	const refreshBtn = document.getElementById("refreshBtn");
+	if (refreshBtn) {
+		refreshBtn.addEventListener("click", function() {
+			fetchAnalyticsData();
+		});
+	}
+
+	// Botón Limpiar Filtros
+	const resetFiltersBtn = document.getElementById("resetFiltersBtn");
+	if (resetFiltersBtn) {
+		resetFiltersBtn.addEventListener("click", function() {
+			activeFilters.range = "14d";
+			activeFilters.uo = "";
+			activeFilters.uo_role = "all";
+			activeFilters.burn_policy = "";
+			activeFilters.status = "";
+			activeFilters.date_from = "";
+			activeFilters.date_to = "";
+
+			if (uoFilterSelect) uoFilterSelect.value = "";
+			if (uoRoleFilterSelect) uoRoleFilterSelect.value = "all";
+			if (burnPolicyFilterSelect) burnPolicyFilterSelect.value = "";
+			if (statusFilterSelect) statusFilterSelect.value = "";
+			if (customDateContainer) customDateContainer.classList.add("d-none");
+
+			rangeButtons.forEach(b => {
+				b.classList.remove("active");
+				if (b.getAttribute("data-range") === "14d") b.classList.add("active");
+			});
+
+			fetchAnalyticsData();
+		});
+	}
+
+	// Carga inicial
+	fetchAnalyticsData();
+});
+</script>
+{% endblock %}

@@ -37,6 +37,7 @@ python = "^3.11"
 django = ">=5.1,<7.0"
 djangorestframework = ">=3.18.2"
 cryptography = ">=44.0.1"
+drf-spectacular = "^0.30.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=9.0.3"

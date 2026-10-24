@@ -1,7 +1,13 @@
 from django.urls import path
 from arcamitte.views import (
+    APIDocumentCheckHashView,
+    APIDocumentDetailView,
+    APIDocumentEmailTemplateView,
+    APIDocumentRootView,
     APIDocumentStatusView,
-    APIDocumentUploadView,
+    APIHealthCheckView,
+    APIOUListView,
+    APIOURecipientsView,
     PublicAccessRequestView,
     PublicConsumeView,
     RedeemOtpView,
@@ -36,17 +42,47 @@ urlpatterns = [
         name="index",
     ),
     # ==========================================================================
-    # ENDPOINTS DE LA API REST v1 (MICROSERVICIO M2M Y PÚBLICO)
+    # SUITE SEGURA DE LA API REST v1 (INGESTA Y CONSULTA DE ESTADO)
     # ==========================================================================
     path(
+        "api/v1/health/",
+        APIHealthCheckView.as_view(),
+        name="api-v1-health",
+    ),
+    path(
+        "api/v1/documents/check-hash/",
+        APIDocumentCheckHashView.as_view(),
+        name="api-v1-document-check-hash",
+    ),
+    path(
         "api/v1/documents/",
-        APIDocumentUploadView.as_view(),
+        APIDocumentRootView.as_view(),
         name="api-v1-document-upload",
+    ),
+    path(
+        "api/v1/documents/<str:file_hash>/",
+        APIDocumentDetailView.as_view(),
+        name="api-v1-document-detail",
     ),
     path(
         "api/v1/documents/<str:file_hash>/status/",
         APIDocumentStatusView.as_view(),
         name="api-v1-document-status",
+    ),
+    path(
+        "api/v1/documents/<str:file_hash>/email-template/",
+        APIDocumentEmailTemplateView.as_view(),
+        name="api-v1-document-email-template",
+    ),
+    path(
+        "api/v1/uos/",
+        APIOUListView.as_view(),
+        name="api-v1-uo-list",
+    ),
+    path(
+        "api/v1/uos/<str:identifier>/recipients/",
+        APIOURecipientsView.as_view(),
+        name="api-v1-uo-recipients",
     ),
     path(
         "api/v1/request-access/",
@@ -57,16 +93,5 @@ urlpatterns = [
         "api/v1/consume/",
         PublicConsumeView.as_view(),
         name="api-v1-consume",
-    ),
-    # Retrocompatibilidad para integraciones previas
-    path(
-        "api/public/request-access/",
-        PublicAccessRequestView.as_view(),
-        name="api-public-request-access",
-    ),
-    path(
-        "api/public/consume/",
-        PublicConsumeView.as_view(),
-        name="api-public-consume",
     ),
 ]
