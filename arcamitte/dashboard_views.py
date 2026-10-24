@@ -1708,8 +1708,8 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
         if err_resp:
             return err_resp
 
-        assert docs_qs is not None
-        assert logs_qs is not None
+        if docs_qs is None or logs_qs is None:
+            return JsonResponse({"error": _("Error al delimitar registros.")}, status=500)
 
         now = timezone.now()
         total_docs = docs_qs.count()
@@ -1922,8 +1922,8 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
         if err_resp:
             return err_resp
 
-        assert docs_qs is not None
-        assert logs_qs is not None
+        if docs_qs is None or logs_qs is None:
+            return JsonResponse({"error": _("Error al delimitar registros.")}, status=500)
 
         # Filtro de búsqueda de texto en vivo
         q = request.GET.get("q", "").strip()

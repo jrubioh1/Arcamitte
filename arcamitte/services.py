@@ -226,8 +226,8 @@ def shred_and_delete_file(file_field: Any) -> bool:
         logger.error(f"[ARCAMITTE ERROR] Fallo durante trituración segura de archivo: {exc}")
         try:
             file_field.delete(save=False)
-        except Exception:
-            pass
+        except Exception as del_exc:
+            logger.warning(f"[ARCAMITTE WARNING] Fallo secundario al desvincular campo de archivo: {del_exc}")
         return False
 
 

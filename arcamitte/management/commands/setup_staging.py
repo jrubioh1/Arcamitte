@@ -133,8 +133,8 @@ class Command(BaseCommand):
         )
         try:
             validate_password(admin_pass, user=admin_user)
-        except Exception:
-            pass
+        except ValidationError as val_err:
+            logger.debug(f"Aviso de validación en contraseña de staging: {val_err}")
         admin_user.set_password(admin_pass)
         admin_user.is_staff = True
         admin_user.is_superuser = True
