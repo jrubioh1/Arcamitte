@@ -1,0 +1,94 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Inicio' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label='arcamitte' %}">Arcamitte</a>
+&rsaquo; <a href="{% url 'admin:arcamitte_encrypteddocument_changelist' %}">{% trans 'Documentos Cifrados' %}</a>
+&rsaquo; <a href="{% url 'admin:arcamitte_encrypteddocument_change' object.pk %}">{{ object.original_filename }}</a>
+&rsaquo; {% trans 'Finalizar Asiento' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" style="max-width: 850px; margin: 0 auto; padding: 10px;">
+    <div class="module" style="background:#1e293b; border:1px solid #dc2626; padding:24px; border-radius:8px; color:#f8fafc; margin-bottom:20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <span style="font-size:2rem; line-height:1;">⏹️</span>
+            <div>
+                <h2 style="color:#ef4444; margin:0; font-size:1.4rem;">{% trans "Finalizar Asiento Documental y Destruir Archivo Físico" %}</h2>
+                <span style="color:#94a3b8; font-size:0.85rem;">{% trans "Constancia de vicisitud e inmutabilidad legal" %}</span>
+            </div>
+        </div>
+
+        <div style="background:#450a0a; border:1px solid #b91c1c; border-radius:6px; padding:14px; margin-bottom:20px; color:#fecaca; font-size:0.9rem; line-height:1.5;">
+            <strong>⚠️ {% trans "Atención: Operación Irreversible" %}</strong><br>
+            {% trans "Por motivos de seguridad y cumplimiento estricto del principio de no repudio:" %}
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li>{% trans "El archivo binario confidencial cifrado será" %} <strong>{% trans "destruido físicamente de disco" %}</strong> {% trans "mediante sobreescritura por bloques con datos criptográficos aleatorios (shredding)." %}</li>
+                <li>{% trans "El asiento documental" %} <strong>{% trans "NO se eliminará" %}</strong> {% trans "de la base de datos, garantizando la trazabilidad inmutable del trámite." %}</li>
+                <li>{% trans "Se generará un registro probatorio de" %} <strong>{% trans "Vicisitud (Finalización Manual)" %}</strong> {% trans "en el log de auditoría con su usuario, fecha/hora exacta, dirección IP y el motivo aportado." %}</li>
+            </ul>
+        </div>
+
+        <div style="background:#0f172a; border:1px solid #334155; border-radius:6px; padding:16px; margin-bottom:20px;">
+            <h3 style="color:#38bdf8; margin:0 0 12px 0; font-size:1rem; border-bottom:1px solid #334155; padding-bottom:6px;">
+                📄 {% trans "Metadatos del Asiento" %}
+            </h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; font-size:0.85rem;">
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "Nombre del archivo:" %}</span>
+                    <strong style="color:#f1f5f9; word-break:break-all;">{{ object.original_filename }}</strong>
+                </div>
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "Hash SHA-256 (Localizador):" %}</span>
+                    <code style="background:#1e293b; color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:0.75rem; word-break:break-all; display:inline-block;">{{ object.file_hash }}</code>
+                </div>
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "UO Emisora:" %}</span>
+                    <span style="color:#e2e8f0;">{% if object.origin_uo %}[{{ object.origin_uo.numeric_code }}] {{ object.origin_uo.name }}{% else %}—{% endif %}</span>
+                </div>
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "UO Receptora:" %}</span>
+                    <span style="color:#e2e8f0;">{% if object.target_uo %}[{{ object.target_uo.numeric_code }}] {{ object.target_uo.name }}{% else %}—{% endif %}</span>
+                </div>
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "Fecha de alta:" %}</span>
+                    <span style="color:#e2e8f0;">{{ object.created_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                <div>
+                    <span style="color:#94a3b8; display:block;">{% trans "Fecha límite de caducidad:" %}</span>
+                    <span style="color:#e2e8f0;">{% if object.expires_at %}{{ object.expires_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</span>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <span style="color:#94a3b8; display:block;">{% trans "Destinatarios autorizados:" %}</span>
+                    <span style="color:#cbd5e1; word-break:break-all;">{{ object.allowed_emails|join:", " }}</span>
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" style="margin-top:10px;">
+            {% csrf_token %}
+            <div style="margin-bottom:20px;">
+                <label for="id_reason" style="display:block; font-weight:bold; margin-bottom:8px; color:#e2e8f0; font-size:0.9rem;">
+                    📝 {% trans "Motivo o justificación de la vicisitud (opcional pero recomendado):" %}
+                </label>
+                <textarea name="reason" id="id_reason" rows="3" class="vLargeTextField" style="width:100%; box-sizing:border-box; background:#0f172a; color:#f8fafc; border:1px solid #475569; border-radius:6px; padding:10px; font-size:0.85rem;" placeholder="{% trans 'Ejemplo: Trámite completado por vía alternativa / Expediente cerrado formalmente / Documento remitido por error...' %}"></textarea>
+                <div style="color:#94a3b8; font-size:0.8rem; margin-top:4px;">
+                    {% trans "Este motivo quedará registrado de forma inalterable en el log de auditoría del documento." %}
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <button type="submit" class="button" style="background:#ba2121; color:#fff; border:none; padding:10px 22px; border-radius:6px; font-size:0.9rem; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                    ⏹️ {% trans "Confirmar Finalización y Destruir Archivo Físico" %}
+                </button>
+                <a href="{% url 'admin:arcamitte_encrypteddocument_changelist' %}" class="button cancel-link" style="padding:10px 18px; border-radius:6px; font-size:0.9rem; text-decoration:none;">
+                    {% trans "Cancelar" %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

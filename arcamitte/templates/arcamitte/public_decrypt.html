@@ -1,0 +1,103 @@
+{% extends "arcamitte/public_base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Descargar Documento" %} | Arcamitte{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 class="card-title">
+                <span>📥</span> {% trans "Verificación y Descarga de Documento" %}
+            </h1>
+            <span class="badge badge-emerald">{% trans "Descarga Segura" %}</span>
+        </div>
+        <p class="card-subtitle">
+            {% blocktrans %}Introduzca el <strong>código de verificación de 6 dígitos</strong> recibido en su correo electrónico para iniciar la descarga del archivo.{% endblocktrans %}
+        </p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}">
+                <div>{{ message }}</div>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if error_message %}
+        <div class="alert alert-error">
+            <div>
+                <strong>{% trans "Aviso:" %}</strong><br>
+                {{ error_message }}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-error">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if file_hash %}
+        <div style="background-color: #0b1329; border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.85rem;">
+            <div style="margin-bottom: 0.35rem; color: var(--text-muted);">
+                <strong style="color: var(--accent-cyan);">{% trans "Identificador del documento:" %}</strong><br>
+                <code style="word-break: break-all; color: #bae6fd; font-family: monospace;">{{ file_hash }}</code>
+            </div>
+            {% if email %}
+                <div style="color: var(--text-muted); margin-top: 0.5rem;">
+                    <strong style="color: var(--accent-cyan);">{% trans "Dirección de correo:" %}</strong> {{ email }}
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <form method="POST" autocomplete="off">
+        {% csrf_token %}
+        {{ form.file_hash }}
+        {{ form.email }}
+
+        <div class="form-group">
+            <label for="{{ form.otp_code.id_for_label }}" class="form-label">
+                {{ form.otp_code.label }} *
+            </label>
+            {{ form.otp_code }}
+            {% if form.otp_code.errors %}
+                <div style="color: var(--accent-rose); font-size: 0.85rem; margin-top: 0.35rem;">
+                    {{ form.otp_code.errors.0 }}
+                </div>
+            {% endif %}
+            <span class="form-help">{{ form.otp_code.help_text }}</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 1rem; width: 100%;">
+            {% trans "Verificar código y descargar documento" %}
+        </button>
+    </form>
+
+    <script>
+    window.addEventListener("pageshow", function(event) {
+        const otpInput = document.getElementById("otp_code");
+        if (otpInput) {
+            otpInput.value = "";
+        }
+    });
+    </script>
+
+    <div style="background-color: #0b1329; border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 8px; padding: 1.25rem; margin-top: 2rem;">
+        <h3 style="font-size: 0.95rem; color: #fca5a5; margin-bottom: 0.5rem;">
+            {% trans "Avisos de seguridad:" %}
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.5rem;">
+            {% trans "Dispone de un máximo de 3 intentos para introducir el código de verificación recibido." %}
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+            {% trans "Por motivos de confidencialidad, el documento dejará de estar disponible en la plataforma una vez completada la entrega." %}
+        </p>
+    </div>
+</div>
+{% endblock %}

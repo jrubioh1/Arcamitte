@@ -1,0 +1,2423 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-24 10:48+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: arcamitte/admin.py:501 arcamitte/admin.py:1301 arcamitte/models.py:208
+#: arcamitte/models.py:455 arcamitte/templates/arcamitte/dashboard.html:96
+msgid "UO Emisora"
+msgstr ""
+
+#: arcamitte/admin.py:503
+msgid "Unidad Organizativa que emite y custodia el documento confidencial."
+msgstr ""
+
+#: arcamitte/admin.py:507 arcamitte/admin.py:623 arcamitte/models.py:217
+msgid "UO Receptora (Malla)"
+msgstr ""
+
+#: arcamitte/admin.py:511 arcamitte/admin.py:627
+msgid ""
+"Unidad Organizativa de destino si se trata de un trámite inter-departamental "
+"(permite auto-completar buzón y miembros)."
+msgstr ""
+
+#: arcamitte/admin.py:515
+msgid "Archivo confidencial original"
+msgstr "Archivo confidencial original"
+
+#: arcamitte/admin.py:518
+msgid ""
+"Formatos admitidos: PDF, LibreOffice (.odt, .ods, .odp, .odg) o Microsoft "
+"Office (.docx, .xlsx, .pptx, .doc, .xls, .ppt)."
+msgstr ""
+"Formatos admitidos: PDF, LibreOffice (.odt, .ods, .odp, .odg) o Microsoft "
+"Office (.docx, .xlsx, .pptx, .doc, .xls, .ppt)."
+
+#: arcamitte/admin.py:522 arcamitte/admin.py:639 arcamitte/models.py:170
+msgid "Descripción del documento"
+msgstr "Descripción del documento"
+
+#: arcamitte/admin.py:529 arcamitte/admin.py:645
+msgid "Descripción informativa o motivo confidencial del trámite..."
+msgstr "Descripción informativa o motivo confidencial del trámite..."
+
+#: arcamitte/admin.py:533
+msgid ""
+"Descripción que se incluirá en las notificaciones por correo y en la "
+"plantilla corporativa."
+msgstr ""
+"Descripción que se incluirá en las notificaciones por correo y en la "
+"plantilla corporativa."
+
+#: arcamitte/admin.py:537 arcamitte/admin.py:653 arcamitte/models.py:192
+msgid "Correos autorizados"
+msgstr "Correos autorizados"
+
+#: arcamitte/admin.py:539
+msgid "Direcciones de correo autorizadas para solicitar el canje con OTP."
+msgstr "Direcciones de correo autorizadas para solicitar el canje con OTP."
+
+#: arcamitte/admin.py:542 arcamitte/admin.py:659
+msgid "Política de Destrucción"
+msgstr "Política de Destrucción"
+
+#: arcamitte/admin.py:548
+msgid ""
+"Seleccione si el archivo en disco debe destruirse de inmediato al primer "
+"acceso de cualquiera o conservarse hasta que todos los destinatarios "
+"autorizados lo hayan descargado."
+msgstr ""
+"Seleccione si el archivo en disco debe destruirse de inmediato al primer "
+"acceso de cualquiera o conservarse hasta que todos los destinatarios "
+"autorizados lo hayan descargado."
+
+#: arcamitte/admin.py:552 arcamitte/admin.py:665 arcamitte/models.py:257
+#: arcamitte/models.py:367 arcamitte/models.py:577
+msgid "Fecha de caducidad"
+msgstr "Fecha de caducidad"
+
+#: arcamitte/admin.py:560
+msgid ""
+"Fecha y hora límite de validez del asiento (por defecto, 2 semanas desde el "
+"registro). Llegada la fecha sin acceso, el asiento se cerrará "
+"automáticamente y el archivo se destruirá físicamente en disco."
+msgstr ""
+
+#: arcamitte/admin.py:580
+msgid "Debe seleccionar una Unidad Organizativa emisora a la que pertenezca."
+msgstr ""
+
+#: arcamitte/admin.py:588
+msgid "No dispone de membresía activa en la Unidad Organizativa seleccionada."
+msgstr ""
+
+#: arcamitte/admin.py:595 arcamitte/dashboard_views.py:260
+msgid "La fecha de caducidad debe ser posterior a la fecha y hora actual."
+msgstr ""
+
+#: arcamitte/admin.py:604
+msgid "Debe seleccionar un archivo."
+msgstr "Debe seleccionar un archivo."
+
+#: arcamitte/admin.py:631
+msgid "Re-subir archivo original (Reactivar)"
+msgstr "Re-subir archivo original (Reactivar)"
+
+#: arcamitte/admin.py:635
+msgid ""
+"Si el documento ya fue consumido o desea habilitar nuevos destinatarios, "
+"suba aquí el archivo original. Se re-cifrará y reactivará manteniendo la "
+"trazabilidad histórica."
+msgstr ""
+"Si el documento ya fue consumido o desea habilitar nuevos destinatarios, "
+"suba aquí el archivo original. Se re-cifrará y reactivará manteniendo la "
+"trazabilidad histórica."
+
+#: arcamitte/admin.py:649
+msgid ""
+"Descripción que se incluirá en las notificaciones por correo y en la "
+"plantilla corporativa. Puede modificarse tanto en documentos activos como "
+"reactivados."
+msgstr ""
+"Descripción que se incluirá en las notificaciones por correo y en la "
+"plantilla corporativa. Puede modificarse tanto en documentos activos como "
+"reactivados."
+
+#: arcamitte/admin.py:656
+msgid "Destinatarios autorizados a solicitar el canje con OTP."
+msgstr "Destinatarios autorizados a solicitar el canje con OTP."
+
+#: arcamitte/admin.py:673
+msgid ""
+"Fecha y hora límite de validez del asiento. Superada la fecha sin acceso, el "
+"archivo físico se destruye en disco."
+msgstr ""
+
+#: arcamitte/admin.py:838
+msgid "Unidades Organizativas (Malla)"
+msgstr ""
+
+#: arcamitte/admin.py:842
+msgid ""
+"Seleccione la UO emisora responsable del documento y, opcionalmente, la UO "
+"receptora de destino para el trámite en malla."
+msgstr ""
+
+#: arcamitte/admin.py:847
+msgid "Registro de Documento"
+msgstr "Registro de Documento"
+
+#: arcamitte/admin.py:851
+#, fuzzy
+#| msgid ""
+#| "Suba el documento original, configure la descripción informativa, los "
+#| "correos autorizados y seleccione la política de acceso (descarga única vs "
+#| "cuando accedan todos)."
+msgid ""
+"Suba el documento original, configure la descripción informativa, los "
+"correos autorizados, la política de acceso y la fecha de caducidad del "
+"asiento (por defecto 2 semanas)."
+msgstr ""
+"Suba el documento original, configure la descripción informativa, los "
+"correos autorizados y seleccione la política de acceso (descarga única vs "
+"cuando accedan todos)."
+
+#: arcamitte/admin.py:858
+msgid "Identificación del Documento"
+msgstr "Identificación del Documento"
+
+#: arcamitte/admin.py:874
+msgid "Ciclo de Vida y Reactivación"
+msgstr "Ciclo de Vida y Reactivación"
+
+#: arcamitte/admin.py:889
+msgid "Destinatarios Autorizados"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/admin.py:1060
+msgid ""
+"Los asientos documentales son inmutables. Utilice la función de finalización "
+"de asiento con constancia de vicisitud."
+msgstr ""
+
+#: arcamitte/admin.py:1065
+msgid ""
+"Los asientos documentales son inmutables. Utilice la acción masiva de "
+"finalización de asientos."
+msgstr ""
+
+#: arcamitte/admin.py:1169
+msgid ""
+"No cuenta con permisos para realizar descargas de auditoría administrativa."
+msgstr ""
+"No cuenta con permisos para realizar descargas de auditoría administrativa."
+
+#: arcamitte/admin.py:1173 arcamitte/admin.py:1210
+msgid "Documento no encontrado."
+msgstr "Documento no encontrado."
+
+#: arcamitte/admin.py:1178
+msgid ""
+"El documento ya fue entregado y no se encuentra disponible en la pasarela."
+msgstr ""
+"El documento ya fue entregado y no se encuentra disponible en la pasarela."
+
+#: arcamitte/admin.py:1217
+#, fuzzy
+#| msgid ""
+#| "No cuenta con permisos para realizar descargas de auditoría "
+#| "administrativa."
+msgid "No tiene permisos para gestionar este asiento documental."
+msgstr ""
+"No cuenta con permisos para realizar descargas de auditoría administrativa."
+
+#: arcamitte/admin.py:1222
+msgid ""
+"Este asiento ya se encuentra finalizado y su archivo físico ha sido retirado."
+msgstr ""
+
+#: arcamitte/admin.py:1246
+msgid "Finalizar Asiento Documental (Constancia de Vicisitud)"
+msgstr ""
+
+#: arcamitte/admin.py:1252
+msgid "⏹️ Finalizar asientos seleccionados (triturar archivo y dejar vicisitud)"
+msgstr ""
+
+#: arcamitte/admin.py:1283 arcamitte/models.py:426
+msgid "Descarga de auditoría administrativa"
+msgstr "Descarga de auditoría administrativa"
+
+#: arcamitte/admin.py:1286
+msgid "No cuenta con permisos de auditoría."
+msgstr "No cuenta con permisos de auditoría."
+
+#: arcamitte/admin.py:1292
+msgid ""
+"Por motivos de seguridad, la descarga de auditoría debe realizarse de forma "
+"individual por documento."
+msgstr ""
+"Por motivos de seguridad, la descarga de auditoría debe realizarse de forma "
+"individual por documento."
+
+#: arcamitte/admin.py:1313 arcamitte/models.py:463
+msgid "UO Receptora"
+msgstr ""
+
+#: arcamitte/admin.py:1325 arcamitte/models.py:177
+#: arcamitte/templates/arcamitte/dashboard.html:95
+#: arcamitte/templates/arcamitte/document_list.html:56
+msgid "Hash SHA-256"
+msgstr "Hash SHA-256"
+
+#: arcamitte/admin.py:1334 arcamitte/templates/arcamitte/document_list.html:59
+msgid "Política"
+msgstr "Política"
+
+#: arcamitte/admin.py:1344 arcamitte/templates/arcamitte/api_tokens.html:53
+#: arcamitte/templates/arcamitte/dashboard.html:97
+#: arcamitte/templates/arcamitte/document_detail.html:135
+#: arcamitte/templates/arcamitte/document_list.html:61
+#: arcamitte/templates/arcamitte/uo_list.html:24
+msgid "Estado"
+msgstr "Estado"
+
+#: arcamitte/admin.py:1348
+msgid "desconocido"
+msgstr "desconocido"
+
+#: arcamitte/admin.py:1367 arcamitte/templates/arcamitte/dashboard.html:98
+msgid "Fecha"
+msgstr ""
+
+#: arcamitte/admin.py:1376 arcamitte/templates/arcamitte/document_list.html:60
+msgid "Caducidad"
+msgstr ""
+
+#: arcamitte/admin.py:1419 arcamitte/templates/arcamitte/api_tokens.html:54
+#: arcamitte/templates/arcamitte/dashboard.html:99
+#: arcamitte/templates/arcamitte/document_list.html:62
+#, fuzzy
+#| msgid "Acción"
+msgid "Acciones"
+msgstr "Acción"
+
+#: arcamitte/admin.py:1436
+msgid "Plantilla Correo"
+msgstr "Plantilla Correo"
+
+#: arcamitte/admin.py:1450 arcamitte/templates/arcamitte/dashboard.html:154
+msgid "Auditoría"
+msgstr "Auditoría"
+
+#: arcamitte/admin.py:1465
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:10
+msgid "Finalizar Asiento"
+msgstr ""
+
+#: arcamitte/admin.py:1476
+msgid "Eliminar"
+msgstr "Eliminar"
+
+#: arcamitte/admin.py:1540
+msgid "Archivo JSON de aprovisionamiento"
+msgstr ""
+
+#: arcamitte/admin.py:1542
+msgid ""
+"Archivo con extensión .json que contenga las definiciones de "
+"'organizational_units' y 'users' según el esquema oficial."
+msgstr ""
+
+#: arcamitte/admin.py:1549
+#, fuzzy
+#| msgid "Debe seleccionar un archivo."
+msgid "Debe adjuntar un archivo JSON."
+msgstr "Debe seleccionar un archivo."
+
+#: arcamitte/admin.py:1551
+msgid "El archivo debe tener extensión .json."
+msgstr ""
+
+#: arcamitte/admin.py:1584
+msgid "Miembros activos"
+msgstr ""
+
+#: arcamitte/admin.py:1630
+msgid ""
+"Solo el Rol Maestro (Superusuario) puede realizar cargas masivas de UOs y "
+"Usuarios."
+msgstr ""
+
+#: arcamitte/admin.py:1666
+msgid "Carga Masiva de Unidades Organizativas y Usuarios (JSON)"
+msgstr ""
+
+#: arcamitte/authentication.py:38
+msgid "Formato de token de API inválido. Debe comenzar con 'arca_live_'."
+msgstr ""
+
+#: arcamitte/authentication.py:51
+#, fuzzy
+#| msgid "Error al enviar el correo electrónico con las credenciales."
+msgid "Error al verificar credenciales."
+msgstr "Error al enviar el correo electrónico con las credenciales."
+
+#: arcamitte/authentication.py:55
+msgid "Token de API inválido, revocado o expirado."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:209
+#, fuzzy
+#| msgid "Debe seleccionar un archivo."
+msgid "Debe seleccionar un archivo confidencial para cifrar."
+msgstr "Debe seleccionar un archivo."
+
+#: arcamitte/dashboard_views.py:219
+#, fuzzy
+#| msgid "Debe seleccionar un archivo."
+msgid "Debe seleccionar la UO emisora responsable."
+msgstr "Debe seleccionar un archivo."
+
+#: arcamitte/dashboard_views.py:224
+msgid "No tiene autorización operativa sobre la UO emisora seleccionada."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:255
+msgid "El formato de fecha de caducidad es inválido."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:322
+msgid "No tiene autorización para inspeccionar este documento."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:381 arcamitte/dashboard_views.py:400
+msgid ""
+"Solo la UO emisora o un superadministrador puede clausurar el documento."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:384
+#, fuzzy
+#| msgid "El documento ya no se encuentra disponible para su descarga."
+msgid "Este documento ya no se encuentra activo."
+msgstr "El documento ya no se encuentra disponible para su descarga."
+
+#: arcamitte/dashboard_views.py:404
+msgid "Debe proporcionar un motivo justificado para la destrucción anticipada."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:509 arcamitte/dashboard_views.py:523
+msgid "Se requieren privilegios administrativos para gestionar API Tokens."
+msgstr ""
+
+#: arcamitte/dashboard_views.py:527
+#, fuzzy
+#| msgid "Debe proporcionar la contraseña de descifrado recibida por correo."
+msgid "Debe proporcionar un nombre o identificador para el servicio."
+msgstr "Debe proporcionar la contraseña de descifrado recibida por correo."
+
+#: arcamitte/dashboard_views.py:573
+msgid "Se requieren privilegios administrativos para revocar API Tokens."
+msgstr ""
+
+#: arcamitte/forms.py:21
+msgid "Identificador del Documento (Hash SHA-256)"
+msgstr "Identificador del Documento (Hash SHA-256)"
+
+#: arcamitte/forms.py:27
+msgid "Cadena hexadecimal de 64 caracteres"
+msgstr "Cadena hexadecimal de 64 caracteres"
+
+#: arcamitte/forms.py:33
+msgid ""
+"Identificador de 64 caracteres facilitado para la descarga del documento."
+msgstr ""
+"Identificador de 64 caracteres facilitado para la descarga del documento."
+
+#: arcamitte/forms.py:36 arcamitte/templates/arcamitte/document_detail.html:134
+msgid "Correo Electrónico"
+msgstr "Correo Electrónico"
+
+#: arcamitte/forms.py:40
+msgid "su-correo@empresa.com"
+msgstr "su-correo@empresa.com"
+
+#: arcamitte/forms.py:45
+msgid ""
+"Dirección de correo autorizada donde recibirá el código de verificación."
+msgstr ""
+"Dirección de correo autorizada donde recibirá el código de verificación."
+
+#: arcamitte/forms.py:52
+msgid ""
+"El identificador SHA-256 debe componerse de 64 caracteres hexadecimales "
+"[0-9a-f]."
+msgstr ""
+"El identificador SHA-256 debe componerse de 64 caracteres hexadecimales "
+"[0-9a-f]."
+
+#: arcamitte/forms.py:77
+msgid "Código de Verificación (6 dígitos)"
+msgstr "Código de Verificación (6 dígitos)"
+
+#: arcamitte/forms.py:90
+msgid "Introduzca el código de 6 dígitos recibido en su correo electrónico."
+msgstr "Introduzca el código de 6 dígitos recibido en su correo electrónico."
+
+#: arcamitte/forms.py:96
+msgid "El identificador SHA-256 no es válido."
+msgstr "El identificador SHA-256 no es válido."
+
+#: arcamitte/forms.py:106
+msgid "El código de verificación debe contener 6 dígitos numéricos."
+msgstr "El código de verificación debe contener 6 dígitos numéricos."
+
+#: arcamitte/models.py:30
+msgid "Código numérico único"
+msgstr ""
+
+#: arcamitte/models.py:31
+msgid "Identificador numérico único de la Unidad Organizativa (ej. 1001)."
+msgstr ""
+
+#: arcamitte/models.py:37
+msgid "Alias / Siglas"
+msgstr ""
+
+#: arcamitte/models.py:38
+msgid ""
+"Siglas o código textual único en mayúsculas (ej. RRHH, LEGAL, AUDITORIA)."
+msgstr ""
+
+#: arcamitte/models.py:42
+msgid "Nombre descriptivo"
+msgstr ""
+
+#: arcamitte/models.py:43
+msgid "Denominación oficial completa de la Unidad Organizativa."
+msgstr ""
+
+#: arcamitte/models.py:47
+msgid "Correo oficial / Buzón general de la UO"
+msgstr ""
+
+#: arcamitte/models.py:48
+msgid ""
+"Dirección de correo electrónico corporativo o buzón compartido de la UO."
+msgstr ""
+
+#: arcamitte/models.py:53
+#, fuzzy
+#| msgid "Dirección IP"
+msgid "Descripción"
+msgstr "Dirección IP"
+
+#: arcamitte/models.py:54
+#, fuzzy
+#| msgid ""
+#| "Descripción informativa para las notificaciones por correo electrónico."
+msgid "Descripción informativa sobre las funciones de esta unidad."
+msgstr ""
+"Descripción informativa para las notificaciones por correo electrónico."
+
+#: arcamitte/models.py:59
+msgid "¿Activa?"
+msgstr ""
+
+#: arcamitte/models.py:60
+msgid "Indica si la UO está operativa para emitir y recibir trámites."
+msgstr ""
+
+#: arcamitte/models.py:64 arcamitte/models.py:262
+msgid "Fecha de alta"
+msgstr "Fecha de alta"
+
+#: arcamitte/models.py:68 arcamitte/models.py:267
+msgid "Fecha de actualización"
+msgstr "Fecha de actualización"
+
+#: arcamitte/models.py:72 arcamitte/models.py:111
+msgid "Unidad Organizativa"
+msgstr ""
+
+#: arcamitte/models.py:73
+#: arcamitte/templates/admin/arcamitte/import_batch.html:8
+#: arcamitte/templates/arcamitte/base.html:80
+#: arcamitte/templates/arcamitte/uo_list.html:4
+msgid "Unidades Organizativas"
+msgstr ""
+
+#: arcamitte/models.py:97
+msgid "Operador (Emisión y consulta de trámites)"
+msgstr ""
+
+#: arcamitte/models.py:98
+msgid "Auditor (Inspección y descarga legal preservada)"
+msgstr ""
+
+#: arcamitte/models.py:99
+msgid "Administrador de UO (Gestión de usuarios y documentos de la UO)"
+msgstr ""
+
+#: arcamitte/models.py:105 arcamitte/templates/arcamitte/login.html:57
+msgid "Usuario"
+msgstr ""
+
+#: arcamitte/models.py:117
+msgid "Rol en la UO"
+msgstr ""
+
+#: arcamitte/models.py:118
+msgid "Nivel de privilegios dentro de esta Unidad Organizativa."
+msgstr ""
+
+#: arcamitte/models.py:122
+msgid "¿Membresía activa?"
+msgstr ""
+
+#: arcamitte/models.py:123
+msgid "Indica si el usuario tiene acceso operativo actual a esta UO."
+msgstr ""
+
+#: arcamitte/models.py:127
+#, fuzzy
+#| msgid "Fecha de actualización"
+msgid "Fecha de asignación"
+msgstr "Fecha de actualización"
+
+#: arcamitte/models.py:131
+msgid "Membresía de Usuario en UO"
+msgstr ""
+
+#: arcamitte/models.py:132
+msgid "Membresías de Usuarios en UOs"
+msgstr ""
+
+#: arcamitte/models.py:158
+msgid "Descarga única (primer acceso)"
+msgstr "Descarga única (primer acceso)"
+
+#: arcamitte/models.py:159
+msgid "Disponible para todos los destinatarios"
+msgstr "Disponible para todos los destinatarios"
+
+#: arcamitte/models.py:164
+msgid "Nombre original del documento"
+msgstr "Nombre original del documento"
+
+#: arcamitte/models.py:165
+msgid "Nombre del archivo original cargado en el sistema."
+msgstr "Nombre del archivo original cargado en el sistema."
+
+#: arcamitte/models.py:171
+msgid "Descripción informativa para las notificaciones por correo electrónico."
+msgstr ""
+"Descripción informativa para las notificaciones por correo electrónico."
+
+#: arcamitte/models.py:178
+msgid "Hash SHA-256 hexadecimal (64 caracteres) del archivo original."
+msgstr "Hash SHA-256 hexadecimal (64 caracteres) del archivo original."
+
+#: arcamitte/models.py:182
+msgid "Archivo cifrado"
+msgstr "Archivo cifrado"
+
+#: arcamitte/models.py:183
+msgid "Archivo binario cifrado en reposo con la DEK."
+msgstr "Archivo binario cifrado en reposo con la DEK."
+
+#: arcamitte/models.py:187
+msgid "Clave Maestra de Datos (DEK) cifrada"
+msgstr "Clave Maestra de Datos (DEK) cifrada"
+
+#: arcamitte/models.py:188
+msgid "DEK cifrada internamente con settings.ARCAMITTE_FERNET_KEY."
+msgstr "DEK cifrada internamente con settings.ARCAMITTE_FERNET_KEY."
+
+#: arcamitte/models.py:193
+msgid "Lista de correos autorizados en minúsculas."
+msgstr "Lista de correos autorizados en minúsculas."
+
+#: arcamitte/models.py:199
+msgid "Política de destrucción"
+msgstr "Política de destrucción"
+
+#: arcamitte/models.py:200
+msgid "Determina si se destruye al primer acceso o tras el acceso de todos."
+msgstr "Determina si se destruye al primer acceso o tras el acceso de todos."
+
+#: arcamitte/models.py:209
+msgid "Unidad Organizativa responsable de la emisión del documento."
+msgstr ""
+
+#: arcamitte/models.py:218
+msgid ""
+"Unidad Organizativa de destino si se trata de un trámite inter-departamental."
+msgstr ""
+
+#: arcamitte/models.py:226
+#, fuzzy
+#| msgid "Consumido por"
+msgid "Subido por"
+msgstr "Consumido por"
+
+#: arcamitte/models.py:227
+msgid "Usuario que dio de alta el documento en el sistema."
+msgstr ""
+
+#: arcamitte/models.py:232
+msgid "Destinatarios que han consumido"
+msgstr "Destinatarios que han consumido"
+
+#: arcamitte/models.py:233
+msgid "Lista de correos que ya han descargado su copia individual."
+msgstr "Lista de correos que ya han descargado su copia individual."
+
+#: arcamitte/models.py:238
+msgid "¿Documento consumido?"
+msgstr "¿Documento consumido?"
+
+#: arcamitte/models.py:239
+msgid "Indica si el documento ya fue canjeado y destruido del almacenamiento."
+msgstr "Indica si el documento ya fue canjeado y destruido del almacenamiento."
+
+#: arcamitte/models.py:245
+msgid "Consumido por"
+msgstr "Consumido por"
+
+#: arcamitte/models.py:246
+msgid ""
+"Correo del usuario o resumen de destinatarios que retiraron el documento."
+msgstr ""
+"Correo del usuario o resumen de destinatarios que retiraron el documento."
+
+#: arcamitte/models.py:251
+msgid "Fecha y hora del canje"
+msgstr "Fecha y hora del canje"
+
+#: arcamitte/models.py:252
+msgid "Momento exacto en el que el documento fue canjeado."
+msgstr "Momento exacto en el que el documento fue canjeado."
+
+#: arcamitte/models.py:258
+msgid ""
+"Fecha límite tras la cual el asiento se cerrará y el archivo será destruido "
+"físicamente (por defecto 2 semanas)."
+msgstr ""
+
+#: arcamitte/models.py:263
+msgid "Marca temporal de creación del registro."
+msgstr "Marca temporal de creación del registro."
+
+#: arcamitte/models.py:268
+msgid "Marca temporal de la última actualización."
+msgstr "Marca temporal de la última actualización."
+
+#: arcamitte/models.py:272
+msgid "Documento Cifrado"
+msgstr "Documento Cifrado"
+
+#: arcamitte/models.py:273
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:8
+#: arcamitte/templates/arcamitte/base.html:48
+#: arcamitte/templates/arcamitte/document_list.html:9
+msgid "Documentos Cifrados"
+msgstr "Documentos Cifrados"
+
+#: arcamitte/models.py:276
+msgid "Puede realizar descarga de auditoría administrativa"
+msgstr "Puede realizar descarga de auditoría administrativa"
+
+#: arcamitte/models.py:337
+msgid ""
+"Los asientos documentales son inmutables y no pueden eliminarse. Utilice la "
+"función de finalización de asiento con constancia de vicisitud."
+msgstr ""
+
+#: arcamitte/models.py:351 arcamitte/models.py:432
+#: arcamitte/templates/arcamitte/audit_logs.html:52
+#: arcamitte/templates/arcamitte/document_list.html:55
+msgid "Documento"
+msgstr "Documento"
+
+#: arcamitte/models.py:355
+msgid "Correo oficial del solicitante"
+msgstr "Correo oficial del solicitante"
+
+#: arcamitte/models.py:359
+msgid "Código OTP"
+msgstr "Código OTP"
+
+#: arcamitte/models.py:360
+msgid "Código numérico de 6 dígitos generado criptográficamente."
+msgstr "Código numérico de 6 dígitos generado criptográficamente."
+
+#: arcamitte/models.py:364 arcamitte/models.py:588
+msgid "Fecha de creación"
+msgstr "Fecha de creación"
+
+#: arcamitte/models.py:368
+msgid "Caducidad estricta a 15 minutos."
+msgstr "Caducidad estricta a 15 minutos."
+
+#: arcamitte/models.py:372
+msgid "¿Utilizado?"
+msgstr "¿Utilizado?"
+
+#: arcamitte/models.py:373
+msgid "Indica si el token ya fue consumido o revocado."
+msgstr "Indica si el token ya fue consumido o revocado."
+
+#: arcamitte/models.py:377
+msgid "Intentos fallidos"
+msgstr "Intentos fallidos"
+
+#: arcamitte/models.py:378
+msgid "Contador de intentos fallidos. Se revoca al alcanzar 3."
+msgstr "Contador de intentos fallidos. Se revoca al alcanzar 3."
+
+#: arcamitte/models.py:382
+msgid "Token de Verificación OTP"
+msgstr "Token de Verificación OTP"
+
+#: arcamitte/models.py:383
+msgid "Tokens de Verificación OTP"
+msgstr "Tokens de Verificación OTP"
+
+#: arcamitte/models.py:417
+msgid "Solicitud de código de verificación"
+msgstr "Solicitud de código de verificación"
+
+#: arcamitte/models.py:418
+msgid "Código de verificación enviado"
+msgstr "Código de verificación enviado"
+
+#: arcamitte/models.py:419
+msgid "Descarga completada y retirada de la pasarela"
+msgstr "Descarga completada y retirada de la pasarela"
+
+#: arcamitte/models.py:420
+msgid "Descarga individual completada (en espera de restantes destinatarios)"
+msgstr "Descarga individual completada (en espera de restantes destinatarios)"
+
+#: arcamitte/models.py:421
+msgid "Reactivación de documento"
+msgstr "Reactivación de documento"
+
+#: arcamitte/models.py:422
+msgid "Finalización manual del asiento (destrucción física)"
+msgstr ""
+
+#: arcamitte/models.py:423
+msgid "Caducidad automática del asiento por vencimiento"
+msgstr ""
+
+#: arcamitte/models.py:424
+msgid "Acceso a documento no disponible"
+msgstr "Acceso a documento no disponible"
+
+#: arcamitte/models.py:425
+msgid "Código bloqueado por intentos fallidos"
+msgstr "Código bloqueado por intentos fallidos"
+
+#: arcamitte/models.py:436
+msgid "Correo del solicitante"
+msgstr "Correo del solicitante"
+
+#: arcamitte/models.py:441 arcamitte/templates/arcamitte/audit_logs.html:51
+#: arcamitte/templates/arcamitte/document_detail.html:196
+msgid "Acción"
+msgstr "Acción"
+
+#: arcamitte/models.py:446
+msgid "Detalles / Constancia de vicisitud"
+msgstr ""
+
+#: arcamitte/models.py:447
+msgid "Información contextual, motivo de la vicisitud o justificación legal."
+msgstr ""
+
+#: arcamitte/models.py:468 arcamitte/templates/arcamitte/audit_logs.html:53
+#: arcamitte/templates/arcamitte/document_detail.html:197
+msgid "Dirección IP"
+msgstr "Dirección IP"
+
+#: arcamitte/models.py:473
+msgid "User-Agent"
+msgstr "User-Agent"
+
+#: arcamitte/models.py:477
+msgid "Fecha y hora"
+msgstr "Fecha y hora"
+
+#: arcamitte/models.py:481
+msgid "Registro de Auditoría de Acceso"
+msgstr "Registro de Auditoría de Acceso"
+
+#: arcamitte/models.py:482
+msgid "Registros de Auditoría de Accesos"
+msgstr "Registros de Auditoría de Accesos"
+
+#: arcamitte/models.py:499
+msgid ""
+"Los registros de auditoría legal son estrictamente inmutables y no pueden "
+"eliminarse del sistema."
+msgstr ""
+
+#: arcamitte/models.py:514
+#, fuzzy
+#| msgid "Documentos Cifrados"
+msgid "Subir y registrar documentos cifrados"
+msgstr "Documentos Cifrados"
+
+#: arcamitte/models.py:515
+#, fuzzy
+#| msgid "Descarga Segura de Documentos"
+msgid "Consultar estado de documentos"
+msgstr "Descarga Segura de Documentos"
+
+#: arcamitte/models.py:516
+msgid "Finalizar y destruir asientos documentales"
+msgstr ""
+
+#: arcamitte/models.py:517
+#, fuzzy
+#| msgid "No cuenta con permisos de auditoría."
+msgid "Consultar registros de auditoría legal"
+msgstr "No cuenta con permisos de auditoría."
+
+#: arcamitte/models.py:521
+msgid "Nombre descriptivo del servicio / cliente"
+msgstr ""
+
+#: arcamitte/models.py:522
+msgid ""
+"Nombre del microservicio o sistema autorizado (ej. 'ERP Nóminas', 'CRM "
+"Ventas')."
+msgstr ""
+
+#: arcamitte/models.py:527
+msgid "Prefijo público visible"
+msgstr ""
+
+#: arcamitte/models.py:528
+msgid ""
+"Primeros caracteres del token para identificación (ej. 'arca_live_a1b2')."
+msgstr ""
+
+#: arcamitte/models.py:534
+#, fuzzy
+#| msgid "Hash SHA-256"
+msgid "Hash SHA-256 del token"
+msgstr "Hash SHA-256"
+
+#: arcamitte/models.py:535
+msgid ""
+"Hash criptográfico en reposo. El secreto original nunca se almacena en el "
+"servidor."
+msgstr ""
+
+#: arcamitte/models.py:543
+msgid "Unidad Organizativa asignada"
+msgstr ""
+
+#: arcamitte/models.py:544
+msgid ""
+"UO a la que se circunscriben los trámites emitidos por este token (opcional)."
+msgstr ""
+
+#: arcamitte/models.py:552
+#, fuzzy
+#| msgid "Consumido por"
+msgid "Emitido por"
+msgstr "Consumido por"
+
+#: arcamitte/models.py:556
+#, fuzzy
+#| msgid "Correos autorizados"
+msgid "Permisos / Scopes autorizados"
+msgstr "Correos autorizados"
+
+#: arcamitte/models.py:557
+msgid ""
+"Lista de scopes concedidos (ej. ['documents:create', 'documents:read'])."
+msgstr ""
+
+#: arcamitte/models.py:561
+msgid "Límite de peticiones por minuto"
+msgstr ""
+
+#: arcamitte/models.py:562
+msgid "Tasa máxima de peticiones por minuto permitidas para este token."
+msgstr ""
+
+#: arcamitte/models.py:567
+#, fuzzy
+#| msgid "Fecha de alta"
+msgid "Fecha de último uso"
+msgstr "Fecha de alta"
+
+#: arcamitte/models.py:572
+#, fuzzy
+#| msgid "Dirección IP"
+msgid "Última dirección IP"
+msgstr "Dirección IP"
+
+#: arcamitte/models.py:578
+msgid ""
+"Fecha límite tras la cual el token queda automáticamente invalidado "
+"(opcional)."
+msgstr ""
+
+#: arcamitte/models.py:583
+msgid "¿Activo?"
+msgstr ""
+
+#: arcamitte/models.py:584
+msgid ""
+"Permite revocar el token de forma instantánea sin eliminar el registro "
+"histórico."
+msgstr ""
+
+#: arcamitte/models.py:592
+msgid "Token de API"
+msgstr ""
+
+#: arcamitte/models.py:593
+msgid "Tokens de API"
+msgstr ""
+
+#: arcamitte/serializers.py:50
+#, fuzzy
+#| msgid ""
+#| "El identificador SHA-256 debe componerse de 64 caracteres hexadecimales "
+#| "[0-9a-f]."
+msgid ""
+"El hash SHA-256 debe componerse exactamente de 64 caracteres hexadecimales."
+msgstr ""
+"El identificador SHA-256 debe componerse de 64 caracteres hexadecimales "
+"[0-9a-f]."
+
+#: arcamitte/serializers.py:91
+#, fuzzy
+#| msgid "Hash SHA-256"
+msgid "Hash SHA-256 inválido."
+msgstr "Hash SHA-256"
+
+#: arcamitte/serializers.py:105
+msgid "El código OTP debe ser estrictamente numérico de 6 dígitos."
+msgstr ""
+
+#: arcamitte/serializers.py:164
+msgid "La fecha de caducidad debe ser posterior al momento actual."
+msgstr ""
+
+#: arcamitte/services.py:42
+msgid ""
+"Si los datos indicados corresponden a un documento disponible y una "
+"dirección de correo autorizada, recibirá en breve un código de verificación "
+"en su buzón."
+msgstr ""
+"Si los datos indicados corresponden a un documento disponible y una "
+"dirección de correo autorizada, recibirá en breve un código de verificación "
+"en su buzón."
+
+#: arcamitte/services.py:265
+msgid ""
+"El archivo proporcionado no coincide con el hash SHA-256 del documento "
+"original."
+msgstr ""
+"El archivo proporcionado no coincide con el hash SHA-256 del documento "
+"original."
+
+#: arcamitte/services.py:353
+#, fuzzy
+#| msgid "El documento ya no se encuentra disponible para su descarga."
+msgid "El asiento ya se encuentra finalizado y el archivo ha sido retirado."
+msgstr "El documento ya no se encuentra disponible para su descarga."
+
+#: arcamitte/services.py:386
+msgid ""
+"Asiento finalizado correctamente. El archivo ha sido destruido físicamente y "
+"la vicisitud ha quedado registrada en la auditoría legal."
+msgstr ""
+
+#: arcamitte/services.py:490
+#, python-format
+msgid "El archivo excede el tamaño máximo permitido de %(max_size)s MB."
+msgstr "El archivo excede el tamaño máximo permitido de %(max_size)s MB."
+
+#: arcamitte/services.py:503
+msgid "El usuario no pertenece a la UO emisora seleccionada."
+msgstr ""
+
+#: arcamitte/services.py:526
+msgid "Ya existe un documento registrado con este mismo hash SHA-256."
+msgstr "Ya existe un documento registrado con este mismo hash SHA-256."
+
+#: arcamitte/services.py:615
+msgid "fecha no registrada"
+msgstr "fecha no registrada"
+
+#: arcamitte/services.py:617
+msgid "un usuario autorizado"
+msgstr "un usuario autorizado"
+
+#: arcamitte/services.py:636
+#, python-format
+msgid "Información sobre su solicitud: Documento '%(filename)s'"
+msgstr "Información sobre su solicitud: Documento '%(filename)s'"
+
+#: arcamitte/services.py:672
+#, python-format
+msgid "Aviso: Copia ya descargada de '%(filename)s'"
+msgstr "Aviso: Copia ya descargada de '%(filename)s'"
+
+#: arcamitte/services.py:727
+#, python-format
+msgid "Código de verificación para '%(filename)s' - Arcamitte"
+msgstr "Código de verificación para '%(filename)s' - Arcamitte"
+
+#: arcamitte/services.py:831
+msgid "El código de verificación no es válido o ha expirado."
+msgstr "El código de verificación no es válido o ha expirado."
+
+#: arcamitte/services.py:840
+msgid ""
+"El plazo de disponibilidad de este documento ha expirado y el archivo ha "
+"sido retirado de la plataforma."
+msgstr ""
+
+#: arcamitte/services.py:845
+msgid "El documento ya no se encuentra disponible para su descarga."
+msgstr "El documento ya no se encuentra disponible para su descarga."
+
+#: arcamitte/services.py:857
+msgid ""
+"Usted ya ha descargado este documento con anterioridad. Cada destinatario "
+"dispone de un único acceso."
+msgstr ""
+"Usted ya ha descargado este documento con anterioridad. Cada destinatario "
+"dispone de un único acceso."
+
+#: arcamitte/services.py:878
+msgid ""
+"Ha superado el número máximo de intentos permitidos. El acceso ha sido "
+"bloqueado por seguridad."
+msgstr ""
+"Ha superado el número máximo de intentos permitidos. El acceso ha sido "
+"bloqueado por seguridad."
+
+#: arcamitte/services.py:886
+#, python-format
+msgid "Código de verificación incorrecto. Intentos restantes: %(remaining)d."
+msgstr "Código de verificación incorrecto. Intentos restantes: %(remaining)d."
+
+#: arcamitte/services.py:900
+msgid "El archivo cifrado no está disponible en el servidor."
+msgstr "El archivo cifrado no está disponible en el servidor."
+
+#: arcamitte/services.py:951
+msgid "Documento descifrado con éxito."
+msgstr "Documento descifrado con éxito."
+
+#: arcamitte/services.py:955
+msgid "Se produjo un error al procesar el descifrado del documento."
+msgstr "Se produjo un error al procesar el descifrado del documento."
+
+#: arcamitte/services.py:970
+msgid "El documento ya ha sido consumido y destruido del servidor."
+msgstr "El documento ya ha sido consumido y destruido del servidor."
+
+#: arcamitte/services.py:973
+msgid "El archivo cifrado no está disponible."
+msgstr "El archivo cifrado no está disponible."
+
+#: arcamitte/services.py:998
+msgid "No tiene permisos de auditoría en la UO asociada a este documento."
+msgstr ""
+
+#: arcamitte/services.py:1031
+msgid "Descarga de auditoría completada."
+msgstr "Descarga de auditoría completada."
+
+#: arcamitte/services.py:1035
+msgid "Error al descifrar el documento para auditoría."
+msgstr "Error al descifrar el documento para auditoría."
+
+#: arcamitte/services.py:1151
+msgid "El contenido JSON debe ser un objeto/diccionario raíz."
+msgstr ""
+
+#: arcamitte/services.py:1157
+msgid "'organizational_units' y 'users' deben ser listas JSON."
+msgstr ""
+
+#: arcamitte/services.py:1169
+msgid "Cada entrada en 'organizational_units' debe ser un objeto JSON."
+msgstr ""
+
+#: arcamitte/services.py:1207
+msgid "Cada entrada en 'users' debe ser un objeto JSON."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:6
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:6
+msgid "Inicio"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:9
+msgid "Carga Masiva JSON"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:16
+msgid "Importación Masiva de Unidades Organizativas y Usuarios"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:18
+msgid ""
+"Este módulo administrativo permite aprovisionar de forma simultánea e "
+"idempotente múltiples Unidades Organizativas (UO) y sus usuarios asociados "
+"(con roles de Operador, Auditor o Administrador de UO) mediante un archivo "
+"JSON estructurado."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:34
+msgid "Ejecutar Carga Masiva"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:35
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:88
+#: arcamitte/templates/arcamitte/document_upload.html:135
+msgid "Cancelar"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/import_batch.html:41
+msgid "Ejemplo de Estructura JSON Válida"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/organizationalunit_change_list.html:8
+msgid "Carga Masiva JSON (UOs + Usuarios)"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:20
+msgid "Finalizar Asiento Documental y Destruir Archivo Físico"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:21
+msgid "Constancia de vicisitud e inmutabilidad legal"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:26
+msgid "Atención: Operación Irreversible"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:27
+#, fuzzy
+#| msgid "Por motivos de seguridad, no comparta esta clave con terceros."
+msgid ""
+"Por motivos de seguridad y cumplimiento estricto del principio de no repudio:"
+msgstr "Por motivos de seguridad, no comparta esta clave con terceros."
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:29
+msgid "El archivo binario confidencial cifrado será"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:29
+msgid "destruido físicamente de disco"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:29
+msgid ""
+"mediante sobreescritura por bloques con datos criptográficos aleatorios "
+"(shredding)."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:30
+#, fuzzy
+#| msgid "Archivo Documental"
+msgid "El asiento documental"
+msgstr "Archivo Documental"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:30
+msgid "NO se eliminará"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:30
+msgid ""
+"de la base de datos, garantizando la trazabilidad inmutable del trámite."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:31
+msgid "Se generará un registro probatorio de"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:31
+msgid "Vicisitud (Finalización Manual)"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:31
+msgid ""
+"en el log de auditoría con su usuario, fecha/hora exacta, dirección IP y el "
+"motivo aportado."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:37
+msgid "Metadatos del Asiento"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:41
+#, fuzzy
+#| msgid "📄 Nombre del archivo: %(doc_name)s"
+msgid "Nombre del archivo:"
+msgstr "📄 Nombre del archivo: %(doc_name)s"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:45
+#, fuzzy
+#| msgid "Hash SHA-256"
+msgid "Hash SHA-256 (Localizador):"
+msgstr "Hash SHA-256"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:49
+#: arcamitte/templates/arcamitte/document_detail.html:59
+#: arcamitte/templates/arcamitte/document_terminate.html:44
+msgid "UO Emisora:"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:53
+#: arcamitte/templates/arcamitte/document_detail.html:69
+msgid "UO Receptora:"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:57
+#, fuzzy
+#| msgid "Fecha de alta"
+msgid "Fecha de alta:"
+msgstr "Fecha de alta"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:61
+#, fuzzy
+#| msgid "Fecha de caducidad"
+msgid "Fecha límite de caducidad:"
+msgstr "Fecha de caducidad"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:65
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "Destinatarios autorizados:"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:75
+msgid "Motivo o justificación de la vicisitud (opcional pero recomendado):"
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:77
+msgid ""
+"Ejemplo: Trámite completado por vía alternativa / Expediente cerrado "
+"formalmente / Documento remitido por error..."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:79
+msgid ""
+"Este motivo quedará registrado de forma inalterable en el log de auditoría "
+"del documento."
+msgstr ""
+
+#: arcamitte/templates/admin/arcamitte/terminate_confirmation.html:85
+msgid "Confirmar Finalización y Destruir Archivo Físico"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:4
+#: arcamitte/templates/arcamitte/base.html:70
+msgid "API Tokens (M2M)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:8
+msgid "Tokens de Acceso API"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:8
+msgid "Machine-to-Machine"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:10
+msgid ""
+"Autenticación segura para integración con otros microservicios y sistemas "
+"externos."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:18
+msgid "¡Nuevo API Token Generado con Éxito!"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:21
+msgid ""
+"Copie su clave secreta inmediatamente. Por directivas de seguridad Zero-"
+"Knowledge (NIST SP 800-63B), el servidor solo almacena el hash SHA-256 y "
+"esta clave"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:22
+msgid "NO volverá a ser visible nunca más."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:27
+#, fuzzy
+#| msgid "Copiar Hash"
+msgid "Copiar"
+msgstr "Copiar Hash"
+
+#: arcamitte/templates/arcamitte/api_tokens.html:31
+msgid "¡Copiado al portapapeles!"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:41
+msgid "Tokens Registrados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:42
+msgid "tokens"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:48
+msgid "Nombre / Servicio"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:49
+msgid "Prefijo"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:50
+msgid "Permisos (Scopes)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:51
+msgid "Límite"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:52
+#, fuzzy
+#| msgid "Último acceso"
+msgid "Último Uso"
+msgstr "Último acceso"
+
+#: arcamitte/templates/arcamitte/api_tokens.html:63
+msgid "Expira:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:84
+#, fuzzy
+#| msgid "fecha no registrada"
+msgid "Sin uso registrado"
+msgstr "fecha no registrada"
+
+#: arcamitte/templates/arcamitte/api_tokens.html:89
+msgid "Revocado"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:91
+#: arcamitte/templates/arcamitte/dashboard.html:119
+#: arcamitte/templates/arcamitte/document_detail.html:14
+#: arcamitte/templates/arcamitte/document_list.html:102
+msgid "Caducado"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:93
+#: arcamitte/templates/arcamitte/dashboard.html:121
+#: arcamitte/templates/arcamitte/document_detail.html:16
+#: arcamitte/templates/arcamitte/document_list.html:104
+msgid "Activo"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:100
+msgid "Revocar Token"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:101
+msgid "Revocar"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:113
+msgid "No hay API Tokens registrados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:114
+msgid ""
+"Genere un token a la derecha para permitir a otros microservicios invocar la "
+"API."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:129
+msgid "Generar Nuevo API Token"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:137
+msgid "Nombre del Servicio / Cliente"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:139
+msgid "Identificador descriptivo de la aplicación cliente."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:143
+msgid "Permisos de Acceso (Scopes)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:147
+#, fuzzy
+#| msgid "Cifrado y Registro de Nuevo Documento"
+msgid "Cifrado y registro de documentos"
+msgstr "Cifrado y Registro de Nuevo Documento"
+
+#: arcamitte/templates/arcamitte/api_tokens.html:153
+msgid "Consulta de estado y canje"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:159
+msgid "Revocación anticipada de asientos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:165
+msgid "Inspección de trazas de auditoría"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:172
+msgid "Tasa (req/min)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:176
+msgid "Validez (Días)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:182
+msgid "Crear y Emitir API Token"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:192
+msgid "Uso en Cabeceras HTTP"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/api_tokens.html:195
+msgid ""
+"Las llamadas M2M pueden autenticarse mediante cualquiera de los siguientes "
+"encabezados:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:4
+#: arcamitte/templates/arcamitte/base.html:64
+msgid "Trazabilidad Forense"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:8
+msgid "Trazabilidad Forense y Auditoría Legal"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:10
+msgid ""
+"Registro inmutable de accesos, operaciones criptográficas, canjes y "
+"vicisitudes del sistema."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:20
+msgid "Buscar por IP, hash, correo o detalles..."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:25
+msgid "Todas las acciones"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:33
+#: arcamitte/templates/arcamitte/document_list.html:38
+msgid "Filtrar"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:39
+#: arcamitte/templates/arcamitte/document_list.html:44
+msgid "Limpiar"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:50
+#: arcamitte/templates/arcamitte/document_detail.html:195
+#, fuzzy
+#| msgid "Fecha y hora"
+msgid "Fecha y Hora"
+msgstr "Fecha y hora"
+
+#: arcamitte/templates/arcamitte/audit_logs.html:54
+#: arcamitte/templates/arcamitte/document_detail.html:198
+#, fuzzy
+#| msgid "Solicitar Acceso"
+msgid "Solicitante / Actor"
+msgstr "Solicitar Acceso"
+
+#: arcamitte/templates/arcamitte/audit_logs.html:55
+#: arcamitte/templates/arcamitte/document_detail.html:136
+#: arcamitte/templates/arcamitte/document_detail.html:199
+msgid "Detalles"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:76
+msgid "Sin asiento vinculado"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/audit_logs.html:93
+#, fuzzy
+#| msgid "No cuenta con permisos de auditoría."
+msgid "No se encontraron registros de auditoría"
+msgstr "No cuenta con permisos de auditoría."
+
+#: arcamitte/templates/arcamitte/audit_logs.html:104
+#: arcamitte/templates/arcamitte/document_list.html:136
+#, python-format
+msgid "Página %(page)s de %(total)s"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:17
+msgid "Panel de Control"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:37
+msgid "Operaciones"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:42
+#: arcamitte/templates/arcamitte/dashboard.html:4
+msgid "Dashboard"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:54
+msgid "Cifrar Asiento"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:59
+#, fuzzy
+#| msgid "Auditoría"
+msgid "Seguridad y Auditoría"
+msgstr "Auditoría"
+
+#: arcamitte/templates/arcamitte/base.html:75
+msgid "Gobernanza"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:85
+msgid "Enlaces y Sistemas"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:90
+msgid "Django Admin Clásico"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:96
+msgid "Portal Público Canje"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:121
+msgid "Custodia Criptográfica Descentralizada"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:139
+msgid "Django Admin"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:147
+msgid "Cerrar sesión"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/base.html:171
+msgid "Microservicio de Cifrado y Custodia"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:9
+msgid "Dashboard Criptográfico"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:10
+#, fuzzy
+#| msgid "Historial de accesos y trazabilidad de clave"
+msgid "Estado general de asientos, custodia y trazabilidad forense."
+msgstr "Historial de accesos y trazabilidad de clave"
+
+#: arcamitte/templates/arcamitte/dashboard.html:14
+#: arcamitte/templates/arcamitte/document_list.html:14
+#: arcamitte/templates/arcamitte/document_upload.html:4
+msgid "Cifrar Nuevo Asiento"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:24
+msgid "Total Asientos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:26
+msgid "Trámites en custodia"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:39
+msgid "Asientos Activos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:41
+msgid "Disponibles para canje"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:54
+#, fuzzy
+#| msgid "Consumido por"
+msgid "Consumidos"
+msgstr "Consumido por"
+
+#: arcamitte/templates/arcamitte/dashboard.html:56
+msgid "Destruidos en disco"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:69
+msgid "Caducados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:71
+msgid "Vencidos o terminados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:85
+#, fuzzy
+#| msgid "Documentos Cifrados"
+msgid "Últimos Asientos Cifrados"
+msgstr "Documentos Cifrados"
+
+#: arcamitte/templates/arcamitte/dashboard.html:87
+msgid "Ver todos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:94
+#, fuzzy
+#| msgid "Archivo confidencial original"
+msgid "Archivo Original"
+msgstr "Archivo confidencial original"
+
+#: arcamitte/templates/arcamitte/dashboard.html:117
+#: arcamitte/templates/arcamitte/document_detail.html:12
+#: arcamitte/templates/arcamitte/document_list.html:100
+#, fuzzy
+#| msgid "Consumido por"
+msgid "Consumido"
+msgstr "Consumido por"
+
+#: arcamitte/templates/arcamitte/dashboard.html:123
+#: arcamitte/templates/arcamitte/document_detail.html:18
+#: arcamitte/templates/arcamitte/document_list.html:106
+msgid "Inactivo"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:130
+#: arcamitte/templates/arcamitte/document_list.html:110
+#, fuzzy
+#| msgid "Auditoría"
+msgid "Detalle y Auditoría"
+msgstr "Auditoría"
+
+#: arcamitte/templates/arcamitte/dashboard.html:139
+#, fuzzy
+#| msgid "fecha no registrada"
+msgid "No hay asientos registrados aún."
+msgstr "fecha no registrada"
+
+#: arcamitte/templates/arcamitte/dashboard.html:152
+msgid "Trazabilidad Reciente"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:177
+msgid "No hay eventos de auditoría registrados."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:185
+msgid "Garantías Arcamitte"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:188
+msgid "Cifrado Envelope AES-256-GCM"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:189
+msgid "Sanitización física NIST SP 800-88"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:190
+msgid "Tokens API Zero-Knowledge"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/dashboard.html:191
+msgid "Trazabilidad forense inmutable"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:4
+msgid "Detalle del Asiento"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:27
+msgid "Volver al listado"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:31
+#: arcamitte/templates/arcamitte/document_list.html:114
+msgid "Terminar y Destruir"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:41
+msgid "Metadatos Criptográficos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:47
+#: arcamitte/templates/arcamitte/document_terminate.html:41
+#, fuzzy
+#| msgid "Hash SHA-256"
+msgid "Hash SHA-256:"
+msgstr "Hash SHA-256"
+
+#: arcamitte/templates/arcamitte/document_detail.html:51
+msgid "Tamaño Original:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:55
+msgid "Tipo MIME:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:74
+msgid "Sin UO específica"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:79
+#, fuzzy
+#| msgid "Política de Destrucción"
+msgid "Política Destrucción:"
+msgstr "Política de Destrucción"
+
+#: arcamitte/templates/arcamitte/document_detail.html:85
+#, fuzzy
+#| msgid "fecha no registrada"
+msgid "Fecha de Registro:"
+msgstr "fecha no registrada"
+
+#: arcamitte/templates/arcamitte/document_detail.html:89
+#, fuzzy
+#| msgid "Fecha de caducidad"
+msgid "Fecha de Caducidad:"
+msgstr "Fecha de caducidad"
+
+#: arcamitte/templates/arcamitte/document_detail.html:95
+msgid "Fichero en Disco:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:99
+#, fuzzy
+#| msgid "Error en el descifrado:"
+msgid "Presente cifrado"
+msgstr "Error en el descifrado:"
+
+#: arcamitte/templates/arcamitte/document_detail.html:103
+msgid "Destruido (NIST SP 800-88)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:113
+#, fuzzy
+#| msgid "Descripción del documento"
+msgid "Descripción / Asunto:"
+msgstr "Descripción del documento"
+
+#: arcamitte/templates/arcamitte/document_detail.html:124
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "Destinatarios y Canjes"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/arcamitte/document_detail.html:128
+msgid "Estado de entrega y canje por cada dirección autorizada:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:147
+msgid "Canjeado"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:149
+msgid "Pendiente"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:156
+msgid "Pendiente de OTP"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:163
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "No se han definido destinatarios autorizados."
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/arcamitte/document_detail.html:174
+msgid "Instrucciones de Descarga para el Destinatario"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:177
+msgid "Portal:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:178
+#, fuzzy
+#| msgid "Identificador único:"
+msgid "Hash Identificador:"
+msgstr "Identificador único:"
+
+#: arcamitte/templates/arcamitte/document_detail.html:188
+msgid "Trazabilidad Forense e Historial de Auditoría"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:189
+msgid "eventos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_detail.html:220
+#, fuzzy
+#| msgid "Registros de Auditoría de Accesos"
+msgid "No hay registros de auditoría para este asiento."
+msgstr "Registros de Auditoría de Accesos"
+
+#: arcamitte/templates/arcamitte/document_list.html:4
+#, fuzzy
+#| msgid "Documentos Cifrados"
+msgid "Asientos Cifrados"
+msgstr "Documentos Cifrados"
+
+#: arcamitte/templates/arcamitte/document_list.html:10
+msgid "Gestión y custodia criptográfica de archivos confidenciales."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:25
+msgid "Buscar por nombre, hash SHA-256 o descripción..."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:30
+msgid "Todos los estados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:31
+msgid "Activos (Pendientes de canje)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:32
+msgid "Consumidos (Destruidos en disco)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:33
+msgid "Caducados / Bloqueados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:57
+msgid "UO Origen"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:57
+msgid "Destino"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:58
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "Destinatarios"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/arcamitte/document_list.html:87
+#, fuzzy
+#| msgid "Correos autorizados"
+msgid "autorizados"
+msgstr "Correos autorizados"
+
+#: arcamitte/templates/arcamitte/document_list.html:124
+msgid "No se encontraron asientos"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_list.html:125
+msgid "Pruebe con otros términos de búsqueda o cifre un nuevo documento."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:4
+msgid "Terminar y Destruir Asiento"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:10
+msgid "Clausura y Destrucción Física"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:12
+msgid ""
+"Procedimiento de revocación anticipada y sanitización criptográfica NIST SP "
+"800-88."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:21
+msgid "Confirmación Obligatoria de Clausura"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:29
+msgid "¡Esta acción es irreversible!"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:30
+msgid ""
+"El archivo cifrado en disco será sobreescrito con bytes aleatorios y "
+"eliminado físicamente (NIST SP 800-88 Rev. 1). Cualquier código OTP emitido "
+"quedará invalidado de inmediato."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:36
+msgid "Datos del documento a destruir:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:38
+#, fuzzy
+#| msgid "Archivo cifrado"
+msgid "Archivo:"
+msgstr "Archivo cifrado"
+
+#: arcamitte/templates/arcamitte/document_terminate.html:47
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "Destinatarios:"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/arcamitte/document_terminate.html:57
+msgid "Motivo Justificado de Revocación / Destrucción"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:59
+msgid ""
+"Indique el motivo legal, técnico o corporativo para clausurar y destruir "
+"este documento..."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:61
+msgid ""
+"Este motivo quedará registrado de forma inalterable en el historial forense."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:67
+msgid "Cancelar y regresar"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_terminate.html:71
+msgid "Confirmar Destrucción Definitiva"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:8
+#, fuzzy
+#| msgid "Cifrar, Hashear y Registrar Documento"
+msgid "Cifrar y Custodiar Documento"
+msgstr "Cifrar, Hashear y Registrar Documento"
+
+#: arcamitte/templates/arcamitte/document_upload.html:10
+msgid ""
+"Generación automática de clave criptográfica (DEK), cifrado Envelope AES-256-"
+"GCM y registro forense."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:18
+#, fuzzy
+#| msgid "Error interno en el procesamiento criptográfico."
+msgid "Datos del Asiento Criptográfico"
+msgstr "Error interno en el procesamiento criptográfico."
+
+#: arcamitte/templates/arcamitte/document_upload.html:23
+msgid "Por favor corrija los siguientes errores:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:38
+#, fuzzy
+#| msgid "Archivo confidencial original"
+msgid "Archivo Confidencial Original"
+msgstr "Archivo confidencial original"
+
+#: arcamitte/templates/arcamitte/document_upload.html:42
+msgid ""
+"Formatos admitidos: PDF, Microsoft Office y LibreOffice. Tamaño máximo según "
+"directiva."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:49
+msgid "UO Emisora (Custodia)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:52
+msgid "Seleccione UO Emisora"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:60
+msgid "Departamento emisor responsable del documento."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:66
+#, fuzzy
+#| msgid "Contraseña (Opcional)"
+msgid "UO Receptora (Opcional)"
+msgstr "Contraseña (Opcional)"
+
+#: arcamitte/templates/arcamitte/document_upload.html:69
+msgid "Ninguna / Destinatario Externo"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:77
+msgid "Permite derivar el trámite dentro de la malla inter-departamental."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:84
+#, fuzzy
+#| msgid "Correos Autorizados"
+msgid "Correos Autorizados para Canje (OTP)"
+msgstr "Correos Autorizados"
+
+#: arcamitte/templates/arcamitte/document_upload.html:88
+msgid ""
+"Separe múltiples correos con comas o saltos de línea. Solo estas direcciones "
+"podrán recibir el código OTP."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:94
+#, fuzzy
+#| msgid "Descripción del documento"
+msgid "Descripción / Asunto del Trámite"
+msgstr "Descripción del documento"
+
+#: arcamitte/templates/arcamitte/document_upload.html:96
+msgid "Documento confidencial tramitado a través de Arcamitte..."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:102
+#, fuzzy
+#| msgid "Política de Destrucción"
+msgid "Política de Destrucción (Burn Policy)"
+msgstr "Política de Destrucción"
+
+#: arcamitte/templates/arcamitte/document_upload.html:107
+msgid "Primer acceso (Un solo canje)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:108
+msgid ""
+"El archivo físico en disco se destruye inmediatamente tras el primer canje "
+"exitoso."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:114
+#, fuzzy
+#| msgid "Destinatarios Autorizados"
+msgid "Todos los destinatarios autorizados"
+msgstr "Destinatarios Autorizados"
+
+#: arcamitte/templates/arcamitte/document_upload.html:115
+msgid ""
+"Se destruye únicamente cuando todos los correos hayan completado su descarga."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:122
+#, fuzzy
+#| msgid "Fecha de caducidad"
+msgid "Fecha y Hora de Caducidad"
+msgstr "Fecha de caducidad"
+
+#: arcamitte/templates/arcamitte/document_upload.html:126
+msgid ""
+"Por defecto 2 semanas. Al expirar, se clausura el canje y se destruye el "
+"fichero en disco."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:138
+#, fuzzy
+#| msgid "Cifrar, Hashear y Registrar Documento"
+msgid "Cifrar y Registrar Asiento"
+msgstr "Cifrar, Hashear y Registrar Documento"
+
+#: arcamitte/templates/arcamitte/document_upload.html:151
+#, fuzzy
+#| msgid "Avisos de seguridad:"
+msgid "Garantías de Seguridad"
+msgstr "Avisos de seguridad:"
+
+#: arcamitte/templates/arcamitte/document_upload.html:160
+msgid "Clave Única Efímera (DEK)"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:162
+msgid ""
+"Cada documento cuenta con una DEK única de 256 bits generada por entropía "
+"del SO."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:172
+msgid "Cero Transporte del Binario"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:174
+msgid ""
+"Los destinatarios solo reciben el Hash SHA-256 identificativo para verificar "
+"el canje."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:184
+msgid "Sanitización NIST SP 800-88"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:186
+msgid ""
+"Sobreescritura física aleatoria y sincronización a bloque (fsync) al "
+"consumirse."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:196
+msgid "Auditoría Legal Inmutable"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/document_upload.html:198
+msgid ""
+"Cada interacción queda registrada con sello temporal, IP y hash de "
+"validación."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:10
+#: arcamitte/templates/arcamitte/login.html:67
+msgid "Iniciar Sesión"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:31
+msgid "Panel de Control y Custodia Criptográfica"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:40
+msgid "Error de autenticación:"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:58
+msgid "Introduzca su usuario"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:61
+#, fuzzy
+#| msgid "Copiar Contraseña"
+msgid "Contraseña"
+msgstr "Copiar Contraseña"
+
+#: arcamitte/templates/arcamitte/login.html:62
+#, fuzzy
+#| msgid "Introduzca su código de acceso..."
+msgid "Introduzca su contraseña"
+msgstr "Introduzca su código de acceso..."
+
+#: arcamitte/templates/arcamitte/login.html:75
+msgid "Plataforma protegida bajo NIST SP 800-53 y OWASP API Top 10."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/login.html:77
+msgid "Volver a la pasarela pública de canje con OTP"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/public_base.html:7
+msgid "Arcamitte - Microservicio Criptográfico de Entrega Segura"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/public_base.html:378
+msgid "Solicitar Acceso"
+msgstr "Solicitar Acceso"
+
+#: arcamitte/templates/arcamitte/public_base.html:379
+#: arcamitte/templates/arcamitte/public_decrypt.html:4
+msgid "Descargar Documento"
+msgstr "Descargar Documento"
+
+#: arcamitte/templates/arcamitte/public_base.html:403
+msgid ""
+"Arcamitte &copy; 2026 &mdash; Microservicio Criptográfico de Entrega Segura"
+msgstr ""
+"Arcamitte &copy; 2026 &mdash; Microservicio Criptográfico de Entrega Segura"
+
+#: arcamitte/templates/arcamitte/public_base.html:411
+msgid "✓ ¡Copiado!"
+msgstr "✓ ¡Copiado!"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:11
+msgid "Verificación y Descarga de Documento"
+msgstr "Verificación y Descarga de Documento"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:13
+msgid "Descarga Segura"
+msgstr "Descarga Segura"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:16
+msgid ""
+"Introduzca el <strong>código de verificación de 6 dígitos</strong> recibido "
+"en su correo electrónico para iniciar la descarga del archivo."
+msgstr ""
+"Introduzca el <strong>código de verificación de 6 dígitos</strong> recibido "
+"en su correo electrónico para iniciar la descarga del archivo."
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:31
+msgid "Aviso:"
+msgstr "Aviso:"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:48
+msgid "Identificador del documento:"
+msgstr "Identificador del documento:"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:53
+msgid "Dirección de correo:"
+msgstr "Dirección de correo:"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:78
+msgid "Verificar código y descargar documento"
+msgstr "Verificar código y descargar documento"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:93
+msgid "Avisos de seguridad:"
+msgstr "Avisos de seguridad:"
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:96
+msgid ""
+"Dispone de un máximo de 3 intentos para introducir el código de verificación "
+"recibido."
+msgstr ""
+"Dispone de un máximo de 3 intentos para introducir el código de verificación "
+"recibido."
+
+#: arcamitte/templates/arcamitte/public_decrypt.html:99
+msgid ""
+"Por motivos de confidencialidad, el documento dejará de estar disponible en "
+"la plataforma una vez completada la entrega."
+msgstr ""
+"Por motivos de confidencialidad, el documento dejará de estar disponible en "
+"la plataforma una vez completada la entrega."
+
+#: arcamitte/templates/arcamitte/public_request.html:4
+msgid "Solicitar Documento"
+msgstr "Solicitar Documento"
+
+#: arcamitte/templates/arcamitte/public_request.html:11
+msgid "Descarga Segura de Documentos"
+msgstr "Descarga Segura de Documentos"
+
+#: arcamitte/templates/arcamitte/public_request.html:13
+msgid "Acceso Seguro"
+msgstr "Acceso Seguro"
+
+#: arcamitte/templates/arcamitte/public_request.html:16
+msgid ""
+"Introduzca el identificador (SHA-256) del documento y su correo electrónico "
+"para recibir un código de verificación."
+msgstr ""
+"Introduzca el identificador (SHA-256) del documento y su correo electrónico "
+"para recibir un código de verificación."
+
+#: arcamitte/templates/arcamitte/public_request.html:66
+msgid "Solicitar código de verificación"
+msgstr "Solicitar código de verificación"
+
+#: arcamitte/templates/arcamitte/public_request.html:90
+msgid "Información sobre el servicio:"
+msgstr "Información sobre el servicio:"
+
+#: arcamitte/templates/arcamitte/public_request.html:93
+msgid "Identificador único:"
+msgstr "Identificador único:"
+
+#: arcamitte/templates/arcamitte/public_request.html:93
+msgid ""
+"El acceso se gestiona a través del código SHA-256 facilitado por el "
+"remitente."
+msgstr ""
+"El acceso se gestiona a través del código SHA-256 facilitado por el "
+"remitente."
+
+#: arcamitte/templates/arcamitte/public_request.html:94
+msgid "Verificación por correo:"
+msgstr "Verificación por correo:"
+
+#: arcamitte/templates/arcamitte/public_request.html:94
+msgid ""
+"Se remitirá un código temporal de un solo uso a la dirección de correo "
+"autorizada."
+msgstr ""
+"Se remitirá un código temporal de un solo uso a la dirección de correo "
+"autorizada."
+
+#: arcamitte/templates/arcamitte/public_request.html:95
+msgid "Confidencialidad:"
+msgstr "Confidencialidad:"
+
+#: arcamitte/templates/arcamitte/public_request.html:95
+msgid ""
+"Una vez completada la entrega, el documento dejará de estar disponible en la "
+"plataforma conforme a las políticas de seguridad establecidas."
+msgstr ""
+"Una vez completada la entrega, el documento dejará de estar disponible en la "
+"plataforma conforme a las políticas de seguridad establecidas."
+
+#: arcamitte/templates/arcamitte/uo_list.html:8
+msgid "Malla de Unidades Organizativas"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:10
+msgid ""
+"Estructura departamental para la custodia y derivación de documentos "
+"confidenciales."
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:19
+#, fuzzy
+#| msgid "Código OTP"
+msgid "Código"
+msgstr "Código OTP"
+
+#: arcamitte/templates/arcamitte/uo_list.html:20
+msgid "Alias"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:21
+msgid "Denominación Oficial"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:22
+msgid "Buzón Institucional"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:23
+msgid "Miembros Asignados"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:51
+msgid "miembros"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:56
+msgid "Activa"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:58
+msgid "Inactiva"
+msgstr ""
+
+#: arcamitte/templates/arcamitte/uo_list.html:66
+msgid "No hay Unidades Organizativas registradas"
+msgstr ""
+
+#: arcamitte/views.py:190
+msgid ""
+"Ha superado el límite de solicitudes permitidas. Por favor, espere un minuto "
+"antes de reintentar."
+msgstr ""
+
+#: arcamitte/views.py:268
+msgid ""
+"Debe solicitar el acceso con el identificador del documento antes de "
+"introducir el código de verificación."
+msgstr ""
+"Debe solicitar el acceso con el identificador del documento antes de "
+"introducir el código de verificación."
+
+#: arcamitte/views.py:492
+#, fuzzy
+#| msgid "No se encontró ningún registro correspondiente a este archivo."
+msgid "No se encontró ningún documento con el hash especificado."
+msgstr "No se encontró ningún registro correspondiente a este archivo."
+
+#: arcamitte/views.py:500
+msgid ""
+"No tiene permisos para acceder a documentos de otra Unidad Organizativa."
+msgstr ""

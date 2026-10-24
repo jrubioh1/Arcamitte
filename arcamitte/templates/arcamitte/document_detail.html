@@ -1,0 +1,228 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Detalle del Asiento" %} - {{ doc.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+	<div>
+		<h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+			<span>{{ doc.original_filename }}</span>
+			{% if doc.is_consumed %}
+				<span class="badge bg-secondary fs-6">{% trans "Consumido" %}</span>
+			{% elif doc.is_expired %}
+				<span class="badge bg-danger fs-6">{% trans "Caducado" %}</span>
+			{% elif doc.is_active %}
+				<span class="badge bg-success fs-6">{% trans "Activo" %}</span>
+			{% else %}
+				<span class="badge bg-warning text-dark fs-6">{% trans "Inactivo" %}</span>
+			{% endif %}
+		</h1>
+		<div class="text-muted small font-mono">
+			{{ doc.file_hash }}
+		</div>
+	</div>
+	<div class="d-flex gap-2">
+		<a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary">
+			&larr; {% trans "Volver al listado" %}
+		</a>
+		{% if doc.is_active and not doc.is_consumed and not doc.is_expired %}
+			<a href="{% url 'dashboard:document_terminate' doc.file_hash %}" class="btn btn-danger">
+				<i data-feather="trash-2" style="width:16px;height:16px;" class="me-1"></i> {% trans "Terminar y Destruir" %}
+			</a>
+		{% endif %}
+	</div>
+</div>
+
+<div class="row g-4 mb-4">
+	<div class="col-12 col-xl-6">
+		<div class="card h-100">
+			<div class="card-header">
+				<h5 class="card-title mb-0">{% trans "Metadatos Criptográficos" %}</h5>
+			</div>
+			<div class="card-body">
+				<table class="table table-sm">
+					<tbody>
+						<tr>
+							<th style="width: 35%;">{% trans "Hash SHA-256:" %}</th>
+							<td class="font-mono small text-break text-primary">{{ doc.file_hash }}</td>
+						</tr>
+						<tr>
+							<th>{% trans "Tamaño Original:" %}</th>
+							<td>{{ doc.file_size|filesizeformat }} ({{ doc.file_size }} bytes)</td>
+						</tr>
+						<tr>
+							<th>{% trans "Tipo MIME:" %}</th>
+							<td><code>{{ doc.mime_type|default:"application/octet-stream" }}</code></td>
+						</tr>
+						<tr>
+							<th>{% trans "UO Emisora:" %}</th>
+							<td>
+								{% if doc.origin_uo %}
+									<span class="badge bg-primary">{{ doc.origin_uo.alias }}</span> - {{ doc.origin_uo.name }}
+								{% else %}
+									<span class="badge bg-secondary">Global / Desacoplado</span>
+								{% endif %}
+							</td>
+						</tr>
+						<tr>
+							<th>{% trans "UO Receptora:" %}</th>
+							<td>
+								{% if doc.target_uo %}
+									<span class="badge bg-info text-white">{{ doc.target_uo.alias }}</span> - {{ doc.target_uo.name }}
+								{% else %}
+									<span class="text-muted">{% trans "Sin UO específica" %}</span>
+								{% endif %}
+							</td>
+						</tr>
+						<tr>
+							<th>{% trans "Política Destrucción:" %}</th>
+							<td>
+								<strong>{{ doc.get_burn_policy_display }}</strong>
+							</td>
+						</tr>
+						<tr>
+							<th>{% trans "Fecha de Registro:" %}</th>
+							<td>{{ doc.created_at|date:"d/m/Y H:i:s" }}</td>
+						</tr>
+						<tr>
+							<th>{% trans "Fecha de Caducidad:" %}</th>
+							<td class="{% if doc.is_expired %}text-danger fw-bold{% endif %}">
+								{{ doc.expires_at|date:"d/m/Y H:i:s"|default:"-" }}
+							</td>
+						</tr>
+						<tr>
+							<th>{% trans "Fichero en Disco:" %}</th>
+							<td>
+								{% if file_exists_on_disk %}
+									<span class="badge bg-success">
+										<i data-feather="check" style="width:12px;height:12px;" class="me-1"></i> {% trans "Presente cifrado" %}
+									</span>
+								{% else %}
+									<span class="badge bg-secondary">
+										<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i> {% trans "Destruido (NIST SP 800-88)" %}
+									</span>
+								{% endif %}
+							</td>
+						</tr>
+					</tbody>
+				</table>
+
+				{% if doc.description %}
+					<div class="mt-3 p-3 bg-light rounded-3 border">
+						<h6 class="fw-bold text-dark mb-1 small">{% trans "Descripción / Asunto:" %}</h6>
+						<p class="mb-0 text-muted small">{{ doc.description }}</p>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-xl-6">
+		<div class="card h-100">
+			<div class="card-header">
+				<h5 class="card-title mb-0">{% trans "Destinatarios y Canjes" %}</h5>
+			</div>
+			<div class="card-body">
+				<p class="small text-muted mb-3">
+					{% trans "Estado de entrega y canje por cada dirección autorizada:" %}
+				</p>
+				<div class="table-responsive">
+					<table class="table table-hover table-sm">
+						<thead>
+							<tr>
+								<th>{% trans "Correo Electrónico" %}</th>
+								<th>{% trans "Estado" %}</th>
+								<th class="d-none d-md-table-cell">{% trans "Detalles" %}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% for rec in recipient_status_list %}
+								<tr>
+									<td>
+										<strong>{{ rec.email }}</strong>
+									</td>
+									<td>
+										{% if rec.consumed %}
+											<span class="badge bg-success">{% trans "Canjeado" %}</span>
+										{% else %}
+											<span class="badge bg-warning text-dark">{% trans "Pendiente" %}</span>
+										{% endif %}
+									</td>
+									<td class="d-none d-md-table-cell small text-muted">
+										{% if rec.consumed %}
+											{{ rec.consumed_at|date:"d/m/Y H:i" }} &bull; {{ rec.consumed_ip|default:"-" }}
+										{% else %}
+											{% trans "Pendiente de OTP" %}
+										{% endif %}
+									</td>
+								</tr>
+							{% empty %}
+								<tr>
+									<td colspan="3" class="text-muted text-center py-3">
+										{% trans "No se han definido destinatarios autorizados." %}
+									</td>
+								</tr>
+							{% endfor %}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="mt-4 p-3 bg-light rounded-3 border">
+					<h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2 small">
+						<i data-feather="external-link" style="width:14px;height:14px;" class="text-primary"></i>
+						{% trans "Instrucciones de Descarga para el Destinatario" %}
+					</h6>
+					<div class="bg-white p-2 rounded border small">
+						<div><strong>{% trans "Portal:" %}</strong> <span class="text-primary">{{ public_request_url }}</span></div>
+						<div><strong>{% trans "Hash Identificador:" %}</strong> <code class="font-mono text-dark">{{ doc.file_hash }}</code></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="card">
+	<div class="card-header d-flex justify-content-between align-items-center">
+		<h5 class="card-title mb-0">{% trans "Trazabilidad Forense e Historial de Auditoría" %}</h5>
+		<span class="badge bg-light text-dark border">{{ access_logs|length }} {% trans "eventos" %}</span>
+	</div>
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>{% trans "Fecha y Hora" %}</th>
+					<th>{% trans "Acción" %}</th>
+					<th>{% trans "Dirección IP" %}</th>
+					<th>{% trans "Solicitante / Actor" %}</th>
+					<th>{% trans "Detalles" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for log in access_logs %}
+					<tr>
+						<td class="small text-muted font-mono">{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+						<td>
+							<span class="badge bg-light text-dark border">
+								{{ log.get_action_display|default:log.action }}
+							</span>
+						</td>
+						<td class="font-mono small">{{ log.ip_address|default:"-" }}</td>
+						<td class="small">
+							<strong>{{ log.email|default:"Sistema" }}</strong>
+						</td>
+						<td class="small text-muted">{{ log.details }}</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="5" class="text-center py-4 text-muted">
+							{% trans "No hay registros de auditoría para este asiento." %}
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}

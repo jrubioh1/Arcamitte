@@ -1,0 +1,79 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Terminar y Destruir Asiento" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+	<h1 class="h3 fw-bold text-danger mb-1 d-flex align-items-center gap-2">
+		<i data-feather="alert-triangle" style="width:24px;height:24px;"></i>
+		<span>{% trans "Clausura y Destrucción Física" %}</span>
+	</h1>
+	<p class="text-muted small mb-0">{% trans "Procedimiento de revocación anticipada y sanitización criptográfica NIST SP 800-88." %}</p>
+</div>
+
+<div class="row justify-content-center">
+	<div class="col-12 col-lg-8">
+		<div class="card border-danger shadow-sm">
+			<div class="card-header bg-danger text-white">
+				<h5 class="card-title text-white mb-0 d-flex align-items-center gap-2">
+					<i data-feather="trash-2" style="width:18px;height:18px;"></i>
+					{% trans "Confirmación Obligatoria de Clausura" %}
+				</h5>
+			</div>
+			<div class="card-body p-4">
+				<div class="alert alert-warning mb-4">
+					<div class="d-flex align-items-start gap-2">
+						<i data-feather="alert-circle" style="width:20px;height:20px;" class="mt-1 flex-shrink-0"></i>
+						<div>
+							<strong>{% trans "¡Esta acción es irreversible!" %}</strong><br>
+							{% trans "El archivo cifrado en disco será sobreescrito con bytes aleatorios y eliminado físicamente (NIST SP 800-88 Rev. 1). Cualquier código OTP emitido quedará invalidado de inmediato." %}
+						</div>
+					</div>
+				</div>
+
+				<div class="p-3 bg-light rounded-3 mb-4 border">
+					<h6 class="fw-bold text-dark mb-2 small">{% trans "Datos del documento a destruir:" %}</h6>
+					<div class="row g-2 small">
+						<div class="col-sm-4 text-muted">{% trans "Archivo:" %}</div>
+						<div class="col-sm-8 fw-bold">{{ doc.original_filename }}</div>
+
+						<div class="col-sm-4 text-muted">{% trans "Hash SHA-256:" %}</div>
+						<div class="col-sm-8 font-mono text-break text-primary">{{ doc.file_hash }}</div>
+
+						<div class="col-sm-4 text-muted">{% trans "UO Emisora:" %}</div>
+						<div class="col-sm-8">{{ doc.origin_uo.alias|default:"Global" }}</div>
+
+						<div class="col-sm-4 text-muted">{% trans "Destinatarios:" %}</div>
+						<div class="col-sm-8">{{ doc.allowed_emails|join:", " }}</div>
+					</div>
+				</div>
+
+				<form method="post" autocomplete="off">
+					{% csrf_token %}
+
+					<div class="mb-4">
+						<label class="form-label fw-bold text-dark">
+							{% trans "Motivo Justificado de Revocación / Destrucción" %} <span class="text-danger">*</span>
+						</label>
+						<textarea name="justification" class="form-control" rows="3" required placeholder="{% trans 'Indique el motivo legal, técnico o corporativo para clausurar y destruir este documento...' %}"></textarea>
+						<div class="form-text small text-muted">
+							{% trans "Este motivo quedará registrado de forma inalterable en el historial forense." %}
+						</div>
+					</div>
+
+					<div class="d-flex justify-content-between align-items-center">
+						<a href="{% url 'dashboard:document_detail' doc.file_hash %}" class="btn btn-outline-secondary">
+							&larr; {% trans "Cancelar y regresar" %}
+						</a>
+						<button type="submit" class="btn btn-danger px-4">
+							<i data-feather="flame" style="width:16px;height:16px;" class="me-1"></i>
+							{% trans "Confirmar Destrucción Definitiva" %}
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Dashboard Criptográfico" %}</h1>
+		<p class="text-muted small mb-0">{% trans "Estado general de asientos, custodia y trazabilidad forense." %}</p>
+	</div>
+	<div>
+		<a href="{% url 'dashboard:document_upload' %}" class="btn btn-primary shadow-sm">
+			<i data-feather="upload-cloud" style="width:16px;height:16px;" class="me-1"></i> {% trans "Cifrar Nuevo Asiento" %}
+		</a>
+	</div>
+</div>
+
+<div class="row g-3 mb-4">
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Total Asientos" %}</div>
+					<h2 class="fw-bold my-1">{{ total_documents }}</h2>
+					<div class="text-muted small">{% trans "Trámites en custodia" %}</div>
+				</div>
+				<div class="arca-stat-icon primary">
+					<i data-feather="database"></i>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Asientos Activos" %}</div>
+					<h2 class="fw-bold my-1 text-success">{{ active_documents }}</h2>
+					<div class="text-muted small">{% trans "Disponibles para canje" %}</div>
+				</div>
+				<div class="arca-stat-icon success">
+					<i data-feather="check-circle"></i>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Consumidos" %}</div>
+					<h2 class="fw-bold my-1 text-secondary">{{ consumed_documents }}</h2>
+					<div class="text-muted small">{% trans "Destruidos en disco" %}</div>
+				</div>
+				<div class="arca-stat-icon warning">
+					<i data-feather="flame"></i>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-sm-6 col-xl-3">
+		<div class="arca-stat-card p-3">
+			<div class="d-flex align-items-center justify-content-between">
+				<div>
+					<div class="text-muted small text-uppercase fw-bold">{% trans "Caducados" %}</div>
+					<h2 class="fw-bold my-1 text-danger">{{ expired_documents }}</h2>
+					<div class="text-muted small">{% trans "Vencidos o terminados" %}</div>
+				</div>
+				<div class="arca-stat-icon danger">
+					<i data-feather="alert-triangle"></i>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row g-4">
+	<div class="col-12 col-lg-8">
+		<div class="card h-100">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">{% trans "Últimos Asientos Cifrados" %}</h5>
+				<a href="{% url 'dashboard:document_list' %}" class="btn btn-sm btn-outline-primary">
+					{% trans "Ver todos" %} &rarr;
+				</a>
+			</div>
+			<div class="table-responsive">
+				<table class="table table-hover align-middle mb-0">
+					<thead>
+						<tr>
+							<th>{% trans "Archivo Original" %}</th>
+							<th class="d-none d-md-table-cell">{% trans "Hash SHA-256" %}</th>
+							<th>{% trans "UO Emisora" %}</th>
+							<th>{% trans "Estado" %}</th>
+							<th class="d-none d-md-table-cell">{% trans "Fecha" %}</th>
+							<th class="text-end">{% trans "Acciones" %}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for doc in recent_documents %}
+							<tr>
+								<td>
+									<strong>{{ doc.original_filename|truncatechars:24 }}</strong>
+									<div class="text-muted small d-md-none font-mono">{{ doc.file_hash|slice:":10" }}...</div>
+								</td>
+								<td class="d-none d-md-table-cell font-mono small text-muted">
+									{{ doc.file_hash|slice:":16" }}...
+								</td>
+								<td>
+									<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:"Global" }}</span>
+								</td>
+								<td>
+									{% if doc.is_consumed %}
+										<span class="badge bg-secondary">{% trans "Consumido" %}</span>
+									{% elif doc.is_expired %}
+										<span class="badge bg-danger">{% trans "Caducado" %}</span>
+									{% elif doc.is_active %}
+										<span class="badge bg-success">{% trans "Activo" %}</span>
+									{% else %}
+										<span class="badge bg-warning text-dark">{% trans "Inactivo" %}</span>
+									{% endif %}
+								</td>
+								<td class="d-none d-md-table-cell text-muted small">
+									{{ doc.created_at|date:"d/m/Y H:i" }}
+								</td>
+								<td class="text-end">
+									<a href="{% url 'dashboard:document_detail' doc.file_hash %}" class="btn btn-sm btn-outline-secondary" title="{% trans 'Detalle y Auditoría' %}">
+										<i data-feather="eye" style="width:14px;height:14px;"></i>
+									</a>
+								</td>
+							</tr>
+						{% empty %}
+							<tr>
+								<td colspan="6" class="text-center py-5 text-muted">
+									<i data-feather="inbox" style="width: 32px; height: 32px;" class="mb-2"></i>
+									<div>{% trans "No hay asientos registrados aún." %}</div>
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-lg-4">
+		<div class="card h-100">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">{% trans "Trazabilidad Reciente" %}</h5>
+				<a href="{% url 'dashboard:audit_logs' %}" class="btn btn-sm btn-outline-primary">
+					{% trans "Auditoría" %}
+				</a>
+			</div>
+			<div class="card-body">
+				<div class="list-group list-group-flush mb-3">
+					{% for log in recent_logs %}
+						<div class="list-group-item px-0 py-2 border-0 border-bottom">
+							<div class="d-flex justify-content-between align-items-start">
+								<div>
+									<span class="badge bg-light text-dark border">
+										{{ log.get_action_display|default:log.action }}
+									</span>
+									<div class="small mt-1 text-muted text-break">{{ log.details|truncatechars:45|default:log.email }}</div>
+								</div>
+								<div class="text-end text-muted small">
+									<div>{{ log.created_at|date:"H:i:s" }}</div>
+									<span class="font-mono text-muted" style="font-size:0.75rem;">{{ log.ip_address|default:"-" }}</span>
+								</div>
+							</div>
+						</div>
+					{% empty %}
+						<div class="text-muted text-center py-4">
+							<i data-feather="clock" style="width:24px;height:24px;" class="mb-2"></i>
+							<div class="small">{% trans "No hay eventos de auditoría registrados." %}</div>
+						</div>
+					{% endfor %}
+				</div>
+
+				<div class="bg-light p-3 rounded-3 border">
+					<h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
+						<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
+						{% trans "Garantías Arcamitte" %}
+					</h6>
+					<ul class="list-unstyled text-muted small mb-0 lh-lg">
+						<li>&bull; {% trans "Cifrado Envelope AES-256-GCM" %}</li>
+						<li>&bull; {% trans "Sanitización física NIST SP 800-88" %}</li>
+						<li>&bull; {% trans "Tokens API Zero-Knowledge" %}</li>
+						<li>&bull; {% trans "Trazabilidad forense inmutable" %}</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

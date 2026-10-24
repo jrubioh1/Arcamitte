@@ -1,0 +1,19 @@
+{
+  "organizational_units": [
+    {
+      "numeric_code": 2001,
+      "alias": "OPERACIONES",
+      "name": "Departamento de Operaciones",
+      "email": "operaciones@arcamitte.local"
+    }
+  ],
+  "users": [
+    {
+      "username": "operador_demo",
+      "email": "operador@arcamitte.local",
+      "password": "DemoPassword#2026",
+      "uo_alias": "OPERACIONES",
+      "role": "OPERATOR"
+    }
+  ]
+}

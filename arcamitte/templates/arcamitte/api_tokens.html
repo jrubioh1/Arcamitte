@@ -1,0 +1,207 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "API Tokens (M2M)" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+	<h1 class="h3 fw-bold mb-1">{% trans "Tokens de Acceso API" %} <span class="text-muted fs-6">({% trans "Machine-to-Machine" %})</span></h1>
+	<p class="text-muted small mb-0">
+		{% trans "Autenticación segura para integración con otros microservicios y sistemas externos." %}
+	</p>
+</div>
+
+{% if new_raw_token %}
+	<div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+		<h5 class="alert-heading fw-bold d-flex align-items-center gap-2 mb-2">
+			<i data-feather="key" style="width:18px;height:18px;"></i>
+			{% trans "¡Nuevo API Token Generado con Éxito!" %}
+		</h5>
+		<p class="mb-2 small">
+			{% trans "Copie su clave secreta inmediatamente. Por directivas de seguridad Zero-Knowledge (NIST SP 800-63B), el servidor solo almacena el hash SHA-256 y esta clave" %}
+			<strong>{% trans "NO volverá a ser visible nunca más." %}</strong>
+		</p>
+		<div class="input-group my-2" style="max-width: 680px;">
+			<input type="text" id="rawTokenInput" class="form-control font-mono fw-bold text-dark bg-white" value="{{ new_raw_token }}" readonly>
+			<button class="btn btn-dark" type="button" onclick="arcaCopyToClipboard('rawTokenInput', 'copySuccessMsg')">
+				<i data-feather="copy" style="width:14px;height:14px;" class="me-1"></i> {% trans "Copiar" %}
+			</button>
+		</div>
+		<div id="copySuccessMsg" class="small text-success fw-bold" style="display:none;">
+			✓ {% trans "¡Copiado al portapapeles!" %}
+		</div>
+		<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+	</div>
+{% endif %}
+
+<div class="row g-4">
+	<div class="col-12 col-xl-8">
+		<div class="card h-100">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">{% trans "Tokens Registrados" %}</h5>
+				<span class="badge bg-light text-dark border">{{ tokens|length }} {% trans "tokens" %}</span>
+			</div>
+			<div class="table-responsive">
+				<table class="table table-hover align-middle mb-0">
+					<thead>
+						<tr>
+							<th>{% trans "Nombre / Servicio" %}</th>
+							<th>{% trans "Prefijo" %}</th>
+							<th>{% trans "Permisos (Scopes)" %}</th>
+							<th>{% trans "Límite" %}</th>
+							<th>{% trans "Último Uso" %}</th>
+							<th>{% trans "Estado" %}</th>
+							<th class="text-end">{% trans "Acciones" %}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for token in tokens %}
+							<tr>
+								<td>
+									<strong>{{ token.name }}</strong>
+									<div class="text-muted small">
+										{% trans "Expira:" %} {{ token.expires_at|date:"d/m/Y"|default:"Permanente" }}
+									</div>
+								</td>
+								<td class="font-mono small text-muted">
+									{{ token.prefix }}...
+								</td>
+								<td>
+									{% for scope in token.scopes %}
+										<span class="badge bg-light text-primary border badge-scope font-mono">{{ scope }}</span>
+									{% empty %}
+										<span class="badge bg-light text-muted border badge-scope font-mono">documents:*</span>
+									{% endfor %}
+								</td>
+								<td class="small">
+									{{ token.rate_limit }} <span class="text-muted">req/min</span>
+								</td>
+								<td class="small text-muted">
+									{% if token.last_used_at %}
+										{{ token.last_used_at|date:"d/m/Y H:i" }}<br>
+										<span class="font-mono text-muted" style="font-size:0.75rem;">{{ token.last_used_ip|default:"" }}</span>
+									{% else %}
+										<em>{% trans "Sin uso registrado" %}</em>
+									{% endif %}
+								</td>
+								<td>
+									{% if not token.is_active %}
+										<span class="badge bg-danger">{% trans "Revocado" %}</span>
+									{% elif token.is_expired %}
+										<span class="badge bg-warning text-dark">{% trans "Caducado" %}</span>
+									{% else %}
+										<span class="badge bg-success">{% trans "Activo" %}</span>
+									{% endif %}
+								</td>
+								<td class="text-end">
+									{% if token.is_active and not token.is_expired %}
+										<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}" class="d-inline" onsubmit="return confirm('¿Está seguro de revocar inmediatamente este token? Los servicios asociados perderán el acceso de forma instantánea.');">
+											{% csrf_token %}
+											<button type="submit" class="btn btn-sm btn-outline-danger" title="{% trans 'Revocar Token' %}">
+												<i data-feather="slash" style="width:14px;height:14px;"></i> {% trans "Revocar" %}
+											</button>
+										</form>
+									{% else %}
+										<span class="text-muted small">&mdash;</span>
+									{% endif %}
+								</td>
+							</tr>
+						{% empty %}
+							<tr>
+								<td colspan="7" class="text-center py-5 text-muted">
+									<i data-feather="key" style="width: 36px; height: 36px;" class="mb-2"></i>
+									<h5>{% trans "No hay API Tokens registrados" %}</h5>
+									<p class="small text-muted mb-0">{% trans "Genere un token a la derecha para permitir a otros microservicios invocar la API." %}</p>
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-xl-4">
+		<div class="card mb-4">
+			<div class="card-header">
+				<h5 class="card-title mb-0 d-flex align-items-center gap-2">
+					<i data-feather="plus-circle" style="width:16px;height:16px;" class="text-primary"></i>
+					{% trans "Generar Nuevo API Token" %}
+				</h5>
+			</div>
+			<div class="card-body p-4">
+				<form method="post" action="{% url 'dashboard:api_tokens' %}" autocomplete="off">
+					{% csrf_token %}
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">{% trans "Nombre del Servicio / Cliente" %} <span class="text-danger">*</span></label>
+						<input type="text" name="name" class="form-control" placeholder="ej. Microservicio RRHH" required>
+						<div class="form-text small text-muted">{% trans "Identificador descriptivo de la aplicación cliente." %}</div>
+					</div>
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">{% trans "Permisos de Acceso (Scopes)" %}</label>
+						<div class="form-check">
+							<input class="form-check-input" type="checkbox" name="scopes" value="documents:create" id="scope_create" checked>
+							<label class="form-check-label small" for="scope_create">
+								<code>documents:create</code> - {% trans "Cifrado y registro de documentos" %}
+							</label>
+						</div>
+						<div class="form-check">
+							<input class="form-check-input" type="checkbox" name="scopes" value="documents:read" id="scope_read" checked>
+							<label class="form-check-label small" for="scope_read">
+								<code>documents:read</code> - {% trans "Consulta de estado y canje" %}
+							</label>
+						</div>
+						<div class="form-check">
+							<input class="form-check-input" type="checkbox" name="scopes" value="documents:terminate" id="scope_term">
+							<label class="form-check-label small" for="scope_term">
+								<code>documents:terminate</code> - {% trans "Revocación anticipada de asientos" %}
+							</label>
+						</div>
+						<div class="form-check">
+							<input class="form-check-input" type="checkbox" name="scopes" value="audit:read" id="scope_audit">
+							<label class="form-check-label small" for="scope_audit">
+								<code>audit:read</code> - {% trans "Inspección de trazas de auditoría" %}
+							</label>
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-6 mb-3">
+							<label class="form-label fw-semibold">{% trans "Tasa (req/min)" %}</label>
+							<input type="number" name="rate_limit" class="form-control" value="60" min="1" max="1000">
+						</div>
+						<div class="col-6 mb-3">
+							<label class="form-label fw-semibold">{% trans "Validez (Días)" %}</label>
+							<input type="number" name="validity_days" class="form-control" value="365" min="1" max="1825">
+						</div>
+					</div>
+
+					<button type="submit" class="btn btn-primary w-100 mt-2">
+						<i data-feather="key" style="width:16px;height:16px;" class="me-1"></i> {% trans "Crear y Emitir API Token" %}
+					</button>
+				</form>
+			</div>
+		</div>
+
+		<div class="card bg-light border">
+			<div class="card-body p-3">
+				<h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2 small">
+					<i data-feather="info" style="width:14px;height:14px;" class="text-primary"></i>
+					{% trans "Uso en Cabeceras HTTP" %}
+				</h6>
+				<p class="small text-muted mb-2">
+					{% trans "Las llamadas M2M pueden autenticarse mediante cualquiera de los siguientes encabezados:" %}
+				</p>
+				<div class="bg-white p-2 rounded border small font-mono mb-2">
+					Authorization: Bearer fdec_live_...
+				</div>
+				<div class="bg-white p-2 rounded border small font-mono">
+					X-API-Key: fdec_live_...
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

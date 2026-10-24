@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+    {% if request.user.is_superuser %}
+        <li>
+            <a href="{% url 'admin:arcamitte_organizationalunit_import_batch' %}" class="addlink" style="background:#0284c7; color:#fff; font-weight:bold;">
+                📥 {% trans "Carga Masiva JSON (UOs + Usuarios)" %}
+            </a>
+        </li>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}

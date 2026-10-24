@@ -1,0 +1,156 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Asientos Cifrados" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Documentos Cifrados" %}</h1>
+		<p class="text-muted small mb-0">{% trans "Gestión y custodia criptográfica de archivos confidenciales." %}</p>
+	</div>
+	<div>
+		<a href="{% url 'dashboard:document_upload' %}" class="btn btn-primary shadow-sm">
+			<i data-feather="upload-cloud" style="width:16px;height:16px;" class="me-1"></i> {% trans "Cifrar Nuevo Asiento" %}
+		</a>
+	</div>
+</div>
+
+<div class="card mb-4">
+	<div class="card-body p-3">
+		<form method="get" class="row g-2 align-items-center">
+			<div class="col-md-5">
+				<div class="input-group">
+					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
+					<input type="text" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por nombre, hash SHA-256 o descripción...' %}">
+				</div>
+			</div>
+			<div class="col-md-3">
+				<select name="status" class="form-select">
+					<option value="">-- {% trans "Todos los estados" %} --</option>
+					<option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Activos (Pendientes de canje)" %}</option>
+					<option value="consumed" {% if status_filter == 'consumed' %}selected{% endif %}>{% trans "Consumidos (Destruidos en disco)" %}</option>
+					<option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>{% trans "Caducados / Bloqueados" %}</option>
+				</select>
+			</div>
+			<div class="col-md-2">
+				<button type="submit" class="btn btn-secondary w-100">
+					{% trans "Filtrar" %}
+				</button>
+			</div>
+			{% if query or status_filter %}
+				<div class="col-md-2">
+					<a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary w-100">
+						{% trans "Limpiar" %}
+					</a>
+				</div>
+			{% endif %}
+		</form>
+	</div>
+
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>{% trans "Documento" %}</th>
+					<th>{% trans "Hash SHA-256" %}</th>
+					<th>{% trans "UO Origen" %} &rarr; {% trans "Destino" %}</th>
+					<th>{% trans "Destinatarios" %}</th>
+					<th>{% trans "Política" %}</th>
+					<th>{% trans "Caducidad" %}</th>
+					<th>{% trans "Estado" %}</th>
+					<th class="text-end">{% trans "Acciones" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for doc in documents %}
+					<tr>
+						<td>
+							<strong class="d-block">{{ doc.original_filename|truncatechars:28 }}</strong>
+							<span class="text-muted small">
+								{{ doc.file_size|filesizeformat }} &bull; {{ doc.created_at|date:"d/m/Y H:i" }}
+							</span>
+						</td>
+						<td>
+							<code class="font-mono text-primary small" title="{{ doc.file_hash }}">
+								{{ doc.file_hash|slice:":12" }}...
+							</code>
+						</td>
+						<td>
+							<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:"Global" }}</span>
+							{% if doc.target_uo %}
+								&rarr; <span class="badge bg-info text-white">{{ doc.target_uo.alias }}</span>
+							{% endif %}
+						</td>
+						<td>
+							<span class="badge bg-light text-dark border">
+								{{ doc.allowed_emails|length }} {% trans "autorizados" %}
+							</span>
+						</td>
+						<td>
+							<span class="badge bg-light text-dark small border">
+								{{ doc.get_burn_policy_display }}
+							</span>
+						</td>
+						<td class="small {% if doc.is_expired %}text-danger fw-bold{% else %}text-muted{% endif %}">
+							{{ doc.expires_at|date:"d/m/Y H:i"|default:"-" }}
+						</td>
+						<td>
+							{% if doc.is_consumed %}
+								<span class="badge bg-secondary">{% trans "Consumido" %}</span>
+							{% elif doc.is_expired %}
+								<span class="badge bg-danger">{% trans "Caducado" %}</span>
+							{% elif doc.is_active %}
+								<span class="badge bg-success">{% trans "Activo" %}</span>
+							{% else %}
+								<span class="badge bg-warning text-dark">{% trans "Inactivo" %}</span>
+							{% endif %}
+						</td>
+						<td class="text-end text-nowrap">
+							<a href="{% url 'dashboard:document_detail' doc.file_hash %}" class="btn btn-sm btn-outline-primary" title="{% trans 'Detalle y Auditoría' %}">
+								<i data-feather="eye" style="width:14px;height:14px;"></i>
+							</a>
+							{% if doc.is_active and not doc.is_consumed and not doc.is_expired %}
+								<a href="{% url 'dashboard:document_terminate' doc.file_hash %}" class="btn btn-sm btn-outline-danger ms-1" title="{% trans 'Terminar y Destruir' %}">
+									<i data-feather="trash-2" style="width:14px;height:14px;"></i>
+								</a>
+							{% endif %}
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="8" class="text-center py-5 text-muted">
+							<i data-feather="inbox" style="width: 36px; height: 36px;" class="mb-2"></i>
+							<h5>{% trans "No se encontraron asientos" %}</h5>
+							<p class="small text-muted mb-0">{% trans "Pruebe con otros términos de búsqueda o cifre un nuevo documento." %}</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+
+	{% if is_paginated %}
+		<div class="card-footer d-flex justify-content-between align-items-center bg-white">
+			<span class="small text-muted">
+				{% blocktrans with page=page_obj.number total=paginator.num_pages %}Página {{ page }} de {{ total }}{% endblocktrans %}
+			</span>
+			<ul class="pagination pagination-sm mb-0">
+				{% if page_obj.has_previous %}
+					<li class="page-item">
+						<a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo;</a>
+					</li>
+				{% endif %}
+				<li class="page-item active">
+					<span class="page-link">{{ page_obj.number }}</span>
+				</li>
+				{% if page_obj.has_next %}
+					<li class="page-item">
+						<a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">&raquo;</a>
+					</li>
+				{% endif %}
+			</ul>
+		</div>
+	{% endif %}
+</div>
+{% endblock %}

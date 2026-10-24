@@ -1,0 +1,65 @@
+# ==============================================================================
+# ARCAMITTE CONFIGURATION TEMPLATE (arcamitte.ini)
+# ==============================================================================
+# Copie este archivo como 'arcamitte.ini' en la raíz del proyecto para personalizar
+# la configuración del microservicio Arcamitte.
+#
+# Para generar una nueva clave 'fernet_key' segura (32 bytes url-safe base64):
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# O con Poetry:
+#   poetry run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# ==============================================================================
+
+[django]
+# Clave secreta para sesiones y firmas de Django
+secret_key = django-insecure-staging-key-arcamitte-cybersec-demo-2026!#@$
+debug = true
+allowed_hosts = *
+# Orígenes confiables para protección CSRF (separados por coma)
+csrf_trusted_origins = http://localhost:8000,http://127.0.0.1:8000,http://0.0.0.0:8000
+
+[database]
+# Motor de base de datos: 'sqlite3' (por defecto) o 'postgresql'
+engine = sqlite3
+# Nombre del fichero SQLite o nombre de la base de datos PostgreSQL
+name = db.sqlite3
+# Configuración para PostgreSQL (descomentar si aplica):
+# user = arcamitte_user
+# password = secreto_seguro
+# host = localhost
+# port = 5432
+
+[security]
+# Clave maestra Fernet del servidor (32 bytes url-safe base64) para cifrar las DEK
+# IMPORTANTE: Reemplace este valor por una clave generada para su entorno:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+fernet_key = cambiame-cambiame-cambiame-cambiame-cambiame=
+# Tamaño máximo de archivo permitido en bytes (por defecto: 52428800 = 50 MB)
+max_file_size = 52428800
+# Iteraciones de PBKDF2 para mitigación de timing attacks (por defecto: 20000)
+timing_pbkdf2_iterations = 20000
+
+[email]
+# Backend de correo: estándar corporativo SMTP (o 'django.core.mail.backends.console.EmailBackend' para terminal)
+backend = django.core.mail.backends.smtp.EmailBackend
+host = localhost
+port = 25
+use_tls = false
+use_ssl = false
+host_user = 
+host_password = 
+default_from_email = no-reply@arcamitte.local
+# Timeout de conexión y socket en segundos para evitar bloqueos
+timeout = 5
+# Envío no bloqueante desacoplado mediante worker pool en segundo plano
+async_email = true
+# Número de hilos del pool para despacho de correos
+email_max_workers = 8
+
+[throttling]
+# Límite de solicitudes por minuto para la Web GUI (control anti-flood)
+web_request_limit_per_minute = 15
+# Tasa de rate limiting DRF para solicitud de OTP
+api_access_request_rate = 15/minute
+# Tasa de rate limiting DRF para canje de documentos
+api_access_consume_rate = 30/minute

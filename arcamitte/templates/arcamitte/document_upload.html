@@ -1,0 +1,206 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Cifrar Nuevo Asiento" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+	<h1 class="h3 fw-bold mb-1">{% trans "Cifrar y Custodiar Documento" %}</h1>
+	<p class="text-muted small mb-0">
+		{% trans "Generación automática de clave criptográfica (DEK), cifrado Envelope AES-256-GCM y registro forense." %}
+	</p>
+</div>
+
+<div class="row g-4">
+	<div class="col-12 col-xl-8">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">{% trans "Datos del Asiento Criptográfico" %}</h5>
+			</div>
+			<div class="card-body p-4">
+				{% if form_errors %}
+					<div class="alert alert-danger alert-dismissible fade show" role="alert">
+						<strong>{% trans "Por favor corrija los siguientes errores:" %}</strong>
+						<ul class="mb-0 mt-2 small">
+							{% for err in form_errors %}
+								<li>{{ err }}</li>
+							{% endfor %}
+						</ul>
+						<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+					</div>
+				{% endif %}
+
+				<form method="post" enctype="multipart/form-data" autocomplete="off">
+					{% csrf_token %}
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">
+							{% trans "Archivo Confidencial Original" %} <span class="text-danger">*</span>
+						</label>
+						<input type="file" name="original_file" class="form-control" required accept=".pdf,.docx,.xlsx,.pptx,.odt,.ods,.odp,.doc,.xls,.ppt">
+						<div class="form-text small text-muted">
+							{% trans "Formatos admitidos: PDF, Microsoft Office y LibreOffice. Tamaño máximo según directiva." %}
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-md-6 mb-3">
+							<label class="form-label fw-semibold">
+								{% trans "UO Emisora (Custodia)" %} <span class="text-danger">*</span>
+							</label>
+							<select name="origin_uo" class="form-select" required>
+								<option value="">-- {% trans "Seleccione UO Emisora" %} --</option>
+								{% for uo in available_origin_uos %}
+									<option value="{{ uo.id }}" {% if selected_origin_uo == uo.id|stringformat:"s" %}selected{% endif %}>
+										{{ uo.name }} ({{ uo.alias }})
+									</option>
+								{% endfor %}
+							</select>
+							<div class="form-text small text-muted">
+								{% trans "Departamento emisor responsable del documento." %}
+							</div>
+						</div>
+
+						<div class="col-md-6 mb-3">
+							<label class="form-label fw-semibold">
+								{% trans "UO Receptora (Opcional)" %}
+							</label>
+							<select name="target_uo" class="form-select">
+								<option value="">-- {% trans "Ninguna / Destinatario Externo" %} --</option>
+								{% for uo in all_target_uos %}
+									<option value="{{ uo.id }}" {% if selected_target_uo == uo.id|stringformat:"s" %}selected{% endif %}>
+										{{ uo.name }} ({{ uo.alias }})
+									</option>
+								{% endfor %}
+							</select>
+							<div class="form-text small text-muted">
+								{% trans "Permite derivar el trámite dentro de la malla inter-departamental." %}
+							</div>
+						</div>
+					</div>
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">
+							{% trans "Correos Autorizados para Canje (OTP)" %} <span class="text-danger">*</span>
+						</label>
+						<textarea name="allowed_emails" class="form-control" rows="3" placeholder="destinatario1@empresa.com, destinatario2@empresa.com" required>{{ allowed_emails_raw }}</textarea>
+						<div class="form-text small text-muted">
+							{% trans "Separe múltiples correos con comas o saltos de línea. Solo estas direcciones podrán recibir el código OTP." %}
+						</div>
+					</div>
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">
+							{% trans "Descripción / Asunto del Trámite" %}
+						</label>
+						<textarea name="description" class="form-control" rows="2" placeholder="{% trans 'Documento confidencial tramitado a través de Arcamitte...' %}">{{ description_val }}</textarea>
+					</div>
+
+					<div class="row">
+						<div class="col-md-6 mb-3">
+							<label class="form-label fw-semibold">
+								{% trans "Política de Destrucción (Burn Policy)" %}
+							</label>
+							<div class="form-check mt-1">
+								<input class="form-check-input" type="radio" name="burn_policy" id="burn_first" value="FIRST_ACCESS" checked>
+								<label class="form-check-label" for="burn_first">
+									<strong>{% trans "Primer acceso (Un solo canje)" %}</strong><br>
+									<span class="text-muted small">{% trans "El archivo físico en disco se destruye inmediatamente tras el primer canje exitoso." %}</span>
+								</label>
+							</div>
+							<div class="form-check mt-2">
+								<input class="form-check-input" type="radio" name="burn_policy" id="burn_all" value="ALL_RECIPIENTS">
+								<label class="form-check-label" for="burn_all">
+									<strong>{% trans "Todos los destinatarios autorizados" %}</strong><br>
+									<span class="text-muted small">{% trans "Se destruye únicamente cuando todos los correos hayan completado su descarga." %}</span>
+								</label>
+							</div>
+						</div>
+
+						<div class="col-md-6 mb-3">
+							<label class="form-label fw-semibold">
+								{% trans "Fecha y Hora de Caducidad" %}
+							</label>
+							<input type="datetime-local" name="expires_at" class="form-control" value="{{ default_expires_at }}" required>
+							<div class="form-text small text-muted">
+								{% trans "Por defecto 2 semanas. Al expirar, se clausura el canje y se destruye el fichero en disco." %}
+							</div>
+						</div>
+					</div>
+
+					<hr class="my-4">
+
+					<div class="d-flex justify-content-between align-items-center">
+						<a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary">
+							&larr; {% trans "Cancelar" %}
+						</a>
+						<button type="submit" class="btn btn-primary px-4">
+							<i data-feather="lock" style="width:16px;height:16px;" class="me-1"></i> {% trans "Cifrar y Registrar Asiento" %}
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-xl-4">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0 d-flex align-items-center gap-2">
+					<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
+					{% trans "Garantías de Seguridad" %}
+				</h5>
+			</div>
+			<div class="card-body p-4">
+				<div class="d-flex mb-3 gap-3">
+					<div class="arca-stat-icon primary flex-shrink-0">
+						<i data-feather="key"></i>
+					</div>
+					<div>
+						<h6 class="fw-bold mb-1">{% trans "Clave Única Efímera (DEK)" %}</h6>
+						<p class="text-muted small mb-0">
+							{% trans "Cada documento cuenta con una DEK única de 256 bits generada por entropía del SO." %}
+						</p>
+					</div>
+				</div>
+
+				<div class="d-flex mb-3 gap-3">
+					<div class="arca-stat-icon success flex-shrink-0">
+						<i data-feather="file-text"></i>
+					</div>
+					<div>
+						<h6 class="fw-bold mb-1">{% trans "Cero Transporte del Binario" %}</h6>
+						<p class="text-muted small mb-0">
+							{% trans "Los destinatarios solo reciben el Hash SHA-256 identificativo para verificar el canje." %}
+						</p>
+					</div>
+				</div>
+
+				<div class="d-flex mb-3 gap-3">
+					<div class="arca-stat-icon danger flex-shrink-0">
+						<i data-feather="trash-2"></i>
+					</div>
+					<div>
+						<h6 class="fw-bold mb-1">{% trans "Sanitización NIST SP 800-88" %}</h6>
+						<p class="text-muted small mb-0">
+							{% trans "Sobreescritura física aleatoria y sincronización a bloque (fsync) al consumirse." %}
+						</p>
+					</div>
+				</div>
+
+				<div class="d-flex gap-3">
+					<div class="arca-stat-icon warning flex-shrink-0">
+						<i data-feather="check-square"></i>
+					</div>
+					<div>
+						<h6 class="fw-bold mb-1">{% trans "Auditoría Legal Inmutable" %}</h6>
+						<p class="text-muted small mb-0">
+							{% trans "Cada interacción queda registrada con sello temporal, IP y hash de validación." %}
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

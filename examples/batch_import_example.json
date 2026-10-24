@@ -1,0 +1,88 @@
+{
+  "organizational_units": [
+    {
+      "numeric_code": 1001,
+      "alias": "DIRECCION",
+      "name": "Dirección General y Presidencia",
+      "email": "direccion@arcamitte.local",
+      "description": "Unidad de gobierno corporativo y alta dirección.",
+      "is_active": true
+    },
+    {
+      "numeric_code": 1002,
+      "alias": "RRHH",
+      "name": "Recursos Humanos y Relaciones Laborales",
+      "email": "rrhh@arcamitte.local",
+      "description": "Gestión de nóminas, contrataciones y personal.",
+      "is_active": true
+    },
+    {
+      "numeric_code": 1003,
+      "alias": "LEGAL",
+      "name": "Asesoría Jurídica y Cumplimiento",
+      "email": "legal@arcamitte.local",
+      "description": "Contratos, litigios y secretaría del consejo.",
+      "is_active": true
+    },
+    {
+      "numeric_code": 1004,
+      "alias": "AUDITORIA",
+      "name": "Auditoría Interna y Control de Gestión",
+      "email": "auditoria@arcamitte.local",
+      "description": "Supervisión de riesgos y auditoría de accesos.",
+      "is_active": true
+    }
+  ],
+  "users": [
+    {
+      "username": "admin_dir",
+      "email": "admin_dir@arcamitte.local",
+      "first_name": "Elena",
+      "last_name": "Vázquez",
+      "password": "PasswordDir#2026",
+      "uo_alias": "DIRECCION",
+      "role": "ADMIN",
+      "is_staff": true
+    },
+    {
+      "username": "gestor_rrhh",
+      "email": "gestor_rrhh@arcamitte.local",
+      "first_name": "Carlos",
+      "last_name": "Mendoza",
+      "password": "PasswordRRHH#2026",
+      "uo_alias": "RRHH",
+      "role": "OPERATOR",
+      "is_staff": true
+    },
+    {
+      "username": "auditor_rrhh",
+      "email": "auditor_rrhh@arcamitte.local",
+      "first_name": "Lucía",
+      "last_name": "Gómez",
+      "password": "PasswordAuditor#2026",
+      "uo_alias": "RRHH",
+      "role": "AUDITOR",
+      "is_staff": true
+    },
+    {
+      "username": "gestor_legal",
+      "email": "gestor_legal@arcamitte.local",
+      "first_name": "Javier",
+      "last_name": "Sanz",
+      "password": "PasswordLegal#2026",
+      "uo_alias": "LEGAL",
+      "role": "OPERATOR",
+      "is_staff": true
+    },
+    {
+      "username": "auditor_general",
+      "email": "auditor_gral@arcamitte.local",
+      "first_name": "Marta",
+      "last_name": "Navarro",
+      "password": "PasswordAudGral#2026",
+      "uo_alias": "AUDITORIA",
+      "role": "AUDITOR",
+      "is_staff": true
+    }
+  ]
+}

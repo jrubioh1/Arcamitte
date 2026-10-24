@@ -1,0 +1,187 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="description" content="Arcamitte - Plataforma Autónoma de Custodia Criptográfica y Trámite Confidencial">
+	<meta name="author" content="Arcamitte">
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="shortcut icon" href="{% static 'arcamitte/img/logo.jpg' %}" />
+
+	<title>{% block title %}{% trans "Panel de Control" %}{% endblock %} | Arcamitte</title>
+
+	<!-- Bootstrap 5.3 -->
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Estilos propios Arcamitte -->
+	<link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
+	{% block extra_head %}{% endblock %}
+</head>
+
+<body>
+	<div class="arca-wrapper">
+		<!-- Sidebar Lateral Personalizado Arcamitte -->
+		<nav id="arcaSidebar" class="arca-sidebar">
+			<a class="arca-brand" href="{% url 'dashboard:home' %}">
+				<img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte" class="arca-brand-logo">
+				<span>Arcamitte</span>
+			</a>
+
+			<ul class="arca-nav">
+				<li class="arca-nav-header">
+					{% trans "Operaciones" %}
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'dashboard' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:home' %}">
+						<i data-feather="sliders"></i> <span>{% trans "Dashboard" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'documents' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:document_list' %}">
+						<i data-feather="file-text"></i> <span>{% trans "Documentos Cifrados" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'upload' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:document_upload' %}">
+						<i data-feather="upload-cloud"></i> <span>{% trans "Cifrar Asiento" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-header">
+					{% trans "Seguridad y Auditoría" %}
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'audit' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:audit_logs' %}">
+						<i data-feather="activity"></i> <span>{% trans "Trazabilidad Forense" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'tokens' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:api_tokens' %}">
+						<i data-feather="key"></i> <span>{% trans "API Tokens (M2M)" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-header">
+					{% trans "Gobernanza" %}
+				</li>
+
+				<li class="arca-nav-item {% if active_nav == 'uos' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:uo_list' %}">
+						<i data-feather="grid"></i> <span>{% trans "Unidades Organizativas" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-header">
+					{% trans "Enlaces y Sistemas" %}
+				</li>
+
+				<li class="arca-nav-item">
+					<a class="arca-nav-link" href="{% url 'admin:index' %}" target="_blank">
+						<i data-feather="settings"></i> <span>{% trans "Django Admin Clásico" %}</span>
+					</a>
+				</li>
+
+				<li class="arca-nav-item">
+					<a class="arca-nav-link" href="{% url 'arcamitte:request-access' %}" target="_blank">
+						<i data-feather="globe"></i> <span>{% trans "Portal Público Canje" %}</span>
+					</a>
+				</li>
+			</ul>
+
+			<div class="arca-sidebar-footer">
+				<div class="d-flex align-items-center gap-2 mb-1">
+					<i data-feather="shield" style="width:14px;height:14px;"></i>
+					<strong class="text-white">Arcamitte Security</strong>
+				</div>
+				<div>AES-256-GCM | NIST SP 800-88</div>
+			</div>
+		</nav>
+
+		<!-- Overlay para móviles -->
+		<div id="arcaSidebarOverlay" class="d-lg-none" style="display:none;"></div>
+
+		<!-- Área Principal -->
+		<div class="arca-main">
+			<header class="arca-navbar">
+				<div class="d-flex align-items-center gap-3">
+					<button id="arcaSidebarToggle" type="button" class="arca-toggle-btn" aria-label="Toggle navigation">
+						<i data-feather="menu" style="width:18px;height:18px;"></i>
+					</button>
+					<span class="d-none d-sm-inline text-muted small">
+						{% trans "Custodia Criptográfica Descentralizada" %}
+					</span>
+				</div>
+
+				<div class="d-flex align-items-center gap-3">
+					<div class="dropdown">
+						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
+							<span class="badge bg-primary text-white rounded-circle p-1 d-inline-flex align-items-center justify-content-center" style="width:24px;height:24px;">
+								{{ request.user.username|make_list|first|upper }}
+							</span>
+							<span class="fw-semibold">{{ request.user.username }}</span>
+							{% if request.user.is_superuser %}
+								<span class="badge bg-danger ms-1" style="font-size:0.65rem;">Superadmin</span>
+							{% endif %}
+						</button>
+						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userMenuBtn">
+							<li>
+								<a class="dropdown-item" href="{% url 'admin:index' %}">
+									<i data-feather="settings" style="width:14px;height:14px;" class="me-2"></i> {% trans "Django Admin" %}
+								</a>
+							</li>
+							<li><hr class="dropdown-divider"></li>
+							<li>
+								<form action="{% url 'dashboard:logout' %}" method="post" class="d-inline">
+									{% csrf_token %}
+									<button type="submit" class="dropdown-item text-danger">
+										<i data-feather="log-out" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cerrar sesión" %}
+									</button>
+								</form>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</header>
+
+			<main class="arca-content">
+				{% if messages %}
+					{% for message in messages %}
+						<div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}primary{% endif %} alert-dismissible fade show" role="alert">
+							{{ message }}
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					{% endfor %}
+				{% endif %}
+
+				{% block content %}{% endblock %}
+			</main>
+
+			<footer class="arca-footer d-flex justify-content-between align-items-center">
+				<div>
+					<strong>Arcamitte</strong> &copy; {% now "Y" %} &bull; {% trans "Microservicio de Cifrado y Custodia" %}
+				</div>
+				<div class="text-muted small">
+					NIST SP 800-53 Rev. 5 | OWASP API Security Top 10
+				</div>
+			</footer>
+		</div>
+	</div>
+
+	<!-- Scripts -->
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+	<script src="{% static 'arcamitte/js/arcamitte.js' %}"></script>
+	{% block extra_js %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,302 @@
+/* ==========================================================================
+   ARCAMITTE - Hoja de Estilos Personalizada para el Panel de Control
+   Inspirado en diseño moderno de paneles de seguridad y custodia criptográfica.
+   ========================================================================== */
+
+:root {
+  --arca-primary: #2563eb;
+  --arca-primary-hover: #1d4ed8;
+  --arca-primary-subtle: #dbeafe;
+  --arca-sidebar-bg: #0f172a;
+  --arca-sidebar-hover: #1e293b;
+  --arca-sidebar-active: #334155;
+  --arca-sidebar-text: #cbd5e1;
+  --arca-sidebar-heading: #94a3b8;
+  --arca-body-bg: #f8fafc;
+  --arca-card-bg: #ffffff;
+  --arca-border-color: #e2e8f0;
+  --arca-text-main: #1e293b;
+  --arca-text-muted: #64748b;
+  --arca-success: #059669;
+  --arca-danger: #e11d48;
+  --arca-warning: #d97706;
+  --arca-info: #0284c7;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--arca-body-bg);
+  color: var(--arca-text-main);
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tipografía Monoespaciada Criptográfica */
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+/* Layout General */
+.arca-wrapper {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Sidebar Lateral */
+.arca-sidebar {
+  width: 270px;
+  min-width: 270px;
+  max-width: 270px;
+  background-color: var(--arca-sidebar-bg);
+  color: var(--arca-sidebar-text);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.25s ease-in-out;
+  z-index: 1040;
+}
+
+.arca-sidebar.collapsed {
+  margin-left: -270px;
+}
+
+.arca-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1.25rem 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arca-brand:hover {
+  color: #ffffff;
+}
+
+.arca-brand-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.arca-nav {
+  list-style: none;
+  padding: 1rem 0;
+  margin: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.arca-nav-header {
+  padding: 0.75rem 1.5rem 0.25rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--arca-sidebar-heading);
+}
+
+.arca-nav-item {
+  margin: 2px 10px;
+}
+
+.arca-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.65rem 1rem;
+  color: var(--arca-sidebar-text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.15s ease-in-out;
+}
+
+.arca-nav-link i,
+.arca-nav-link svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-width: 2;
+}
+
+.arca-nav-link:hover {
+  background-color: var(--arca-sidebar-hover);
+  color: #ffffff;
+}
+
+.arca-nav-item.active .arca-nav-link {
+  background-color: var(--arca-primary);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+.arca-sidebar-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  color: var(--arca-sidebar-heading);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Área de Contenido Principal */
+.arca-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: var(--arca-body-bg);
+}
+
+/* Top Navbar */
+.arca-navbar {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--arca-border-color);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.arca-toggle-btn {
+  background: none;
+  border: 1px solid var(--arca-border-color);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--arca-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease-in-out;
+}
+
+.arca-toggle-btn:hover {
+  background-color: var(--arca-body-bg);
+  color: var(--arca-text-main);
+}
+
+/* Contenedor del contenido */
+.arca-content {
+  flex: 1 1 auto;
+  padding: 1.75rem;
+}
+
+/* Tarjetas Estadísticas */
+.arca-stat-card {
+  border: 1px solid var(--arca-border-color);
+  border-radius: 10px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.arca-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+}
+
+.arca-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arca-stat-icon svg,
+.arca-stat-icon i {
+  width: 24px;
+  height: 24px;
+}
+
+.arca-stat-icon.primary { background-color: #eff6ff; color: #2563eb; }
+.arca-stat-icon.success { background-color: #ecfdf5; color: #059669; }
+.arca-stat-icon.warning { background-color: #fffbeb; color: #d97706; }
+.arca-stat-icon.danger  { background-color: #fff1f2; color: #e11d48; }
+
+/* Tarjetas Generales */
+.card {
+  border: 1px solid var(--arca-border-color);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background-color: #ffffff;
+}
+
+.card-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--arca-border-color);
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+}
+
+/* Tablas */
+.table {
+  color: var(--arca-text-main);
+  margin-bottom: 0;
+}
+
+.table > :not(caption) > * > * {
+  padding: 0.85rem 1rem;
+  border-bottom-color: var(--arca-border-color);
+}
+
+.table thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--arca-text-muted);
+  background-color: #f8fafc;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(37, 99, 235, 0.03);
+}
+
+/* Badges */
+.badge-scope {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  margin-right: 0.25rem;
+}
+
+/* Footer */
+.arca-footer {
+  padding: 1rem 1.75rem;
+  background-color: #ffffff;
+  border-top: 1px solid var(--arca-border-color);
+  font-size: 0.85rem;
+  color: var(--arca-text-muted);
+}
+
+/* Media queries responsivas */
+@media (max-width: 991.98px) {
+  .arca-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    margin-left: -270px;
+  }
+
+  .arca-sidebar.show {
+    margin-left: 0;
+  }
+
+  .arca-content {
+    padding: 1rem;
+  }
+}

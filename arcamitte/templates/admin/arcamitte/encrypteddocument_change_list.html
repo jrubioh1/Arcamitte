@@ -1,0 +1,98 @@
+{% extends "admin/change_list.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Contenedor responsivo para el listado de documentos de Arcamitte */
+    #changelist {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    #changelist-form {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    #changelist .results {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    #result_list {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    #result_list th, #result_list td {
+        vertical-align: middle !important;
+        padding: 8px 10px !important;
+        font-size: 0.85rem !important;
+    }
+    #result_list th {
+        white-space: nowrap !important;
+    }
+    #result_list td.field-actions_column {
+        white-space: nowrap !important;
+        min-width: 190px !important;
+    }
+    #result_list td.field-original_filename {
+        white-space: normal !important;
+        max-width: 240px !important;
+        word-break: break-word !important;
+        font-weight: 600;
+    }
+
+    /* En pantallas menores o iguales a 1024px: reorganizar la barra lateral de filtros */
+    @media (max-width: 1024px) {
+        #changelist.filtered {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: auto !important;
+        }
+        .change-list .filtered .results,
+        .change-list .filtered .paginator,
+        .filtered #toolbar,
+        .filtered div.xfull {
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+        #changelist-filter {
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-top: 20px !important;
+            margin-right: 0 !important;
+            box-sizing: border-box !important;
+            border-radius: 8px;
+            border: 1px solid var(--border-color, #334155);
+            background: #0f172a !important;
+        }
+        #changelist-filter h2 {
+            padding: 10px 14px !important;
+            font-size: 0.95rem !important;
+            background: #1e293b !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+        #changelist-filter ul {
+            padding: 0 14px 10px 14px !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+        #changelist-filter li {
+            margin-bottom: 0 !important;
+        }
+        #changelist-filter h3 {
+            width: 100% !important;
+            margin-top: 10px !important;
+            margin-bottom: 4px !important;
+            font-size: 0.82rem !important;
+            color: #38bdf8 !important;
+        }
+    }
+</style>
+{% endblock %}

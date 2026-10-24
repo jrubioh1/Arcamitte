@@ -1,0 +1,74 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Unidades Organizativas" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+	<h1 class="h3 fw-bold mb-1">{% trans "Malla de Unidades Organizativas" %}</h1>
+	<p class="text-muted small mb-0">
+		{% trans "Estructura departamental para la custodia y derivación de documentos confidenciales." %}
+	</p>
+</div>
+
+<div class="card">
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>{% trans "Código" %}</th>
+					<th>{% trans "Alias" %}</th>
+					<th>{% trans "Denominación Oficial" %}</th>
+					<th>{% trans "Buzón Institucional" %}</th>
+					<th>{% trans "Miembros Asignados" %}</th>
+					<th>{% trans "Estado" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for uo in uos %}
+					<tr>
+						<td class="font-mono fw-bold text-primary">
+							{{ uo.numeric_code }}
+						</td>
+						<td>
+							<span class="badge bg-light text-dark border font-mono">{{ uo.alias }}</span>
+						</td>
+						<td>
+							<strong>{{ uo.name }}</strong>
+						</td>
+						<td class="small">
+							{% if uo.email %}
+								<a href="mailto:{{ uo.email }}" class="text-muted text-decoration-none">
+									<i data-feather="mail" style="width:14px;height:14px;" class="me-1"></i>
+									{{ uo.email }}
+								</a>
+							{% else %}
+								<span class="text-muted">-</span>
+							{% endif %}
+						</td>
+						<td>
+							<span class="badge bg-info text-white">
+								{{ uo.active_members_count }} {% trans "miembros" %}
+							</span>
+						</td>
+						<td>
+							{% if uo.is_active %}
+								<span class="badge bg-success">{% trans "Activa" %}</span>
+							{% else %}
+								<span class="badge bg-secondary">{% trans "Inactiva" %}</span>
+							{% endif %}
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="6" class="text-center py-5 text-muted">
+							<i data-feather="inbox" style="width: 36px; height: 36px;" class="mb-2"></i>
+							<h5>{% trans "No hay Unidades Organizativas registradas" %}</h5>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}
