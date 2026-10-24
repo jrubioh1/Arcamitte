@@ -40,32 +40,31 @@ Para salvaguardar la disponibilidad del servicio contra ataques de denegación d
 Permite a un sistema autorizado ingerir un archivo confidencial para su custodia y entrega cifrada.
 
 - **Método:** `POST`
-- **Ruta:** `/api/v1/documents/upload/`
-- **Ámbito Requerido:** `documents:write`
+- **Ruta:** `/api/v1/documents/`
+- **Ámbito Requerido:** `documents:write` (o `documents:create`)
 - **Content-Type:** `multipart/form-data`
+
+> [!TIP]
+> **Diseño Desacoplado:** La aplicación integradora externa **NO necesita especificar Unidades Organizativas (UO)**. Solo requiere enviar el archivo y los correos autorizados. La asignación de UO es una característica organizativa interna y 100% opcional dentro de Arcamitte.
 
 #### Parámetros del Formulario
 | Parámetro | Tipo | Requerido | Descripción |
 | :--- | :--- | :--- | :--- |
-| `file` | Binario | Sí | Archivo en formato permitido (PDF, DOCX, ODT, XLSX, JPG, PNG). Máx. 50 MB. |
-| `description` | Cadena | No | Resumen u objeto del expediente confidencial. |
-| `origin_uo` | Entero | Sí | Código numérico o ID de la UO emisora custodia (ej. `1001`). |
-| `target_uo` | Entero | No | Código numérico o ID de la UO receptora (ej. `1002`). |
-| `burn_policy` | Cadena | No | Política de destrucción: `FIRST_DOWNLOAD` (por defecto) o `ALL_RECIPIENTS`. |
-| `authorized_emails` | Cadena | Sí | Lista separada por comas de correos autorizados para el canje. |
+| `original_file` | Binario | **Sí** | Archivo en formato permitido (PDF, DOCX, ODT, XLSX, JPG, PNG). Máx. 50 MB. |
+| `allowed_emails` | Cadena / JSON | **Sí** | Correo o lista de correos autorizados para el canje con OTP (ej. `["destinatario@empresa.com"]` o `correo@empresa.com`). |
+| `description` | Cadena | No | Resumen u objeto informativo del trámite confidencial. |
+| `burn_policy` | Cadena | No | Política de destrucción: `FIRST_ACCESS` (por defecto) o `ALL_RECIPIENTS`. |
 | `expires_at` | ISO-8601 | No | Fecha/hora límite de disponibilidad. Por defecto: +14 días. |
+| `origin_uo` | Cadena / Int | No (Opcional) | Alias o código de la UO interna emisora si se desea etiquetar en la malla de Arcamitte. |
+| `target_uo` | Cadena / Int | No (Opcional) | Alias o código de la UO interna receptora (opcional). |
 | `reopen_existing` | Booleano | No | Si es `true` y el hash ya existe y fue consumido, reactiva la custodia con nuevos destinatarios. |
 
-#### Ejemplo de Petición cURL
+#### Ejemplo de Petición cURL (Mínimo y Desacoplado)
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/documents/upload/ \
-  -H "X-API-Key: arca_live_9d8f3a8b4c2e1f0e9d8c7b6a5f4e3d2c1b0a" \
-  -F "file=@expediente_auditoria.pdf" \
-  -F "description=Auditoría de Cumplimiento Q3" \
-  -F "origin_uo=1001" \
-  -F "target_uo=1002" \
-  -F "burn_policy=FIRST_DOWNLOAD" \
-  -F "authorized_emails=director@empresa.com,auditor@empresa.com"
+curl -X POST http://127.0.0.1:8000/api/v1/documents/ \
+  -H "X-API-Key: arca_live_SU_TOKEN_AQUI" \
+  -F "original_file=@expediente_auditoria.pdf" \
+  -F "allowed_emails=destinatario@empresa.com"
 ```
 
 #### Respuesta Exitosa (201 Created)

@@ -192,28 +192,27 @@ Genere un token desde el Dashboard (`/dashboard/api-tokens/`) o mediante el coma
 `arca_live_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 
 ### Ejemplo de Subida de Documento
+La aplicación integradora externa únicamente necesita enviar el archivo y los correos autorizados:
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/documents/upload/ \
+curl -X POST http://127.0.0.1:8000/api/v1/documents/ \
   -H "X-API-Key: arca_live_SU_TOKEN_AQUI" \
-  -F "file=@contrato_confidencial.pdf" \
-  -F "description=Contrato mercantil 2026" \
-  -F "origin_uo=1001" \
-  -F "target_uo=1002" \
-  -F "burn_policy=FIRST_DOWNLOAD" \
-  -F "authorized_emails=auditor@empresa.com,director@empresa.com"
+  -F "original_file=@contrato_confidencial.pdf" \
+  -F "allowed_emails=destinatario@empresa.com"
 ```
 
 Respuesta JSON:
 ```json
 {
   "id": "e5b8d28a-7cb2-4a0b-9df6-2be5188f6194",
+  "status": "created",
   "file_hash": "c5f590b2b80041d8e1f5f3e9c68c34fba3f5e5529f7cf7c65d63f47e09961dbf",
   "original_filename": "contrato_confidencial.pdf",
-  "is_consumed": false,
-  "burn_policy": "FIRST_DOWNLOAD",
+  "burn_policy": "FIRST_ACCESS",
   "expires_at": "2026-11-07T12:00:00Z"
 }
 ```
+
+> **Nota sobre UOs:** Las Unidades Organizativas (`origin_uo`, `target_uo`) son 100% opcionales. La aplicación externa no necesita saber nada de departamentos si no los utiliza; Arcamitte se encarga de la custodia criptográfica y la entrega segura de forma totalmente autónoma.
 
 ### Consultar Estado Criptográfico (Sin exponer contenido)
 ```bash
