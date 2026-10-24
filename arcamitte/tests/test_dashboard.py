@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import io
+import shutil
+import tempfile
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -21,6 +23,19 @@ User = get_user_model()
 
 
 class DashboardTestCase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._temp_media = tempfile.mkdtemp(prefix="arca_test_dash_")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._temp_media)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._temp_media, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self) -> None:
         super().setUp()
         # Superuser
@@ -169,8 +184,9 @@ class DashboardTestCase(TestCase):
 
     def test_dashboard_document_upload_validation_error(self) -> None:
         """Verifica que se muestren errores si faltan datos o el formato es inválido."""
-        self.client.force_login(self.admin_user)
+        self.client.force_login(self.operator_user)
 
+        # 1. Sin archivo y correo inválido
         bad_data = {
             "origin_uo": "",
             "allowed_emails": "email-invalido",
@@ -178,7 +194,86 @@ class DashboardTestCase(TestCase):
         response = self.client.post(reverse("dashboard:document_upload"), bad_data)
         self.assertEqual(response.status_code, 400)
         self.assertContains(response, "Debe seleccionar un archivo confidencial", status_code=400)
-        self.assertContains(response, "Debe seleccionar la UO emisora", status_code=400)
+
+        # 2. Operador intenta emitir desde una UO donde no tiene membresía
+        new_pdf = SimpleUploadedFile("doc.pdf", b"%PDF-1.4\nTest\n%%EOF", content_type="application/pdf")
+        unauth_uo_data = {
+            "original_file": new_pdf,
+            "origin_uo": self.uo_legal.id,  # El operador solo pertenece a Seguridad
+            "allowed_emails": "valido@empresa.com",
+        }
+        resp_unauth = self.client.post(reverse("dashboard:document_upload"), unauth_uo_data)
+        self.assertEqual(resp_unauth.status_code, 400)
+        self.assertContains(resp_unauth, "No tiene autorización operativa sobre la UO emisora seleccionada", status_code=400)
+
+    def test_dashboard_document_upload_personal_seat(self) -> None:
+        """Verifica que un documento sin UO emisora sea un asiento personal privado solo visible por su autor."""
+        self.client.force_login(self.operator_user)
+
+        personal_pdf = SimpleUploadedFile("asiento_personal.pdf", b"%PDF-1.4\nPersonal\n%%EOF", content_type="application/pdf")
+        post_data = {
+            "original_file": personal_pdf,
+            "origin_uo": "",  # Sin UO -> Asiento Personal Privado
+            "allowed_emails": "destinatario@externo.com",
+            "description": "Asiento personal privado",
+        }
+        response = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        created_doc = EncryptedDocument.objects.filter(original_filename="asiento_personal.pdf").first()
+        self.assertIsNotNone(created_doc)
+        self.assertIsNone(created_doc.origin_uo)
+        self.assertEqual(created_doc.uploaded_by, self.operator_user)
+
+        # El autor puede verlo en el listado y detalle
+        resp_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertContains(resp_list, "asiento_personal.pdf")
+        resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        self.assertEqual(resp_detail.status_code, 200)
+
+        # Otro usuario regular NO puede verlo
+        other_user = User.objects.create_user(username="otro_operador", email="otro@empresa.com", password="Pass123!")
+        UserUOMembership.objects.create(user=other_user, uo=self.uo_legal, role=UserUOMembership.Role.OPERATOR, is_active=True)
+        self.client.force_login(other_user)
+
+        resp_other_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertNotContains(resp_other_list, "asiento_personal.pdf")
+        resp_other_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        self.assertEqual(resp_other_detail.status_code, 403)
+
+        # El superusuario SÍ puede verlo
+        self.client.force_login(self.admin_user)
+        resp_admin_list = self.client.get(reverse("dashboard:document_list"))
+        self.assertContains(resp_admin_list, "asiento_personal.pdf")
+        resp_admin_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        self.assertEqual(resp_admin_detail.status_code, 200)
+
+    def test_dashboard_document_upload_multiple_individual_emails(self) -> None:
+        """Verifica que se reciban múltiples campos individuales de correo (POST getlist)."""
+        self.client.force_login(self.admin_user)
+        multi_pdf = SimpleUploadedFile("multi_email.pdf", b"%PDF-1.4\nMulti\n%%EOF", content_type="application/pdf")
+        post_data = {
+            "original_file": multi_pdf,
+            "origin_uo": self.uo_security.id,
+            "allowed_emails": ["primero@empresa.com", "segundo@empresa.com", "tercero@empresa.com"],
+        }
+        resp = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        doc = EncryptedDocument.objects.filter(original_filename="multi_email.pdf").first()
+        self.assertIsNotNone(doc)
+        self.assertEqual(set(doc.allowed_emails), {"primero@empresa.com", "segundo@empresa.com", "tercero@empresa.com"})
+
+    def test_dashboard_uo_members_ajax(self) -> None:
+        """Verifica que el endpoint AJAX retorne los miembros y buzón de una UO."""
+        self.client.force_login(self.operator_user)
+        resp = self.client.get(reverse("dashboard:uo_members_ajax", kwargs={"uo_id": self.uo_security.id}))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["uo_alias"], "SEGURIDAD")
+        self.assertEqual(data["uo_email"], "seguridad@arcamitte.local")
+        self.assertEqual(len(data["members"]), 1)
+        self.assertEqual(data["members"][0]["username"], "operador1")
+        self.assertEqual(data["members"][0]["email"], "operador1@arcamitte.local")
 
     def test_dashboard_document_detail_view(self) -> None:
         """Verifica la visualización de metadatos, estado de canje y trazas forenses."""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 import os
 from typing import Any, List, Optional
@@ -14,7 +15,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import models
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -57,13 +58,17 @@ def get_user_accessible_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
 def get_scoped_documents_queryset(user: Any) -> models.QuerySet[EncryptedDocument]:
     """
     Filtra los documentos según el perímetro departamental del usuario.
+    Si un documento carece de UO emisora (asiento personal), solo puede verlo su autor
+    (uploaded_by) o un superusuario.
     """
     if user.is_superuser:
-        return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo")
+        return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
     user_uos = get_user_accessible_uos(user)
     return EncryptedDocument.objects.filter(
-        models.Q(origin_uo__in=user_uos) | models.Q(target_uo__in=user_uos)
-    ).select_related("origin_uo", "target_uo").distinct()
+        models.Q(origin_uo__in=user_uos)
+        | models.Q(target_uo__in=user_uos)
+        | models.Q(origin_uo__isnull=True, uploaded_by=user)
+    ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
 
 
 class DashboardLoginView(auth_views.LoginView):
@@ -191,7 +196,8 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
             "all_target_uos": all_uos,
             "default_expires_at": default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
             "form_errors": [],
-            "allowed_emails_raw": "",
+            "allowed_emails_list": [""],
+            "allowed_emails_json": json.dumps([""]),
             "description_val": "",
             "selected_origin_uo": "",
             "selected_target_uo": "",
@@ -215,27 +221,37 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
 
         origin_uo_id = request.POST.get("origin_uo", "").strip()
         origin_uo: Optional[OrganizationalUnit] = None
-        if not origin_uo_id:
-            errors.append(_("Debe seleccionar la UO emisora responsable."))
-        else:
-            try:
-                origin_uo = available_uos.get(id=origin_uo_id)
-            except OrganizationalUnit.DoesNotExist:
-                errors.append(_("No tiene autorización operativa sobre la UO emisora seleccionada."))
+        if origin_uo_id:
+            if user.is_superuser:
+                origin_uo = all_uos.filter(id=origin_uo_id).first()
+                if not origin_uo:
+                    errors.append(_("La UO emisora seleccionada no existe."))
+            else:
+                origin_uo = available_uos.filter(id=origin_uo_id).first()
+                if not origin_uo:
+                    errors.append(_("No tiene autorización operativa sobre la UO emisora seleccionada."))
 
         target_uo_id = request.POST.get("target_uo", "").strip()
         target_uo: Optional[OrganizationalUnit] = None
         if target_uo_id:
             target_uo = all_uos.filter(id=target_uo_id).first()
 
-        raw_emails = request.POST.get("allowed_emails", "")
-        # Separar por comas, espacios o saltos de línea
-        split_emails = [e.strip() for e in raw_emails.replace("\n", ",").replace(";", ",").split(",") if e.strip()]
+        raw_emails_list = request.POST.getlist("allowed_emails")
+        split_emails: List[str] = []
+        for item in raw_emails_list:
+            for e in item.replace("\n", ",").replace(";", ",").split(","):
+                cleaned = e.strip()
+                if cleaned:
+                    split_emails.append(cleaned)
+
         validated_emails: List[str] = []
-        try:
-            validated_emails = normalize_and_validate_email_list(split_emails)
-        except ValidationError as ve:
-            errors.extend(ve.messages)
+        if not split_emails:
+            errors.append(_("Debe especificar al menos una dirección de correo para el canje."))
+        else:
+            try:
+                validated_emails = normalize_and_validate_email_list(split_emails)
+            except ValidationError as ve:
+                errors.extend(ve.messages)
 
         burn_policy = request.POST.get("burn_policy", EncryptedDocument.BurnPolicy.FIRST_ACCESS)
         if burn_policy not in (EncryptedDocument.BurnPolicy.FIRST_ACCESS, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS):
@@ -271,7 +287,8 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                 "all_target_uos": all_uos,
                 "default_expires_at": raw_expires or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
                 "form_errors": errors,
-                "allowed_emails_raw": raw_emails,
+                "allowed_emails_list": split_emails or [""],
+                "allowed_emails_json": json.dumps(split_emails or [""]),
                 "description_val": description,
                 "selected_origin_uo": origin_uo_id,
                 "selected_target_uo": target_uo_id,
@@ -315,10 +332,12 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
         user = request.user
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
-        # Verificar autorización de acceso departamental
+        # Verificar autorización de acceso departamental o personal
         if not user.is_superuser:
             user_uos = get_user_accessible_uos(user)
-            if doc.origin_uo not in user_uos and doc.target_uo not in user_uos:
+            has_uo_access = (doc.origin_uo in user_uos) or (doc.target_uo in user_uos)
+            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
+            if not (has_uo_access or is_personal_owner):
                 raise PermissionDenied(_("No tiene autorización para inspeccionar este documento."))
 
         file_exists = False
@@ -377,8 +396,10 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
 
         if not user.is_superuser:
             user_uos = get_user_accessible_uos(user)
-            if doc.origin_uo not in user_uos:
-                raise PermissionDenied(_("Solo la UO emisora o un superadministrador puede clausurar el documento."))
+            has_uo_access = (doc.origin_uo in user_uos)
+            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
+            if not (has_uo_access or is_personal_owner):
+                raise PermissionDenied(_("Solo la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."))
 
         if not doc.is_active:
             messages.warning(request, _("Este documento ya no se encuentra activo."))
@@ -396,8 +417,10 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
 
         if not user.is_superuser:
             user_uos = get_user_accessible_uos(user)
-            if doc.origin_uo not in user_uos:
-                raise PermissionDenied(_("Solo la UO emisora o un superadministrador puede clausurar el documento."))
+            has_uo_access = (doc.origin_uo in user_uos)
+            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by == user)
+            if not (has_uo_access or is_personal_owner):
+                raise PermissionDenied(_("Solo la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."))
 
         justification = request.POST.get("justification", "").strip()
         if not justification:
@@ -584,3 +607,56 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
 
         messages.warning(request, _(f"El API Token '{token.name}' ha sido revocado inmediatamente."))
         return redirect("dashboard:api_tokens")
+
+
+class DashboardUOMembersAjaxView(LoginRequiredMixin, View):
+    """
+    Endpoint JSON para obtener buzón y personal activo de una UO
+    para selección interactiva de destinatarios en el panel de control.
+    """
+
+    login_url = "dashboard:login"
+
+    def get(self, request: HttpRequest, uo_id: int) -> JsonResponse:
+        try:
+            uo = OrganizationalUnit.objects.get(pk=uo_id, is_active=True)
+        except OrganizationalUnit.DoesNotExist:
+            return JsonResponse({"error": _("Unidad Organizativa no encontrada.")}, status=404)
+
+        memberships = (
+            UserUOMembership.objects.filter(uo=uo, is_active=True, user__is_active=True)
+            .exclude(user__email="")
+            .select_related("user")
+            .order_by("user__first_name", "user__last_name", "user__username")
+        )
+
+        members_list = []
+        member_emails = []
+        for m in memberships:
+            em = m.user.email.strip().lower()
+            if em and em not in member_emails:
+                member_emails.append(em)
+                full_name = f"{m.user.first_name} {m.user.last_name}".strip()
+                display_name = full_name or m.user.username
+                members_list.append(
+                    {
+                        "id": m.user.id,
+                        "username": m.user.username,
+                        "name": display_name,
+                        "email": em,
+                        "role": m.role,
+                        "role_display": str(m.get_role_display()),
+                    }
+                )
+
+        return JsonResponse(
+            {
+                "uo_id": uo.id,
+                "uo_alias": uo.alias,
+                "uo_name": uo.name,
+                "uo_email": uo.email or "",
+                "member_emails": member_emails,
+                "members": members_list,
+            }
+        )
+

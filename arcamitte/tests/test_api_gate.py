@@ -1,5 +1,7 @@
 import hashlib
-from django.test import TestCase, RequestFactory
+import shutil
+import tempfile
+from django.test import TestCase, RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -9,6 +11,19 @@ from arcamitte.permissions import HasDocumentsCreateScope, HasDocumentsReadScope
 
 
 class APITokenGateTestCase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._temp_media = tempfile.mkdtemp(prefix="arca_test_gate_")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._temp_media)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._temp_media, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         self.factory = RequestFactory()
         self.auth = APITokenAuthentication()

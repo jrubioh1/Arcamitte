@@ -780,7 +780,8 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
         """
         Aislamiento estricto de documentos:
         - Superusuario: Visibilidad global de toda la malla.
-        - Staff con UO: Solo documentos emitidos por o destinados a sus UOs activas.
+        - Staff con UO: Solo documentos emitidos por o destinados a sus UOs activas,
+          o asientos personales creados por el propio usuario (origin_uo=None).
         """
         qs = super().get_queryset(request).select_related("origin_uo", "target_uo", "uploaded_by")
         if request.user.is_superuser:
@@ -789,7 +790,9 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
             user=request.user, is_active=True
         ).values_list("uo_id", flat=True)
         return qs.filter(
-            models.Q(origin_uo_id__in=user_uos) | models.Q(target_uo_id__in=user_uos)
+            models.Q(origin_uo_id__in=user_uos)
+            | models.Q(target_uo_id__in=user_uos)
+            | models.Q(origin_uo_id__isnull=True, uploaded_by=request.user)
         ).distinct()
 
     def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
@@ -1685,7 +1688,9 @@ class AccessVerificationTokenAdmin(admin.ModelAdmin):
             user=request.user, is_active=True
         ).values_list("uo_id", flat=True)
         return qs.filter(
-            models.Q(document__origin_uo_id__in=user_uos) | models.Q(document__target_uo_id__in=user_uos)
+            models.Q(document__origin_uo_id__in=user_uos)
+            | models.Q(document__target_uo_id__in=user_uos)
+            | models.Q(document__origin_uo_id__isnull=True, document__uploaded_by=request.user)
         ).distinct()
 
     def has_add_permission(self, request: HttpRequest) -> bool:
@@ -1729,7 +1734,9 @@ class DocumentAccessLogAdmin(admin.ModelAdmin):
             user=request.user, is_active=True
         ).values_list("uo_id", flat=True)
         return qs.filter(
-            models.Q(origin_uo_id__in=user_uos) | models.Q(target_uo_id__in=user_uos)
+            models.Q(origin_uo_id__in=user_uos)
+            | models.Q(target_uo_id__in=user_uos)
+            | models.Q(origin_uo_id__isnull=True, document__uploaded_by=request.user)
         ).distinct()
 
     def has_add_permission(self, request: HttpRequest) -> bool:

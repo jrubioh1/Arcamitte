@@ -9,7 +9,7 @@
 		<i data-feather="alert-triangle" style="width:24px;height:24px;"></i>
 		<span>{% trans "Clausura y Destrucción Física" %}</span>
 	</h1>
-	<p class="text-muted small mb-0">{% trans "Procedimiento de revocación anticipada y sanitización criptográfica NIST SP 800-88." %}</p>
+	<p class="text-muted small mb-0">{% trans "Procedimiento de revocación y clausura anticipada del documento." %}</p>
 </div>
 
 <div class="row justify-content-center">
@@ -27,7 +27,7 @@
 						<i data-feather="alert-circle" style="width:20px;height:20px;" class="mt-1 flex-shrink-0"></i>
 						<div>
 							<strong>{% trans "¡Esta acción es irreversible!" %}</strong><br>
-							{% trans "El archivo cifrado en disco será sobreescrito con bytes aleatorios y eliminado físicamente (NIST SP 800-88 Rev. 1). Cualquier código OTP emitido quedará invalidado de inmediato." %}
+							{% trans "El archivo cifrado en disco será eliminado permanentemente. Cualquier código OTP emitido quedará invalidado de inmediato." %}
 						</div>
 					</div>
 				</div>
@@ -42,7 +42,7 @@
 						<div class="col-sm-8 font-mono text-break text-primary">{{ doc.file_hash }}</div>
 
 						<div class="col-sm-4 text-muted">{% trans "UO Emisora:" %}</div>
-						<div class="col-sm-8">{{ doc.origin_uo.alias|default:"Global" }}</div>
+						<div class="col-sm-8">{{ doc.origin_uo.alias|default:_("Asiento Personal Privado") }}</div>
 
 						<div class="col-sm-4 text-muted">{% trans "Destinatarios:" %}</div>
 						<div class="col-sm-8">{{ doc.allowed_emails|join:", " }}</div>

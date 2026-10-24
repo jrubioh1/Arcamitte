@@ -110,7 +110,7 @@
 									{{ doc.file_hash|slice:":16" }}...
 								</td>
 								<td>
-									<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:"Global" }}</span>
+									<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:_("Personal") }}</span>
 								</td>
 								<td>
 									{% if doc.is_consumed %}
@@ -177,19 +177,6 @@
 							<div class="small">{% trans "No hay eventos de auditoría registrados." %}</div>
 						</div>
 					{% endfor %}
-				</div>
-
-				<div class="bg-light p-3 rounded-3 border">
-					<h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
-						<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
-						{% trans "Garantías Arcamitte" %}
-					</h6>
-					<ul class="list-unstyled text-muted small mb-0 lh-lg">
-						<li>&bull; {% trans "Cifrado Envelope AES-256-GCM" %}</li>
-						<li>&bull; {% trans "Sanitización física NIST SP 800-88" %}</li>
-						<li>&bull; {% trans "Tokens API Zero-Knowledge" %}</li>
-						<li>&bull; {% trans "Trazabilidad forense inmutable" %}</li>
-					</ul>
 				</div>
 			</div>
 		</div>

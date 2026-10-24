@@ -7,14 +7,14 @@
 <div class="mb-4">
 	<h1 class="h3 fw-bold mb-1">{% trans "Cifrar y Custodiar Documento" %}</h1>
 	<p class="text-muted small mb-0">
-		{% trans "Generación automática de clave criptográfica (DEK), cifrado Envelope AES-256-GCM y registro forense." %}
+		{% trans "Registro y custodia confidencial con entrega desatendida mediante verificación OTP." %}
 	</p>
 </div>
 
-<div class="row g-4">
-	<div class="col-12 col-xl-8">
-		<div class="card">
-			<div class="card-header">
+<div class="row">
+	<div class="col-12 col-xl-10 mx-auto">
+		<div class="card shadow-sm border-0">
+			<div class="card-header bg-transparent border-bottom">
 				<h5 class="card-title mb-0">{% trans "Datos del Asiento Criptográfico" %}</h5>
 			</div>
 			<div class="card-body p-4">
@@ -30,7 +30,7 @@
 					</div>
 				{% endif %}
 
-				<form method="post" enctype="multipart/form-data" autocomplete="off">
+				<form method="post" enctype="multipart/form-data" autocomplete="off" id="upload_form">
 					{% csrf_token %}
 
 					<div class="mb-3">
@@ -39,17 +39,17 @@
 						</label>
 						<input type="file" name="original_file" class="form-control" required accept=".pdf,.docx,.xlsx,.pptx,.odt,.ods,.odp,.doc,.xls,.ppt">
 						<div class="form-text small text-muted">
-							{% trans "Formatos admitidos: PDF, Microsoft Office y LibreOffice. Tamaño máximo según directiva." %}
+							{% trans "Formatos admitidos: PDF, Microsoft Office y LibreOffice." %}
 						</div>
 					</div>
 
 					<div class="row">
 						<div class="col-md-6 mb-3">
-							<label class="form-label fw-semibold">
-								{% trans "UO Emisora (Custodia)" %} <span class="text-danger">*</span>
+							<label class="form-label fw-semibold" for="id_origin_uo">
+								{% trans "UO Emisora" %}
 							</label>
-							<select name="origin_uo" class="form-select" required>
-								<option value="">-- {% trans "Seleccione UO Emisora" %} --</option>
+							<select name="origin_uo" id="id_origin_uo" class="form-select">
+								<option value="">-- {% trans "Ninguna (Asiento Personal Privado)" %} --</option>
 								{% for uo in available_origin_uos %}
 									<option value="{{ uo.id }}" {% if selected_origin_uo == uo.id|stringformat:"s" %}selected{% endif %}>
 										{{ uo.name }} ({{ uo.alias }})
@@ -57,15 +57,15 @@
 								{% endfor %}
 							</select>
 							<div class="form-text small text-muted">
-								{% trans "Departamento emisor responsable del documento." %}
+								{% trans "Si no selecciona UO, el asiento será privado y solo visible para usted." %}
 							</div>
 						</div>
 
 						<div class="col-md-6 mb-3">
-							<label class="form-label fw-semibold">
-								{% trans "UO Receptora (Opcional)" %}
+							<label class="form-label fw-semibold" for="id_target_uo">
+								{% trans "UO Receptora (Destino)" %}
 							</label>
-							<select name="target_uo" class="form-select">
+							<select name="target_uo" id="id_target_uo" class="form-select">
 								<option value="">-- {% trans "Ninguna / Destinatario Externo" %} --</option>
 								{% for uo in all_target_uos %}
 									<option value="{{ uo.id }}" {% if selected_target_uo == uo.id|stringformat:"s" %}selected{% endif %}>
@@ -74,18 +74,60 @@
 								{% endfor %}
 							</select>
 							<div class="form-text small text-muted">
-								{% trans "Permite derivar el trámite dentro de la malla inter-departamental." %}
+								{% trans "Permite derivar el trámite a otra unidad organizativa y seleccionar a su personal." %}
 							</div>
 						</div>
 					</div>
 
+					<!-- Panel dinámico de selección de personal de la UO -->
+					<div id="uo_staff_box" class="card border bg-light mb-3" style="display: none;">
+						<div class="card-body p-3">
+							<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+								<div class="d-flex align-items-center gap-2">
+									<i data-feather="users" style="width:16px;height:16px;" class="text-primary"></i>
+									<span class="fw-semibold small text-dark" id="uo_staff_box_title">{% trans "Personal de la UO" %}</span>
+									<span class="badge bg-secondary-subtle text-secondary small" id="uo_staff_count">0</span>
+								</div>
+								<div class="btn-group btn-group-sm">
+									<button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" id="btn_staff_select_all">
+										<i data-feather="check-square" style="width:12px;height:12px;"></i> {% trans "Seleccionar todos" %}
+									</button>
+									<button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" id="btn_staff_deselect_all">
+										<i data-feather="square" style="width:12px;height:12px;"></i> {% trans "Deseleccionar todos" %}
+									</button>
+								</div>
+							</div>
+							<div id="uo_staff_list" class="row row-cols-1 row-cols-md-2 g-2 mb-2" style="max-height: 220px; overflow-y: auto;">
+								<!-- Se llena dinámicamente -->
+							</div>
+							<div id="uo_mailbox_container" class="pt-2 border-top mt-2" style="display: none;">
+								<button type="button" class="btn btn-sm btn-outline-info py-1" id="btn_add_uo_mailbox">
+									<i data-feather="inbox" style="width:14px;height:14px;"></i> {% trans "Añadir buzón oficial de la UO" %}: <strong id="uo_mailbox_email_text"></strong>
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Destinatarios autorizados: Campos individuales dinámicos -->
 					<div class="mb-3">
-						<label class="form-label fw-semibold">
-							{% trans "Correos Autorizados para Canje (OTP)" %} <span class="text-danger">*</span>
-						</label>
-						<textarea name="allowed_emails" class="form-control" rows="3" placeholder="destinatario1@empresa.com, destinatario2@empresa.com" required>{{ allowed_emails_raw }}</textarea>
-						<div class="form-text small text-muted">
-							{% trans "Separe múltiples correos con comas o saltos de línea. Solo estas direcciones podrán recibir el código OTP." %}
+						<div class="d-flex justify-content-between align-items-center mb-1">
+							<label class="form-label fw-semibold mb-0">
+								{% trans "Correos Autorizados para Canje (OTP)" %} <span class="text-danger">*</span>
+							</label>
+							<span class="badge bg-secondary-subtle text-secondary small" id="emails_counter_badge">1 destinatario</span>
+						</div>
+						<div class="form-text small text-muted mb-2">
+							{% trans "Solo estas direcciones de correo podrán solicitar y recibir el código OTP para canjear el documento." %}
+						</div>
+
+						<div id="email_fields_container" class="d-flex flex-column gap-2">
+							<!-- Filas de correos individuales inyectadas por JS -->
+						</div>
+
+						<div class="mt-2">
+							<button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" id="btn_add_email">
+								<i data-feather="plus" style="width:14px;height:14px;"></i> {% trans "Añadir otro correo" %}
+							</button>
 						</div>
 					</div>
 
@@ -105,14 +147,14 @@
 								<input class="form-check-input" type="radio" name="burn_policy" id="burn_first" value="FIRST_ACCESS" checked>
 								<label class="form-check-label" for="burn_first">
 									<strong>{% trans "Primer acceso (Un solo canje)" %}</strong><br>
-									<span class="text-muted small">{% trans "El archivo físico en disco se destruye inmediatamente tras el primer canje exitoso." %}</span>
+									<span class="text-muted small">{% trans "El archivo se destruye inmediatamente tras el primer canje exitoso." %}</span>
 								</label>
 							</div>
 							<div class="form-check mt-2">
 								<input class="form-check-input" type="radio" name="burn_policy" id="burn_all" value="ALL_RECIPIENTS">
 								<label class="form-check-label" for="burn_all">
 									<strong>{% trans "Todos los destinatarios autorizados" %}</strong><br>
-									<span class="text-muted small">{% trans "Se destruye únicamente cuando todos los correos hayan completado su descarga." %}</span>
+									<span class="text-muted small">{% trans "Se destruye únicamente cuando todos los destinatarios hayan completado la descarga." %}</span>
 								</label>
 							</div>
 						</div>
@@ -123,7 +165,7 @@
 							</label>
 							<input type="datetime-local" name="expires_at" class="form-control" value="{{ default_expires_at }}" required>
 							<div class="form-text small text-muted">
-								{% trans "Por defecto 2 semanas. Al expirar, se clausura el canje y se destruye el fichero en disco." %}
+								{% trans "Por defecto 2 semanas. Al expirar, se clausura el canje y se destruye el fichero." %}
 							</div>
 						</div>
 					</div>
@@ -142,65 +184,276 @@
 			</div>
 		</div>
 	</div>
-
-	<div class="col-12 col-xl-4">
-		<div class="card">
-			<div class="card-header">
-				<h5 class="card-title mb-0 d-flex align-items-center gap-2">
-					<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
-					{% trans "Garantías de Seguridad" %}
-				</h5>
-			</div>
-			<div class="card-body p-4">
-				<div class="d-flex mb-3 gap-3">
-					<div class="arca-stat-icon primary flex-shrink-0">
-						<i data-feather="key"></i>
-					</div>
-					<div>
-						<h6 class="fw-bold mb-1">{% trans "Clave Única Efímera (DEK)" %}</h6>
-						<p class="text-muted small mb-0">
-							{% trans "Cada documento cuenta con una DEK única de 256 bits generada por entropía del SO." %}
-						</p>
-					</div>
-				</div>
-
-				<div class="d-flex mb-3 gap-3">
-					<div class="arca-stat-icon success flex-shrink-0">
-						<i data-feather="file-text"></i>
-					</div>
-					<div>
-						<h6 class="fw-bold mb-1">{% trans "Cero Transporte del Binario" %}</h6>
-						<p class="text-muted small mb-0">
-							{% trans "Los destinatarios solo reciben el Hash SHA-256 identificativo para verificar el canje." %}
-						</p>
-					</div>
-				</div>
-
-				<div class="d-flex mb-3 gap-3">
-					<div class="arca-stat-icon danger flex-shrink-0">
-						<i data-feather="trash-2"></i>
-					</div>
-					<div>
-						<h6 class="fw-bold mb-1">{% trans "Sanitización NIST SP 800-88" %}</h6>
-						<p class="text-muted small mb-0">
-							{% trans "Sobreescritura física aleatoria y sincronización a bloque (fsync) al consumirse." %}
-						</p>
-					</div>
-				</div>
-
-				<div class="d-flex gap-3">
-					<div class="arca-stat-icon warning flex-shrink-0">
-						<i data-feather="check-square"></i>
-					</div>
-					<div>
-						<h6 class="fw-bold mb-1">{% trans "Auditoría Legal Inmutable" %}</h6>
-						<p class="text-muted small mb-0">
-							{% trans "Cada interacción queda registrada con sello temporal, IP y hash de validación." %}
-						</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+	const originSelect = document.getElementById("id_origin_uo");
+	const targetSelect = document.getElementById("id_target_uo");
+	const staffBox = document.getElementById("uo_staff_box");
+	const staffTitle = document.getElementById("uo_staff_box_title");
+	const staffCount = document.getElementById("uo_staff_count");
+	const staffList = document.getElementById("uo_staff_list");
+	const mailboxContainer = document.getElementById("uo_mailbox_container");
+	const mailboxText = document.getElementById("uo_mailbox_email_text");
+	const btnMailbox = document.getElementById("btn_add_uo_mailbox");
+	const btnSelectAll = document.getElementById("btn_staff_select_all");
+	const btnDeselectAll = document.getElementById("btn_staff_deselect_all");
+
+	const emailContainer = document.getElementById("email_fields_container");
+	const btnAddEmail = document.getElementById("btn_add_email");
+	const counterBadge = document.getElementById("emails_counter_badge");
+
+	let currentMailboxEmail = "";
+	let currentStaffMembers = [];
+
+	const initialEmails = {{ allowed_emails_json|safe }};
+
+	function escapeHtml(str) {
+		return (str || "").replace(/"/g, '&quot;');
+	}
+
+	function updateCountBadge() {
+		const inputs = emailContainer.querySelectorAll('input[name="allowed_emails"]');
+		let count = 0;
+		inputs.forEach(inp => {
+			if (inp.value.trim()) count++;
+		});
+		const displayCount = count > 0 ? count : inputs.length;
+		counterBadge.textContent = `${displayCount} destinatario${displayCount === 1 ? '' : 's'}`;
+	}
+
+	function syncStaffCheckboxes() {
+		const existingEmails = new Set();
+		emailContainer.querySelectorAll('input[name="allowed_emails"]').forEach(inp => {
+			const val = inp.value.trim().toLowerCase();
+			if (val) existingEmails.add(val);
+		});
+
+		document.querySelectorAll(".uo-staff-cb").forEach(cb => {
+			cb.checked = existingEmails.has(cb.value.toLowerCase());
+		});
+	}
+
+	function createEmailRow(emailValue = "") {
+		const row = document.createElement("div");
+		row.className = "input-group email-input-row";
+		row.innerHTML = `
+			<span class="input-group-text bg-light text-muted"><i data-feather="mail" style="width:14px;height:14px;"></i></span>
+			<input type="email" name="allowed_emails" class="form-control" placeholder="destinatario@empresa.com" required value="${escapeHtml(emailValue)}">
+			<button type="button" class="btn btn-outline-danger btn-remove-row" title="Eliminar correo">
+				<i data-feather="trash-2" style="width:14px;height:14px;"></i>
+			</button>
+		`;
+
+		const input = row.querySelector("input");
+		const removeBtn = row.querySelector(".btn-remove-row");
+
+		removeBtn.addEventListener("click", function() {
+			const rows = emailContainer.querySelectorAll(".email-input-row");
+			if (rows.length > 1) {
+				row.remove();
+			} else {
+				input.value = "";
+			}
+			syncStaffCheckboxes();
+			updateCountBadge();
+		});
+
+		input.addEventListener("input", function() {
+			syncStaffCheckboxes();
+			updateCountBadge();
+		});
+
+		return row;
+	}
+
+	function addEmailRow(emailValue = "") {
+		const normalized = (emailValue || "").trim().toLowerCase();
+		if (normalized) {
+			// Comprobar si ya existe
+			let exists = false;
+			emailContainer.querySelectorAll('input[name="allowed_emails"]').forEach(inp => {
+				if (inp.value.trim().toLowerCase() === normalized) {
+					exists = true;
+				}
+			});
+			if (exists) return;
+
+			// Comprobar si hay un campo vacío disponible
+			let emptyInput = null;
+			emailContainer.querySelectorAll('input[name="allowed_emails"]').forEach(inp => {
+				if (!inp.value.trim() && !emptyInput) {
+					emptyInput = inp;
+				}
+			});
+
+			if (emptyInput) {
+				emptyInput.value = normalized;
+				syncStaffCheckboxes();
+				updateCountBadge();
+				return;
+			}
+		}
+
+		const newRow = createEmailRow(normalized);
+		emailContainer.appendChild(newRow);
+		if (window.feather) feather.replace();
+		syncStaffCheckboxes();
+		updateCountBadge();
+		if (!normalized) {
+			const inp = newRow.querySelector("input");
+			if (inp) inp.focus();
+		}
+	}
+
+	function removeEmailRowByValue(emailValue) {
+		const normalized = (emailValue || "").trim().toLowerCase();
+		if (!normalized) return;
+
+		let found = false;
+		const rows = emailContainer.querySelectorAll(".email-input-row");
+		rows.forEach(r => {
+			const inp = r.querySelector('input[name="allowed_emails"]');
+			if (inp && inp.value.trim().toLowerCase() === normalized) {
+				if (rows.length > 1) {
+					r.remove();
+				} else {
+					inp.value = "";
+				}
+				found = true;
+			}
+		});
+
+		syncStaffCheckboxes();
+		updateCountBadge();
+	}
+
+	// Inicializar filas de correo
+	if (initialEmails && initialEmails.length > 0) {
+		initialEmails.forEach(em => {
+			if (em || initialEmails.length === 1) {
+				addEmailRow(em);
+			}
+		});
+	} else {
+		addEmailRow("");
+	}
+
+	btnAddEmail.addEventListener("click", function() {
+		addEmailRow("");
+	});
+
+	// Carga interactiva de miembros de UO
+	async function loadUOMembers() {
+		const targetVal = targetSelect ? targetSelect.value : "";
+		const originVal = originSelect ? originSelect.value : "";
+
+		// Prioridad: Si hay target_uo seleccionada, cargar personal de destino.
+		// Si no, si hay origin_uo seleccionada, cargar personal de origen.
+		let selectedUoId = targetVal || originVal;
+		let uoRoleLabel = targetVal ? "{% trans 'Personal de la UO Receptora:' %}" : "{% trans 'Personal de la UO Emisora:' %}";
+
+		if (!selectedUoId) {
+			staffBox.style.display = "none";
+			currentStaffMembers = [];
+			currentMailboxEmail = "";
+			return;
+		}
+
+		try {
+			const resp = await fetch(`/dashboard/api/uo/${selectedUoId}/members/`);
+			if (!resp.ok) {
+				staffBox.style.display = "none";
+				return;
+			}
+
+			const data = await resp.json();
+			currentStaffMembers = data.members || [];
+			currentMailboxEmail = data.uo_email || "";
+
+			staffTitle.textContent = `${uoRoleLabel} ${data.uo_name} (${data.uo_alias})`;
+			staffCount.textContent = `${currentStaffMembers.length} miembro${currentStaffMembers.length === 1 ? '' : 's'}`;
+
+			staffList.innerHTML = "";
+			if (currentStaffMembers.length === 0) {
+				staffList.innerHTML = `<div class="col-12 text-muted small py-1">{% trans "No hay miembros registrados con correo en esta UO." %}</div>`;
+			} else {
+				currentStaffMembers.forEach(m => {
+					const col = document.createElement("div");
+					col.className = "col";
+					col.innerHTML = `
+						<div class="form-check p-2 bg-white rounded border d-flex align-items-center gap-2">
+							<input class="form-check-input uo-staff-cb ms-0 mt-0" type="checkbox" value="${m.email}" id="staff_${m.id}">
+							<label class="form-check-label small mb-0 flex-grow-1 text-truncate" for="staff_${m.id}" style="cursor:pointer;" title="${m.name} <${m.email}>">
+								<span class="fw-semibold text-dark">${m.name}</span>
+								<span class="text-muted d-block" style="font-size:0.75rem;">&lt;${m.email}&gt;</span>
+							</label>
+							<span class="badge bg-light text-secondary border small" style="font-size:0.65rem;">${m.role_display}</span>
+						</div>
+					`;
+					const cb = col.querySelector(".uo-staff-cb");
+					cb.addEventListener("change", function() {
+						if (cb.checked) {
+							addEmailRow(cb.value);
+						} else {
+							removeEmailRowByValue(cb.value);
+						}
+					});
+					staffList.appendChild(col);
+				});
+			}
+
+			if (currentMailboxEmail) {
+				mailboxText.textContent = currentMailboxEmail;
+				mailboxContainer.style.display = "block";
+			} else {
+				mailboxContainer.style.display = "none";
+			}
+
+			staffBox.style.display = "block";
+			if (window.feather) feather.replace();
+			syncStaffCheckboxes();
+		} catch (err) {
+			console.error("Error al cargar personal de la UO:", err);
+			staffBox.style.display = "none";
+		}
+	}
+
+	if (targetSelect) targetSelect.addEventListener("change", loadUOMembers);
+	if (originSelect) originSelect.addEventListener("change", loadUOMembers);
+
+	// Botones de selección masiva de personal
+	btnSelectAll.addEventListener("click", function() {
+		document.querySelectorAll(".uo-staff-cb").forEach(cb => {
+			if (!cb.checked) {
+				cb.checked = true;
+				addEmailRow(cb.value);
+			}
+		});
+	});
+
+	btnDeselectAll.addEventListener("click", function() {
+		document.querySelectorAll(".uo-staff-cb").forEach(cb => {
+			if (cb.checked) {
+				cb.checked = false;
+				removeEmailRowByValue(cb.value);
+			}
+		});
+	});
+
+	btnMailbox.addEventListener("click", function() {
+		if (currentMailboxEmail) {
+			addEmailRow(currentMailboxEmail);
+		}
+	});
+
+	// Si hay UO preseleccionada al cargar
+	if ((targetSelect && targetSelect.value) || (originSelect && originSelect.value)) {
+		loadUOMembers();
+	}
+
+	if (window.feather) feather.replace();
+});
+</script>
 {% endblock %}

@@ -11,9 +11,10 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from arcamitte.models import EncryptedDocument, OrganizationalUnit, UserUOMembership
+from arcamitte.models import DocumentAccessLog, EncryptedDocument, OrganizationalUnit, UserUOMembership
 from arcamitte.services import (
     process_batch_import_json,
+    shred_and_delete_file,
     sync_user_role_permissions,
     upload_and_encrypt_document,
 )
@@ -255,7 +256,7 @@ class Command(BaseCommand):
             reopen_existing=True,
         )
 
-        # Documento 3: Muestra de documento consumido
+        # Documento 3: Muestra de documento consumido (cumpliendo Burn-After-Read)
         pdf_bytes_3 = MINIMAL_VALID_PDF + b"% Informe archivado\n"
         upload_3 = SimpleUploadedFile("informe_auditoria_consumido.pdf", pdf_bytes_3, content_type="application/pdf")
         doc_3 = upload_and_encrypt_document(
@@ -267,14 +268,26 @@ class Command(BaseCommand):
             uploaded_by=user_rrhh,
             reopen_existing=True,
         )
+        # Triturar físicamente el archivo del documento consumido (cumplimiento estricto Burn-After-Read NIST SP 800-88)
+        if doc_3.encrypted_file:
+            shred_and_delete_file(doc_3.encrypted_file)
+
         doc_3.is_consumed = True
         doc_3.consumed_by = "auditor_rrhh@arcamitte.local"
         doc_3.consumed_at = timezone.now()
-        doc_3.save()
+        doc_3.consumed_recipients = ["auditor_rrhh@arcamitte.local"]
+        doc_3.save(update_fields=["is_consumed", "consumed_by", "consumed_at", "consumed_recipients", "updated_at"])
 
-        # Fichero demo local en raíz para pruebas manuales
-        demo_pdf_path = base_dir / "sample_document.pdf"
-        demo_pdf_path.write_bytes(MINIMAL_VALID_PDF)
+        DocumentAccessLog.objects.create(
+            document=doc_3,
+            email="auditor_rrhh@arcamitte.local",
+            action=DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN,
+            origin_uo=uo_rrhh,
+            target_uo=None,
+            ip_address="127.0.0.1",
+            user_agent="Mozilla/5.0 (Staging Sandbox)",
+            details="Entrega completada y archivo triturado físicamente (Burn-After-Read).",
+        )
 
         # ----------------------------------------------------------------------
         # 6. Panel y Reporte Resumen

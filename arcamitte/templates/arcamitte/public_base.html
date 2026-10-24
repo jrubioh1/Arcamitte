@@ -1,424 +1,126 @@
-{% load i18n static %}<!DOCTYPE html>
+{% load static i18n %}<!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE|default:'es' }}">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Arcamitte - Pasarela Criptográfica de Custodia y Entrega Segura">
+    <meta name="author" content="Arcamitte">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="shortcut icon" href="{% static 'arcamitte/img/logo.jpg' %}" />
+
     <title>{% block title %}{% trans "Arcamitte - Microservicio Criptográfico de Entrega Segura" %}{% endblock %}</title>
-    <style>
-        :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --bg-card-hover: #334155;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent-cyan: #06b6d4;
-            --accent-cyan-hover: #0891b2;
-            --accent-emerald: #10b981;
-            --accent-amber: #f59e0b;
-            --accent-rose: #f43f5e;
-            --border-color: #334155;
-            --border-focus: #06b6d4;
-            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Header & Navigation */
-        header {
-            background-color: rgba(15, 23, 42, 0.95);
-            border-bottom: 1px solid var(--border-color);
-            backdrop-filter: blur(8px);
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-
-        .navbar {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 1rem 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-            color: var(--text-main);
-            font-weight: 700;
-            font-size: 1.25rem;
-            letter-spacing: -0.025em;
-        }
-
-        .brand-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 900;
-            color: #0f172a;
-            font-size: 1.1rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .nav-link {
-            text-decoration: none;
-            color: var(--text-muted);
-            font-size: 0.925rem;
-            font-weight: 500;
-            padding: 0.5rem 0.85rem;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            color: var(--text-main);
-            background-color: var(--bg-card);
-        }
-
-        .nav-btn {
-            background-color: rgba(6, 182, 212, 0.15);
-            color: var(--accent-cyan);
-            border: 1px solid rgba(6, 182, 212, 0.3);
-        }
-
-        .nav-btn:hover {
-            background-color: var(--accent-cyan);
-            color: #0f172a;
-        }
-
-        /* Main Container */
-        main {
-            flex: 1;
-            max-width: 1000px;
-            width: 100%;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
-        }
-
-        /* Cards */
-        .card {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        }
-
-        .card-header {
-            margin-bottom: 1.75rem;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1rem;
-        }
-
-        .card-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-subtitle {
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            margin-top: 0.25rem;
-        }
-
-        /* Forms */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-            color: var(--text-main);
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            background-color: #0f172a;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-main);
-            font-size: 0.95rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--border-focus);
-            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
-        }
-
-        .form-file-input {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #0f172a;
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .form-file-input:hover {
-            border-color: var(--accent-cyan);
-            color: var(--text-main);
-        }
-
-        .form-help {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 0.35rem;
-            display: block;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            font-weight: 600;
-            font-size: 0.95rem;
-            padding: 0.85rem 1.5rem;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            width: 100%;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-cyan-hover));
-            color: #0f172a;
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.1);
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.35);
-        }
-
-        .btn-secondary {
-            background-color: var(--bg-card-hover);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: #475569;
-        }
-
-        /* Badges & Alerts */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.65rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            border-radius: 9999px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .badge-cyan {
-            background: rgba(6, 182, 212, 0.15);
-            color: var(--accent-cyan);
-            border: 1px solid rgba(6, 182, 212, 0.3);
-        }
-
-        .badge-emerald {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--accent-emerald);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .alert {
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            font-size: 0.925rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-start;
-        }
-
-        .alert-success {
-            background-color: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.4);
-            color: #6ee7b7;
-        }
-
-        .alert-error {
-            background-color: rgba(244, 63, 94, 0.12);
-            border: 1px solid rgba(244, 63, 94, 0.4);
-            color: #fca5a5;
-        }
-
-        .alert-warning {
-            background-color: rgba(245, 158, 11, 0.12);
-            border: 1px solid rgba(245, 158, 11, 0.4);
-            color: #fde68a;
-        }
-
-        .font-mono {
-            font-family: var(--font-mono);
-        }
-
-        /* Success Box / Token Box */
-        .token-box {
-            background-color: #090d16;
-            border: 1px solid var(--accent-cyan);
-            padding: 1.25rem;
-            border-radius: 8px;
-            margin: 1.25rem 0;
-            position: relative;
-        }
-
-        .token-display {
-            font-family: var(--font-mono);
-            font-size: 0.95rem;
-            color: #38bdf8;
-            word-break: break-all;
-            user-select: all;
-        }
-
-        .copy-btn {
-            margin-top: 0.75rem;
-            width: auto;
-            padding: 0.45rem 1rem;
-            font-size: 0.85rem;
-        }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--border-color);
-            padding: 1.5rem 0;
-            text-align: center;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: auto;
-        }
-
-        /* Responsive Breakpoints */
-        @media (max-width: 768px) {
-            .navbar {
-                flex-direction: column;
-                gap: 0.75rem;
-                padding: 0.75rem 1rem;
-            }
-            .nav-links {
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 0.5rem;
-            }
-            main {
-                margin: 1rem auto;
-                padding: 0 1rem;
-            }
-            .card {
-                padding: 1.25rem;
-            }
-            .card-header > div {
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-            .card-title {
-                font-size: 1.25rem;
-            }
-            .token-display {
-                font-size: 0.85rem;
-                word-break: break-all;
-            }
-        }
-    </style>
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Estilos propios Arcamitte -->
+    <link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
-    <header>
-        <nav class="navbar">
-            <a href="{% url 'arcamitte:request-access' %}" class="brand" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text-main); font-weight: bold; font-size: 1.15rem;">
-                <img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte" style="height: 32px; border-radius: 6px;">
-                <span>Arcamitte</span>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+    <!-- Navbar Superior con estilo Arcamitte -->
+    <header class="navbar navbar-expand-md navbar-dark bg-dark sticky-top shadow-sm py-2" style="background-color: var(--arca-sidebar-bg) !important;">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="{% url 'arcamitte:request-access' %}">
+                <img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte Logo" class="rounded-2 shadow-sm" style="width: 32px; height: 32px; object-fit: cover;">
+                <span class="text-white">Arcamitte</span>
             </a>
-            <div class="nav-links">
-                <a href="{% url 'arcamitte:request-access' %}" class="nav-link">{% trans "Solicitar Acceso" %}</a>
-                <a href="{% url 'arcamitte:redeem-otp' %}" class="nav-link">{% trans "Descargar Documento" %}</a>
-                <div class="lang-switcher" style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, 0.05); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border-color); margin-left: 0.5rem;">
-                    <a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
-                       class="lang-link" 
-                       title="Español" 
-                       style="text-decoration: none; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; color: {% if LANGUAGE_CODE|slice:':2' == 'es' %}#0f172a{% else %}var(--text-muted){% endif %}; background: {% if LANGUAGE_CODE|slice:':2' == 'es' %}var(--accent-cyan){% else %}transparent{% endif %}; transition: all 0.2s ease;">
-                       🇪🇸 ES
-                    </a>
-                    <a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
-                       class="lang-link" 
-                       title="English" 
-                       style="text-decoration: none; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; color: {% if LANGUAGE_CODE|slice:':2' == 'en' %}#0f172a{% else %}var(--text-muted){% endif %}; background: {% if LANGUAGE_CODE|slice:':2' == 'en' %}var(--accent-cyan){% else %}transparent{% endif %}; transition: all 0.2s ease;">
-                       🇬🇧 EN
-                    </a>
-                </div>
+
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav" aria-controls="publicNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="publicNav">
+                <ul class="navbar-nav ms-auto align-items-md-center gap-2 mt-2 mt-md-0">
+                    <li class="nav-item">
+                        <a href="{% url 'arcamitte:request-access' %}" class="nav-link text-white-50 {% if request.resolver_match.url_name == 'request-access' %}active text-white fw-semibold{% endif %}">
+                            <i data-feather="key" style="width:14px;height:14px;" class="me-1"></i> {% trans "Solicitar Acceso" %}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'arcamitte:redeem-otp' %}" class="nav-link text-white-50 {% if request.resolver_match.url_name == 'redeem-otp' %}active text-white fw-semibold{% endif %}">
+                            <i data-feather="download" style="width:14px;height:14px;" class="me-1"></i> {% trans "Descargar Documento" %}
+                        </a>
+                    </li>
+
+                    <!-- Selector de Idioma -->
+                    <li class="nav-item ms-md-2">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Idioma">
+                            <a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
+                               class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary{% else %}btn-outline-secondary text-white-50{% endif %} px-2 py-1 fw-semibold">
+                                ES
+                            </a>
+                            <a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
+                               class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary{% else %}btn-outline-secondary text-white-50{% endif %} px-2 py-1 fw-semibold">
+                                EN
+                            </a>
+                        </div>
+                    </li>
+
+                    <!-- Enlace al Dashboard Operativo -->
+                    <li class="nav-item ms-md-2">
+                        <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-light d-flex align-items-center gap-1 px-3">
+                            <i data-feather="lock" style="width:14px;height:14px;"></i>
+                            <span>{% trans "Panel Privado" %}</span>
+                        </a>
+                    </li>
+                </ul>
             </div>
-        </nav>
+        </div>
     </header>
 
-    <main>
-        {% block content %}{% endblock %}
+    <!-- Contenido Principal -->
+    <main class="flex-grow-1 py-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-10 col-lg-7 col-xl-6">
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}primary{% endif %} alert-dismissible fade show shadow-sm border-0" role="alert">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i data-feather="{% if message.tags == 'error' %}alert-circle{% else %}info{% endif %}" style="width:18px;height:18px;" class="flex-shrink-0"></i>
+                                    <div>{{ message }}</div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% block content %}{% endblock %}
+
+                </div>
+            </div>
+        </div>
     </main>
 
-    <footer>
-        <p>{% blocktrans %}Arcamitte &copy; 2026 &mdash; Microservicio Criptográfico de Entrega Segura{% endblocktrans %}</p>
+    <!-- Footer Corporativo Arcamitte -->
+    <footer class="arca-footer py-3 border-top bg-white mt-auto">
+        <div class="container d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 text-center text-sm-start">
+            <div class="small">
+                <strong>Arcamitte</strong> &copy; {% now "Y" %} &bull; {% trans "Microservicio Criptográfico de Entrega Segura" %}
+            </div>
+            <div class="text-muted small">
+                {% trans "Pasarela de Custodia y Canje Criptográfico" %}
+            </div>
+        </div>
     </footer>
 
+    <!-- Scripts Bootstrap 5.3 & Feather Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="{% static 'arcamitte/js/arcamitte.js' %}"></script>
     <script>
-        function copyText(elementId, btnElement) {
-            const text = document.getElementById(elementId).innerText.trim();
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = btnElement.innerText;
-                btnElement.innerText = "{% trans '✓ ¡Copiado!' %}";
-                btnElement.style.backgroundColor = "var(--accent-emerald)";
-                btnElement.style.color = "#0f172a";
-                setTimeout(() => {
-                    btnElement.innerText = originalText;
-                    btnElement.style.backgroundColor = "";
-                    btnElement.style.color = "";
-                }, 2000);
-            });
-        }
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.feather) {
+                feather.replace();
+            }
+        });
     </script>
-    {% block extra_scripts %}{% endblock %}
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

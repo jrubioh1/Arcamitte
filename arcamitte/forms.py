@@ -79,7 +79,8 @@ class RedeemOtpForm(forms.Form):
         min_length=6,
         widget=forms.TextInput(
             attrs={
-                "class": "form-control font-mono text-center",
+                "class": "form-control font-mono text-center fs-3 fw-bold",
+                "style": "letter-spacing: 0.35rem;",
                 "placeholder": "123456",
                 "id": "otp_code",
                 "maxlength": "6",

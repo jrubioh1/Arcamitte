@@ -756,7 +756,7 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         self.assertContains(resp_redeem_en, "Document Verification and Download")
         self.assertContains(resp_redeem_en, "Verification Code (6 digits)")
         self.assertContains(resp_redeem_en, "Verify code and download document")
-        self.assertContains(resp_redeem_en, "Security notices:")
+        self.assertContains(resp_redeem_en, "Secure Download")
 
         # 4. Cambiar a español mediante set-language
         resp_lang_es = self.client.get(f"{set_lang_url}?lang=es&next={reverse('arcamitte:request-access')}")
@@ -779,7 +779,7 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         self.assertContains(resp_redeem_es, "Verificación y Descarga de Documento")
         self.assertContains(resp_redeem_es, "Código de Verificación (6 dígitos)")
         self.assertContains(resp_redeem_es, "Verificar código y descargar documento")
-        self.assertContains(resp_redeem_es, "Avisos de seguridad:")
+        self.assertContains(resp_redeem_es, "Descarga Segura")
 
     def test_close_expired_documents_management_command(self):
         """

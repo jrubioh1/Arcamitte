@@ -24,6 +24,19 @@
 			<div class="row justify-content-center">
 				<div class="col-sm-10 col-md-8 col-lg-5 col-xl-4">
 
+					<div class="d-flex justify-content-end mb-2">
+						<div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Idioma' %}">
+							<a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
+							   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold">
+								ES
+							</a>
+							<a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
+							   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold">
+								EN
+							</a>
+						</div>
+					</div>
+
 					<div class="text-center mb-4">
 						<img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte Logo" class="rounded-3 shadow-sm mb-3" style="width: 72px; height: 72px; object-fit: cover;">
 						<h1 class="h3 fw-bold mb-1">Arcamitte</h1>
@@ -72,7 +85,6 @@
 					</div>
 
 					<div class="text-center mt-3 text-muted small">
-						{% trans "Plataforma protegida bajo NIST SP 800-53 y OWASP API Top 10." %}<br>
 						<a href="{% url 'arcamitte:request-access' %}" class="text-decoration-none text-primary mt-2 d-inline-block">
 							&larr; {% trans "Volver a la pasarela pública de canje con OTP" %}
 						</a>

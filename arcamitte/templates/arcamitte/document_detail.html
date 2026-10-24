@@ -61,7 +61,7 @@
 								{% if doc.origin_uo %}
 									<span class="badge bg-primary">{{ doc.origin_uo.alias }}</span> - {{ doc.origin_uo.name }}
 								{% else %}
-									<span class="badge bg-secondary">Global / Desacoplado</span>
+									<span class="badge bg-secondary">{% trans "Asiento Personal Privado" %}</span>
 								{% endif %}
 							</td>
 						</tr>
@@ -100,7 +100,7 @@
 									</span>
 								{% else %}
 									<span class="badge bg-secondary">
-										<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i> {% trans "Destruido (NIST SP 800-88)" %}
+										<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i> {% trans "Destruido" %}
 									</span>
 								{% endif %}
 							</td>

@@ -4,96 +4,94 @@
 {% block title %}{% trans "Solicitar Documento" %} | Arcamitte{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1 class="card-title">
-                <span>📄</span> {% trans "Descarga Segura de Documentos" %}
-            </h1>
-            <span class="badge badge-cyan">{% trans "Acceso Seguro" %}</span>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent border-bottom p-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <div class="p-2 bg-primary-subtle rounded-3 text-primary d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                    <i data-feather="file-text" style="width:22px;height:22px;"></i>
+                </div>
+                <div>
+                    <h1 class="h5 fw-bold mb-0 text-dark">{% trans "Descarga Segura de Documentos" %}</h1>
+                    <small class="text-muted">{% trans "Pasarela desatendida mediante verificación OTP por correo" %}</small>
+                </div>
+            </div>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                <i data-feather="shield" style="width:12px;height:12px;" class="me-1"></i> {% trans "Acceso Seguro" %}
+            </span>
         </div>
-        <p class="card-subtitle">
+    </div>
+
+    <div class="card-body p-4">
+        <p class="text-muted small mb-4">
             {% trans "Introduzca el identificador (SHA-256) del documento y su correo electrónico para recibir un código de verificación." %}
         </p>
-    </div>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}">
-                <div>{{ message }}</div>
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm" role="alert">
+                {% for error in form.non_field_errors %}
+                    <div class="small">{{ error }}</div>
+                {% endfor %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
-        {% endfor %}
-    {% endif %}
+        {% endif %}
 
-    {% if form.non_field_errors %}
-        <div class="alert alert-error">
-            {% for error in form.non_field_errors %}
-                <div>{{ error }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
+        <form method="POST" autocomplete="off">
+            {% csrf_token %}
 
-    <form method="POST" autocomplete="off">
-        {% csrf_token %}
+            <div class="mb-3">
+                <label for="{{ form.file_hash.id_for_label }}" class="form-label fw-semibold small">
+                    <i data-feather="hash" style="width:14px;height:14px;" class="me-1 text-primary"></i>
+                    {{ form.file_hash.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.file_hash }}
+                {% if form.file_hash.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.file_hash.errors.0 }}
+                    </div>
+                {% endif %}
+                <div class="form-text text-muted small">{{ form.file_hash.help_text }}</div>
+            </div>
 
-        <div class="form-group">
-            <label for="{{ form.file_hash.id_for_label }}" class="form-label">
-                {{ form.file_hash.label }} *
-            </label>
-            {{ form.file_hash }}
-            {% if form.file_hash.errors %}
-                <div style="color: var(--accent-rose); font-size: 0.85rem; margin-top: 0.35rem;">
-                    {{ form.file_hash.errors.0 }}
-                </div>
-            {% endif %}
-            <span class="form-help">{{ form.file_hash.help_text }}</span>
-        </div>
+            <div class="mb-4">
+                <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold small">
+                    <i data-feather="mail" style="width:14px;height:14px;" class="me-1 text-primary"></i>
+                    {{ form.email.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.email.errors.0 }}
+                    </div>
+                {% endif %}
+                <div class="form-text text-muted small">{{ form.email.help_text }}</div>
+            </div>
 
-        <div class="form-group">
-            <label for="{{ form.email.id_for_label }}" class="form-label">
-                {{ form.email.label }} *
-            </label>
-            {{ form.email }}
-            {% if form.email.errors %}
-                <div style="color: var(--accent-rose); font-size: 0.85rem; margin-top: 0.35rem;">
-                    {{ form.email.errors.0 }}
-                </div>
-            {% endif %}
-            <span class="form-help">{{ form.email.help_text }}</span>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
-            {% trans "Solicitar código de verificación" %}
-        </button>
-    </form>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        try {
-            localStorage.removeItem("arcamitte_remembered_email");
-        } catch (e) {}
-        const form = document.querySelector("form");
-        if (form) {
-            form.reset();
-        }
-    });
-    window.addEventListener("pageshow", function(event) {
-        const form = document.querySelector("form");
-        if (form) {
-            form.reset();
-        }
-    });
-    </script>
-
-    <div style="background-color: #0b1329; border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 8px; padding: 1.25rem; margin-top: 2rem;">
-        <h3 style="font-size: 0.95rem; color: var(--accent-cyan); margin-bottom: 0.5rem;">
-            {% trans "Información sobre el servicio:" %}
-        </h3>
-        <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin: 0; padding-left: 1.2rem;">
-            <li><strong>{% trans "Identificador único:" %}</strong> {% trans "El acceso se gestiona a través del código SHA-256 facilitado por el remitente." %}</li>
-            <li><strong>{% trans "Verificación por correo:" %}</strong> {% trans "Se remitirá un código temporal de un solo uso a la dirección de correo autorizada." %}</li>
-            <li><strong>{% trans "Confidencialidad:" %}</strong> {% trans "Una vez completada la entrega, el documento dejará de estar disponible en la plataforma conforme a las políticas de seguridad establecidas." %}</li>
-        </ul>
+            <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-primary py-2 fw-semibold d-flex align-items-center justify-content-center gap-2">
+                    <i data-feather="send" style="width:16px;height:16px;"></i>
+                    <span>{% trans "Solicitar código de verificación" %}</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    try {
+        localStorage.removeItem("arcamitte_remembered_email");
+    } catch (e) {}
+    const form = document.querySelector("form");
+    if (form) {
+        form.reset();
+    }
+});
+window.addEventListener("pageshow", function(event) {
+    const form = document.querySelector("form");
+    if (form) {
+        form.reset();
+    }
+});
+</script>
 {% endblock %}

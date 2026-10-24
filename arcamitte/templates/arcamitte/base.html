@@ -101,9 +101,9 @@
 			<div class="arca-sidebar-footer">
 				<div class="d-flex align-items-center gap-2 mb-1">
 					<i data-feather="shield" style="width:14px;height:14px;"></i>
-					<strong class="text-white">Arcamitte Security</strong>
+					<strong class="text-white">Arcamitte</strong>
 				</div>
-				<div>AES-256-GCM | NIST SP 800-88</div>
+				<div>{% trans "Custodia Criptográfica" %}</div>
 			</div>
 		</nav>
 
@@ -122,8 +122,22 @@
 					</span>
 				</div>
 
-				<div class="d-flex align-items-center gap-3">
-					<div class="dropdown">
+				<div class="d-flex align-items-center gap-2">
+					<!-- Selector de Idioma (ES / EN) -->
+					<div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Idioma' %}">
+						<a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
+						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold"
+						   title="Español">
+							ES
+						</a>
+						<a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
+						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold"
+						   title="English">
+							EN
+						</a>
+					</div>
+
+					<div class="dropdown ms-1">
 						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
 							<span class="badge bg-primary text-white rounded-circle p-1 d-inline-flex align-items-center justify-content-center" style="width:24px;height:24px;">
 								{{ request.user.username|make_list|first|upper }}
@@ -135,8 +149,13 @@
 						</button>
 						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userMenuBtn">
 							<li>
-								<a class="dropdown-item" href="{% url 'admin:index' %}">
+								<a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank">
 									<i data-feather="settings" style="width:14px;height:14px;" class="me-2"></i> {% trans "Django Admin" %}
+								</a>
+							</li>
+							<li>
+								<a class="dropdown-item" href="{% url 'arcamitte:request-access' %}" target="_blank">
+									<i data-feather="globe" style="width:14px;height:14px;" class="me-2"></i> {% trans "Portal Público Canje" %}
 								</a>
 							</li>
 							<li><hr class="dropdown-divider"></li>
@@ -171,7 +190,7 @@
 					<strong>Arcamitte</strong> &copy; {% now "Y" %} &bull; {% trans "Microservicio de Cifrado y Custodia" %}
 				</div>
 				<div class="text-muted small">
-					NIST SP 800-53 Rev. 5 | OWASP API Security Top 10
+					{% trans "Pasarela Segura" %}
 				</div>
 			</footer>
 		</div>

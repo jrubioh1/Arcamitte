@@ -77,7 +77,7 @@
 							</code>
 						</td>
 						<td>
-							<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:"Global" }}</span>
+							<span class="badge bg-light text-dark border">{{ doc.origin_uo.alias|default:_("Personal") }}</span>
 							{% if doc.target_uo %}
 								&rarr; <span class="badge bg-info text-white">{{ doc.target_uo.alias }}</span>
 							{% endif %}
