@@ -18,7 +18,8 @@
             {% trans "Este módulo administrativo permite aprovisionar de forma simultánea e idempotente múltiples Unidades Organizativas (UO) y sus usuarios asociados (con roles de Operador, Auditor o Administrador de UO) mediante un archivo JSON estructurado." %}
         </p>
 
-        <form method="POST" enctype="multipart/form-data" style="margin-top:20px;">
+        <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+        <form method="POST" action="." enctype="multipart/form-data" style="margin-top:20px;">
             {% csrf_token %}
             <div style="margin-bottom:15px;">
                 <label for="id_json_file" style="display:block; font-weight:bold; margin-bottom:6px; color:#e2e8f0;">

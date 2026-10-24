@@ -1,8 +1,11 @@
 import ast
 import io
 import json
+import logging
 import os
 import zipfile
+
+logger = logging.getLogger(__name__)
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 
@@ -96,16 +99,16 @@ def normalize_and_validate_email_list(raw_input) -> list[str]:
                 if isinstance(parsed, (list, tuple)):
                     extract_candidates(parsed)
                     return
-            except Exception:
-                pass
+            except (json.JSONDecodeError, ValueError, TypeError):
+                logger.debug("Cadena de entrada no es un array JSON válido, continuando análisis sintáctico.")
 
             try:
                 parsed = ast.literal_eval(item_str)
                 if isinstance(parsed, (list, tuple, set)):
                     extract_candidates(parsed)
                     return
-            except Exception:
-                pass
+            except (ValueError, SyntaxError, MemoryError, TypeError):
+                logger.debug("Cadena de entrada no es un literal Python evaluable de forma segura.")
 
         # Descomposición por comas, puntos y comas o saltos de línea
         for part in item_str.replace(";", ",").replace("\n", ",").split(","):

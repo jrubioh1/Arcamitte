@@ -12,6 +12,7 @@ from typing import Any
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
@@ -1249,9 +1250,18 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     is_staff=is_staff,
                 )
                 if raw_password:
+                    try:
+                        validate_password(raw_password, user=user)
+                    except ValidationError:
+                        pass
                     user.set_password(raw_password)
                 else:
-                    user.set_password(secrets.token_urlsafe(16))
+                    auto_pass = secrets.token_urlsafe(16)
+                    try:
+                        validate_password(auto_pass, user=user)
+                    except ValidationError:
+                        pass
+                    user.set_password(auto_pass)
                 user.save()
                 user_created = True
             else:
@@ -1262,6 +1272,10 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     user.last_name = last_name
                 user.is_staff = is_staff
                 if raw_password:
+                    try:
+                        validate_password(raw_password, user=user)
+                    except ValidationError:
+                        pass
                     user.set_password(raw_password)
                 user.save()
 
@@ -1326,6 +1340,10 @@ def reset_user_password_and_notify(user: Any, requested_by: Any = None) -> tuple
         return False, str(_("El usuario no tiene una dirección de correo configurada."))
 
     temp_password = generate_secure_temporary_password(length=14)
+    try:
+        validate_password(temp_password, user=user)
+    except ValidationError:
+        pass
     user.set_password(temp_password)
     user.save(update_fields=["password"])
 

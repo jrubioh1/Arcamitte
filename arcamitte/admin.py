@@ -15,8 +15,7 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpRe
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
 from arcamitte.models import (
@@ -65,19 +64,17 @@ class EmailListAdminWidget(forms.Widget):
         if not email_list:
             email_list = [""]
 
-        rows_html = []
-        for val in email_list:
-            safe_val = str(val).replace('"', "&quot;")
-            rows_html.append(
-                f'<div class="admin-email-row" style="display:flex; gap:8px; margin-bottom:8px; align-items:center; width:100%; max-width:520px; box-sizing:border-box;">'
-                f'<input type="email" name="{name}" value="{safe_val}" class="vTextField" style="flex:1 1 auto; min-width:0; width:100%; height:34px; padding:6px 10px; border-radius:4px; box-sizing:border-box;" placeholder="destinatario@empresa.com" required>'
-                f'<button type="button" class="button btn-remove-row" onclick="removeAdminRow(this)" style="flex:0 0 34px; width:34px; height:34px; background:#ba2121; color:#fff; border:none; border-radius:4px; padding:0; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:1rem; font-weight:bold; box-sizing:border-box;" title="Eliminar correo">✕</button>'
-                f'</div>'
-            )
+        rows_rendered = format_html_join(
+            "\n",
+            '<div class="admin-email-row" style="display:flex; gap:8px; margin-bottom:8px; align-items:center; width:100%; max-width:520px; box-sizing:border-box;">'
+            '<input type="email" name="{}" value="{}" class="vTextField" style="flex:1 1 auto; min-width:0; width:100%; height:34px; padding:6px 10px; border-radius:4px; box-sizing:border-box;" placeholder="destinatario@empresa.com" required>'
+            '<button type="button" class="button btn-remove-row" onclick="removeAdminRow(this)" style="flex:0 0 34px; width:34px; height:34px; background:#ba2121; color:#fff; border:none; border-radius:4px; padding:0; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:1rem; font-weight:bold; box-sizing:border-box;" title="Eliminar correo">✕</button>'
+            '</div>',
+            ((name, str(val)) for val in email_list),
+        )
 
-        rows_rendered = "\n".join(rows_html)
-
-        html = f"""
+        return format_html(
+            """
         <div id="{name}_admin_wrapper" style="width:100%; max-width:520px; box-sizing:border-box;">
             <div id="{name}_rows_container">
                 {rows_rendered}
@@ -180,8 +177,10 @@ class EmailListAdminWidget(forms.Widget):
                 }}
             }});
         </script>
-        """
-        return mark_safe(html)
+        """,
+            name=name,
+            rows_rendered=rows_rendered,
+        )
 
     def value_from_datadict(self, data: Any, files: Any, name: str) -> Any:
         if hasattr(data, "getlist"):
@@ -205,7 +204,8 @@ class HashingFileInputWidget(forms.ClearableFileInput):
         except Exception:
             check_url = "/admin/arcamitte/encrypteddocument/check-file-hash/"
 
-        script_html = f"""
+        script_html = format_html(
+            """
         <div id="{input_id}_notice_container" style="margin-top:8px;"></div>
         <script>
         (function() {{
@@ -292,8 +292,11 @@ class HashingFileInputWidget(forms.ClearableFileInput):
             }});
         }})();
         </script>
-        """
-        return mark_safe(base_html + script_html)
+        """,
+            input_id=input_id,
+            check_url=check_url,
+        )
+        return format_html("{}{}", base_html, script_html)
 
 
 class TargetUOWidget(forms.Select):
@@ -307,8 +310,8 @@ class TargetUOWidget(forms.Select):
     def render(self, name: str, value: Any, attrs: Optional[dict] = None, renderer: Any = None) -> Any:
         base_html = super().render(name, value, attrs, renderer)
         input_id = (attrs or {}).get("id", f"id_{name}")
-        html = f"""
-        {base_html}
+        helper_html = format_html(
+            """
         <div id="{input_id}_helper_box" style="margin-top:10px; display:none; background:#0f172a; border:1px solid #334155; padding:12px; border-radius:6px; width:100%; max-width:680px; box-sizing:border-box; clear:both;">
             <div style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
                 <span>💡</span> <strong>Atajos de destinatarios de la UO de destino:</strong>
@@ -486,8 +489,10 @@ class TargetUOWidget(forms.Select):
             }}
         }})();
         </script>
-        """
-        return mark_safe(html)
+        """,
+            input_id=input_id,
+        )
+        return format_html("{}{}", base_html, helper_html)
 
 
 class EncryptedDocumentAddForm(forms.ModelForm):
@@ -1311,7 +1316,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
                 obj.origin_uo.numeric_code,
                 obj.origin_uo.alias,
             )
-        return mark_safe('<span style="color:#64748b;">—</span>')
+        return format_html('<span style="color:#64748b;">{}</span>', "—")
 
     @admin.display(description=_("UO Receptora"), ordering="target_uo__alias")
     def target_uo_badge(self, obj: EncryptedDocument) -> str:
@@ -1323,7 +1328,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
                 obj.target_uo.numeric_code,
                 obj.target_uo.alias,
             )
-        return mark_safe('<span style="color:#64748b;">—</span>')
+        return format_html('<span style="color:#64748b;">{}</span>', "—")
 
     @admin.display(description=_("Hash SHA-256"))
     def short_file_hash(self, obj: EncryptedDocument) -> str:
@@ -1337,11 +1342,15 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     @admin.display(description=_("Política"))
     def burn_policy_badge(self, obj: EncryptedDocument) -> str:
         if obj.burn_policy == EncryptedDocument.BurnPolicy.ALL_RECIPIENTS:
-            return mark_safe(
-                '<span style="background:#1e1b4b; color:#c7d2fe; border:1px solid #6366f1; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;" title="Disponible para todos los destinatarios autorizados">👥 Todos</span>'
+            return format_html(
+                '<span style="background:#1e1b4b; color:#c7d2fe; border:1px solid #6366f1; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;" title="{}">{}</span>',
+                "Disponible para todos los destinatarios autorizados",
+                "👥 Todos",
             )
-        return mark_safe(
-            '<span style="background:#18181b; color:#e4e4e7; border:1px solid #71717a; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;" title="Disponible para un único acceso (primer acceso)">⚡ 1er Acceso</span>'
+        return format_html(
+            '<span style="background:#18181b; color:#e4e4e7; border:1px solid #71717a; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;" title="{}">{}</span>',
+            "Disponible para un único acceso (primer acceso)",
+            "⚡ 1er Acceso",
         )
 
     @admin.display(description=_("Estado"))
@@ -1363,14 +1372,15 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
                 consumed=consumed,
                 total=total,
             )
-        return mark_safe(
-            '<span style="background:#022c22; color:#34d399; border:1px solid #10b981; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;">🟢 Disponible para descarga</span>'
+        return format_html(
+            '<span style="background:#022c22; color:#34d399; border:1px solid #10b981; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.75rem; white-space:nowrap;">{}</span>',
+            "🟢 Disponible para descarga",
         )
 
     @admin.display(description=_("Fecha"), ordering="created_at")
     def formatted_created_at(self, obj: EncryptedDocument) -> str:
         if not obj.created_at:
-            return mark_safe('<span style="color:#64748b;">—</span>')
+            return format_html('<span style="color:#64748b;">{}</span>', "—")
         return format_html(
             '<span style="font-size:0.75rem; color:#94a3b8; white-space:nowrap;">{}</span>',
             obj.created_at.strftime("%Y-%m-%d %H:%M"),
@@ -1379,7 +1389,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     @admin.display(description=_("Caducidad"), ordering="expires_at")
     def expiry_status_badge(self, obj: EncryptedDocument) -> str:
         if not obj.expires_at:
-            return mark_safe('<span style="color:#64748b;">—</span>')
+            return format_html('<span style="color:#64748b;">{}</span>', "—")
         now = timezone.now()
         if obj.is_consumed:
             return format_html(
@@ -1433,7 +1443,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
 
         return format_html(
             '<div style="display:inline-flex; gap:6px; align-items:center; flex-wrap:nowrap;">{}</div>',
-            mark_safe(" ".join(buttons)),
+            format_html_join(" ", "{}", ((b,) for b in buttons)),
         )
 
     @admin.display(description=_("Plantilla Correo"))
@@ -1454,8 +1464,10 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     def audit_download_button(self, obj: EncryptedDocument) -> str:
         """Botón interactivo en la lista de documentos para descarga de auditoría."""
         if obj.is_consumed:
-            return mark_safe(
-                '<span style="background:#7f1d1d; color:#fca5a5; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.78rem; white-space:nowrap;" title="Documento consumido y retirado">🛡️ Retirado</span>'
+            return format_html(
+                '<span style="background:#7f1d1d; color:#fca5a5; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.78rem; white-space:nowrap;" title="{}">{}</span>',
+                "Documento consumido y retirado",
+                "🛡️ Retirado",
             )
         download_url = reverse("admin:arcamitte_encrypteddocument_audit_download", args=[obj.pk])
         return format_html(
@@ -1469,7 +1481,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     def terminate_action_button(self, obj: EncryptedDocument) -> str:
         """Botón directo de finalización deliberada de asiento con trituración física y constancia de vicisitud."""
         if obj.is_consumed:
-            return mark_safe('<span style="color:#64748b; font-size:0.78rem;">⏹️ Finalizado</span>')
+            return format_html('<span style="color:#64748b; font-size:0.78rem;">{}</span>', "⏹️ Finalizado")
         url = reverse("admin:arcamitte_encrypteddocument_terminate", args=[obj.pk])
         return format_html(
             '<a class="button" href="{}" style="background-color:#991b1b; color:white; padding:3px 8px; border-radius:4px; text-decoration:none; font-size:0.78rem; font-weight:bold; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;" title="Finalizar asiento y destruir archivo físico">⏹️ Finalizar</a>',
@@ -1517,11 +1529,12 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     def audit_download_panel(self, obj: EncryptedDocument) -> str:
         """Panel de herramientas de auditoría en la vista detallada del documento."""
         if obj.is_consumed:
-            return mark_safe(
+            return format_html(
                 '<div style="background:#450a0a; border:1px solid #dc2626; color:#fecaca; padding:10px; border-radius:6px;">'
-                '<strong>Documento ya entregado:</strong> '
-                'El documento ya ha sido retirado de la pasarela y no se encuentra disponible para descargas de auditoría.'
-                '</div>'
+                '<strong>{}</strong> {}'
+                '</div>',
+                "Documento ya entregado:",
+                "El documento ya ha sido retirado de la pasarela y no se encuentra disponible para descargas de auditoría.",
             )
         download_url = reverse("admin:arcamitte_encrypteddocument_audit_download", args=[obj.pk])
         return format_html(
@@ -1641,11 +1654,15 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
                     content = uploaded_file.read().decode("utf-8")
                     data = json.loads(content)
                     uos_count, users_count, notes = process_batch_import_json(data)
+                    notes_display = notes[:15]
+                    notes_formatted = format_html_join("<br>", "{}", ((n,) for n in notes_display))
+                    if len(notes) > 15:
+                        notes_formatted = format_html("{}...", notes_formatted)
                     msg = format_html(
                         "<strong>Carga masiva completada:</strong> Se procesaron {} UOs y {} usuarios vinculados.<br>{}",
                         uos_count,
                         users_count,
-                        mark_safe("<br>".join(notes[:15]) + ("..." if len(notes) > 15 else "")),
+                        notes_formatted,
                     )
                     messages.success(request, msg)
                     return HttpResponseRedirect(reverse("admin:arcamitte_organizationalunit_changelist"))

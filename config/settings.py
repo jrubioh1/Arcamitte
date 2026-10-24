@@ -50,11 +50,28 @@ else:
 # Soporte para túneles y balanceadores / proxies inversos (Nginx, Traefik, Docker)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Hardening de cookies de sesión y CSRF (NIST SP 800-63B)
+# Hardening de cookies de sesión, CSRF e idioma (NIST SP 800-63B / OWASP A05)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = not DEBUG
+
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = not DEBUG
+
+LANGUAGE_COOKIE_HTTPONLY = True
+LANGUAGE_COOKIE_SAMESITE = "Lax"
+LANGUAGE_COOKIE_SECURE = not DEBUG
+
+# Endurecimiento de cabeceras HTTP de seguridad (OWASP A05 / Django Deployment Checklist)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config.getboolean("django", "secure_ssl_redirect", fallback=True)
+    SECURE_HSTS_SECONDS = config.getint("django", "secure_hsts_seconds", fallback=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 INSTALLED_APPS = [
     "django.contrib.admin",

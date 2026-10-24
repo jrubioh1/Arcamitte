@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -1166,6 +1167,7 @@ class DashboardPasswordChangeView(LoginRequiredMixin, View):
         form = PasswordChangeCustomForm(request.user, request.POST)
         if form.is_valid():
             new_password = form.cleaned_data["new_password"]
+            validate_password(new_password, user=request.user)
             request.user.set_password(new_password)
             request.user.save(update_fields=["password"])
 

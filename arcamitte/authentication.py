@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from django.contrib.auth.models import AnonymousUser
 from django.utils.translation import gettext_lazy as _
@@ -60,8 +63,8 @@ class APITokenAuthentication(authentication.BaseAuthentication):
         client_ip = get_client_ip(request)
         try:
             token.record_usage(ip_address=client_ip)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Fallo al registrar traza de auditoria de peticion API: %s", exc)
 
         # Si el token fue emitido por un usuario registrado, lo asociamos; si no, usuario anónimo autenticado por token
         user = token.created_by if token.created_by and token.created_by.is_active else AnonymousUser()

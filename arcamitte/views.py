@@ -67,8 +67,8 @@ def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
             max_age=getattr(settings, "LANGUAGE_COOKIE_AGE", 365 * 24 * 60 * 60),
             path=getattr(settings, "LANGUAGE_COOKIE_PATH", "/"),
             domain=getattr(settings, "LANGUAGE_COOKIE_DOMAIN", None),
-            secure=getattr(settings, "LANGUAGE_COOKIE_SECURE", False),
-            httponly=getattr(settings, "LANGUAGE_COOKIE_HTTPONLY", False),
+            secure=getattr(settings, "LANGUAGE_COOKIE_SECURE", not getattr(settings, "DEBUG", True)),
+            httponly=getattr(settings, "LANGUAGE_COOKIE_HTTPONLY", True),
             samesite=getattr(settings, "LANGUAGE_COOKIE_SAMESITE", "Lax"),
         )
         activate(lang_code)
@@ -109,6 +109,10 @@ class ArcamitteI18nViewMixin:
                     lang_code,
                     max_age=getattr(settings, "LANGUAGE_COOKIE_AGE", 365 * 24 * 60 * 60),
                     path=getattr(settings, "LANGUAGE_COOKIE_PATH", "/"),
+                    domain=getattr(settings, "LANGUAGE_COOKIE_DOMAIN", None),
+                    secure=getattr(settings, "LANGUAGE_COOKIE_SECURE", not getattr(settings, "DEBUG", True)),
+                    httponly=getattr(settings, "LANGUAGE_COOKIE_HTTPONLY", True),
+                    samesite=getattr(settings, "LANGUAGE_COOKIE_SAMESITE", "Lax"),
                 )
         return response
 

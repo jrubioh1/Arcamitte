@@ -68,7 +68,8 @@
             </div>
         </div>
 
-        <form method="POST" style="margin-top:10px;">
+        <!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token -->
+        <form method="POST" action="." style="margin-top:10px;">
             {% csrf_token %}
             <div style="margin-bottom:20px;">
                 <label for="id_reason" style="display:block; font-weight:bold; margin-bottom:8px; color:#e2e8f0; font-size:0.9rem;">

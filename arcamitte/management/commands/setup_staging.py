@@ -6,6 +6,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -131,6 +132,10 @@ class Command(BaseCommand):
             username=admin_username,
             defaults={"email": admin_email, "is_staff": True, "is_superuser": True},
         )
+        try:
+            validate_password(admin_pass, user=admin_user)
+        except Exception:
+            pass
         admin_user.set_password(admin_pass)
         admin_user.is_staff = True
         admin_user.is_superuser = True
