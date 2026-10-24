@@ -101,7 +101,12 @@ def dispatch_email(
 
     if sync is None:
         async_enabled = getattr(settings, "ARCAMITTE_ASYNC_EMAIL", True)
-        is_testing = getattr(settings, "TESTING", False) or ("pytest" in sys.modules)
+        is_testing = (
+            getattr(settings, "TESTING", False)
+            or ("test" in sys.argv)
+            or ("pytest" in sys.modules)
+            or str(getattr(settings, "EMAIL_BACKEND", "")).endswith("locmem.EmailBackend")
+        )
         sync = (not async_enabled) or is_testing
 
     if sync:
