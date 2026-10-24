@@ -1,6 +1,6 @@
 {% load static i18n %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ LANGUAGE_CODE|default:'es' }}">
 
 <head>
 	<meta charset="utf-8">
@@ -71,7 +71,12 @@
 									<input class="form-control" type="text" name="username" placeholder="{% trans 'Introduzca su usuario' %}" autofocus required />
 								</div>
 								<div class="mb-3">
-									<label class="form-label fw-semibold small">{% trans "Contraseña" %}</label>
+									<div class="d-flex justify-content-between align-items-center mb-1">
+										<label class="form-label fw-semibold small mb-0">{% trans "Contraseña" %}</label>
+										<a href="{% url 'dashboard:password_reset_request' %}" class="small text-muted text-decoration-none">
+											{% trans "¿Olvidó su contraseña?" %}
+										</a>
+									</div>
 									<input class="form-control" type="password" name="password" placeholder="{% trans 'Introduzca su contraseña' %}" required />
 								</div>
 								<div class="d-grid mt-4">

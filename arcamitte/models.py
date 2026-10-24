@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -136,6 +137,54 @@ class UserUOMembership(models.Model):
     def __str__(self) -> str:
         username = getattr(self.user, "username", str(self.user))
         return f"{username} @ {self.uo.alias} ({self.get_role_display()})"
+
+
+class UserProfile(models.Model):
+    """
+    Perfil complementario para usuarios del sistema Arcamitte.
+    Controla directivas de ciclo de vida de credenciales y seguridad.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="arcamitte_profile",
+        verbose_name=_("Usuario"),
+    )
+    must_change_password = models.BooleanField(
+        default=False,
+        verbose_name=_("¿Debe cambiar la contraseña en el próximo acceso?"),
+        help_text=_("Si está marcado, se exigirá actualizar la contraseña tras iniciar sesión."),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Fecha de creación"),
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Última actualización"),
+    )
+
+    class Meta:
+        verbose_name = _("Perfil de Usuario")
+        verbose_name_plural = _("Perfiles de Usuario")
+
+    def __str__(self) -> str:
+        username = getattr(self.user, "username", str(self.user))
+        return f"Perfil de {username}"
+
+
+def get_or_create_user_profile(user: Any) -> UserProfile:
+    """Obtiene o inicializa de forma segura el perfil de un usuario."""
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return profile
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_or_sync_user_profile(sender: Any, instance: Any, created: bool, **kwargs: Any) -> None:
+    """Garantiza la existencia automática del perfil para cada usuario creado."""
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
 
 
 class EncryptedDocument(models.Model):

@@ -1,0 +1,146 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}
+	{% if is_new %}{% trans "Alta de Usuario" %}{% else %}{% trans "Editar Usuario" %} ({{ target_user.username }}){% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+	<div class="col-lg-8">
+		<div class="d-flex align-items-center justify-content-between mb-4">
+			<div>
+				<h1 class="h3 fw-bold mb-1">
+					{% if is_new %}{% trans "Registrar Nuevo Usuario" %}{% else %}{% trans "Modificar Cuenta de Usuario" %}{% endif %}
+				</h1>
+				<p class="text-muted small mb-0">
+					{% if is_new %}
+						{% trans "Cree una nueva cuenta de acceso. Se remitirá automáticamente una clave temporal por correo." %}
+					{% else %}
+						{% trans "Actualice los datos personales, estado y privilegios de" %} <strong>{{ target_user.username }}</strong>.
+					{% endif %}
+				</p>
+			</div>
+			<a href="{% url 'dashboard:user_list' %}" class="btn btn-outline-secondary btn-sm">
+				&larr; {% trans "Volver al Directorio" %}
+			</a>
+		</div>
+
+		{% if form.errors %}
+			<div class="alert alert-danger alert-dismissible fade show" role="alert">
+				<div class="small">
+					<strong>{% trans "Por favor corrija los siguientes errores:" %}</strong>
+					{% for error in form.non_field_errors %}
+						<div>{{ error }}</div>
+					{% endfor %}
+					{% for field in form %}
+						{% for error in field.errors %}
+							<div>{{ field.label }}: {{ error }}</div>
+						{% endfor %}
+					{% endfor %}
+				</div>
+				<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+			</div>
+		{% endif %}
+
+		<div class="card shadow-sm border-0">
+			<div class="card-body p-4">
+				<form method="post" autocomplete="off">
+					{% csrf_token %}
+
+					<div class="row g-3 mb-3">
+						<div class="col-md-6">
+							<label class="form-label fw-semibold small">{{ form.username.label }}</label>
+							{{ form.username }}
+						</div>
+						<div class="col-md-6">
+							<label class="form-label fw-semibold small">{{ form.email.label }}</label>
+							{{ form.email }}
+						</div>
+					</div>
+
+					<div class="row g-3 mb-3">
+						<div class="col-md-6">
+							<label class="form-label fw-semibold small">{{ form.first_name.label }}</label>
+							{{ form.first_name }}
+						</div>
+						<div class="col-md-6">
+							<label class="form-label fw-semibold small">{{ form.last_name.label }}</label>
+							{{ form.last_name }}
+						</div>
+					</div>
+
+					{% if is_new and admin_uos %}
+						<div class="card bg-light border-0 p-3 mb-3">
+							<h6 class="fw-bold small mb-2 text-dark">
+								<i data-feather="grid" style="width:14px;height:14px;" class="me-1 text-primary"></i>
+								{% trans "Asignación Departamental Inicial (Opcional)" %}
+							</h6>
+							<div class="row g-2">
+								<div class="col-md-7">
+									<label class="form-label small text-muted">{% trans "Unidad Organizativa" %}</label>
+									<select name="initial_uo" class="form-select form-select-sm">
+										<option value="">{% trans "-- Sin asignar UO inicialmente --" %}</option>
+										{% for uo in admin_uos %}
+											<option value="{{ uo.id }}">{{ uo.alias }} - {{ uo.name }}</option>
+										{% endfor %}
+									</select>
+								</div>
+								<div class="col-md-5">
+									<label class="form-label small text-muted">{% trans "Rol en la UO" %}</label>
+									<select name="initial_role" class="form-select form-select-sm">
+										{% for code, label in roles %}
+											<option value="{{ code }}" {% if code == 'OPERATOR' %}selected{% endif %}>{{ label }}</option>
+										{% endfor %}
+									</select>
+								</div>
+							</div>
+						</div>
+					{% endif %}
+
+					<div class="row g-3 mb-4">
+						<div class="col-md-4">
+							<div class="form-check">
+								{{ form.is_active }}
+								<label class="form-check-label small fw-semibold" for="{{ form.is_active.id_for_label }}">
+									{{ form.is_active.label }}
+								</label>
+							</div>
+						</div>
+						{% if form.is_staff %}
+							<div class="col-md-4">
+								<div class="form-check">
+									{{ form.is_staff }}
+									<label class="form-check-label small fw-semibold" for="{{ form.is_staff.id_for_label }}">
+										{{ form.is_staff.label }}
+									</label>
+								</div>
+							</div>
+						{% endif %}
+						{% if form.is_superuser %}
+							<div class="col-md-4">
+								<div class="form-check">
+									{{ form.is_superuser }}
+									<label class="form-check-label small fw-semibold" for="{{ form.is_superuser.id_for_label }}">
+										{{ form.is_superuser.label }}
+									</label>
+								</div>
+							</div>
+						{% endif %}
+					</div>
+
+					<div class="d-flex justify-content-end gap-2">
+						<a href="{% url 'dashboard:user_list' %}" class="btn btn-light border">
+							{% trans "Cancelar" %}
+						</a>
+						<button type="submit" class="btn btn-primary d-flex align-items-center gap-1">
+							<i data-feather="check" style="width:16px;height:16px;"></i>
+							<span>{% if is_new %}{% trans "Crear Usuario y Enviar Clave" %}{% else %}{% trans "Guardar Cambios" %}{% endif %}</span>
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

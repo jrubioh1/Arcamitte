@@ -1,0 +1,181 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Miembros de" %} {{ uo.alias }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<div class="d-flex align-items-center gap-2 mb-1">
+			<h1 class="h3 fw-bold mb-0">{% trans "Gestión de Personal y Membresías" %}</h1>
+			<span class="badge bg-primary font-mono fs-6">{{ uo.alias }}</span>
+		</div>
+		<p class="text-muted small mb-0">
+			{{ uo.name }} (Código: {{ uo.numeric_code }})
+		</p>
+	</div>
+	<div class="d-flex gap-2">
+		<a href="{% url 'dashboard:uo_edit' uo.id %}" class="btn btn-outline-secondary btn-sm">
+			<i data-feather="edit" style="width:14px;height:14px;" class="me-1"></i> {% trans "Editar UO" %}
+		</a>
+		<a href="{% url 'dashboard:uo_list' %}" class="btn btn-outline-secondary btn-sm">
+			&larr; {% trans "Volver a UOs" %}
+		</a>
+	</div>
+</div>
+
+<div class="row g-4">
+	<!-- Lista de Miembros Actuales -->
+	<div class="col-lg-8">
+		<div class="card shadow-sm border-0">
+			<div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+				<h2 class="h6 fw-bold mb-0 text-dark">
+					<i data-feather="users" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+					{% trans "Personal Asignado" %} ({{ memberships|length }})
+				</h2>
+			</div>
+			<div class="table-responsive">
+				<table class="table table-hover align-middle mb-0">
+					<thead>
+						<tr>
+							<th>{% trans "Usuario" %}</th>
+							<th>{% trans "Correo Electrónico" %}</th>
+							<th>{% trans "Rol Operativo" %}</th>
+							<th>{% trans "Estado" %}</th>
+							<th class="text-end">{% trans "Acciones" %}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for m in memberships %}
+							<tr>
+								<td>
+									<strong>{{ m.user.username }}</strong>
+									{% if m.user.get_full_name %}
+										<div class="text-muted small">{{ m.user.get_full_name }}</div>
+									{% endif %}
+								</td>
+								<td class="small">
+									{% if m.user.email %}
+										<a href="mailto:{{ m.user.email }}" class="text-muted text-decoration-none">
+											{{ m.user.email }}
+										</a>
+									{% else %}
+										<span class="text-muted italic small">{% trans "Sin email" %}</span>
+									{% endif %}
+								</td>
+								<td>
+									<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-flex align-items-center gap-1">
+										{% csrf_token %}
+										<input type="hidden" name="action" value="update_role">
+										<input type="hidden" name="membership_id" value="{{ m.id }}">
+										<select name="role" class="form-select form-select-sm" style="min-width: 140px;" onchange="this.form.submit()">
+											{% for code, label in roles %}
+												<option value="{{ code }}" {% if m.role == code %}selected{% endif %}>{{ label }}</option>
+											{% endfor %}
+										</select>
+									</form>
+								</td>
+								<td>
+									<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline">
+										{% csrf_token %}
+										<input type="hidden" name="action" value="toggle_active">
+										<input type="hidden" name="membership_id" value="{{ m.id }}">
+										<button type="submit" class="btn btn-sm p-0 border-0 bg-transparent" title="{% trans 'Pulsar para alternar estado' %}">
+											{% if m.is_active %}
+												<span class="badge bg-success">{% trans "Activo" %}</span>
+											{% else %}
+												<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
+											{% endif %}
+										</button>
+									</form>
+								</td>
+								<td class="text-end">
+									<div class="d-flex justify-content-end gap-1">
+										<!-- Botón Reset Password -->
+										<form method="post" action="{% url 'dashboard:user_reset_password' m.user.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una contraseña temporal y enviarla al correo de este usuario?' %}');">
+											{% csrf_token %}
+											<input type="hidden" name="next" value="{{ request.get_full_path }}">
+											<button type="submit" class="btn btn-outline-warning btn-sm" title="{% trans 'Resetear Contraseña' %}">
+												<i data-feather="key" style="width:13px;height:13px;"></i>
+											</button>
+										</form>
+
+										<!-- Botón Eliminar Membresía -->
+										<form method="post" action="{% url 'dashboard:uo_members' uo.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea desvincular este usuario de la Unidad Organizativa?' %}');">
+											{% csrf_token %}
+											<input type="hidden" name="action" value="remove_member">
+											<input type="hidden" name="membership_id" value="{{ m.id }}">
+											<button type="submit" class="btn btn-outline-danger btn-sm" title="{% trans 'Desvincular' %}">
+												<i data-feather="user-x" style="width:13px;height:13px;"></i>
+											</button>
+										</form>
+									</div>
+								</td>
+							</tr>
+						{% empty %}
+							<tr>
+								<td colspan="5" class="text-center py-4 text-muted">
+									{% trans "Esta Unidad Organizativa no cuenta con personal asignado actualmente." %}
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+	<!-- Formulario para Añadir Miembro -->
+	<div class="col-lg-4">
+		<div class="card shadow-sm border-0 sticky-top" style="top: 85px;">
+			<div class="card-header bg-white py-3 border-bottom">
+				<h2 class="h6 fw-bold mb-0 text-dark">
+					<i data-feather="user-plus" style="width:16px;height:16px;" class="me-1 text-primary"></i>
+					{% trans "Asignar Usuario a la UO" %}
+				</h2>
+			</div>
+			<div class="card-body p-3">
+				{% if available_users %}
+					<form method="post" action="{% url 'dashboard:uo_members' uo.id %}">
+						{% csrf_token %}
+						<input type="hidden" name="action" value="add_member">
+
+						<div class="mb-3">
+							<label class="form-label fw-semibold small">{% trans "Seleccionar Usuario" %}</label>
+							<select name="user_id" class="form-select form-select-sm" required>
+								<option value="" disabled selected>{% trans "Elija un usuario del sistema..." %}</option>
+								{% for u in available_users %}
+									<option value="{{ u.id }}">
+										{{ u.username }} {% if u.get_full_name %}({{ u.get_full_name }}){% endif %}
+									</option>
+								{% endfor %}
+							</select>
+						</div>
+
+						<div class="mb-3">
+							<label class="form-label fw-semibold small">{% trans "Rol a Asignar" %}</label>
+							<select name="role" class="form-select form-select-sm">
+								{% for code, label in roles %}
+									<option value="{{ code }}" {% if code == 'OPERATOR' %}selected{% endif %}>{{ label }}</option>
+								{% endfor %}
+							</select>
+						</div>
+
+						<div class="d-grid mt-4">
+							<button type="submit" class="btn btn-primary btn-sm d-flex align-items-center justify-content-center gap-1">
+								<i data-feather="plus-circle" style="width:14px;height:14px;"></i>
+								<span>{% trans "Vincular a esta UO" %}</span>
+							</button>
+						</div>
+					</form>
+				{% else %}
+					<div class="text-center py-4 text-muted small">
+						<i data-feather="check-circle" style="width:28px;height:28px;" class="text-success mb-2"></i>
+						<div>{% trans "Todos los usuarios activos ya forman parte de esta Unidad Organizativa." %}</div>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

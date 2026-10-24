@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import io
 import shutil
 import tempfile
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.utils import timezone
 
 from arcamitte.models import (
     APIToken,
@@ -16,8 +15,11 @@ from arcamitte.models import (
     OrganizationalUnit,
     UserUOMembership,
     default_document_expiry,
+    get_or_create_user_profile,
 )
-from arcamitte.services import upload_and_encrypt_document
+from arcamitte.services import (
+    upload_and_encrypt_document,
+)
 
 User = get_user_model()
 
@@ -101,7 +103,8 @@ class DashboardTestCase(TestCase):
         self.assertContains(response, "csrfmiddlewaretoken")
 
     def test_dashboard_login_successful(self) -> None:
-        """Verifica el inicio de sesión exitoso y la redirección al dashboard."""
+        """Verifica el inicio de sesión exitoso: superusuario al selector de modo y usuario regular al dashboard."""
+        # 1. Login como Superusuario -> Debe redirigir al Selector de Modo
         response = self.client.post(
             reverse("dashboard:login"),
             {
@@ -112,7 +115,23 @@ class DashboardTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["user"].is_authenticated)
-        self.assertContains(response, "Dashboard Criptográfico")
+        self.assertContains(response, "Selección de Modo de Trabajo")
+        self.assertContains(response, "Gobernanza y Administración")
+        self.assertContains(response, "Operativa Documental")
+
+        # 2. Login como Usuario Regular (Operador) -> Directo al Dashboard Operativo
+        self.client.logout()
+        resp_op = self.client.post(
+            reverse("dashboard:login"),
+            {
+                "username": "operador1",
+                "password": "OperatorPassword123!",
+            },
+            follow=True,
+        )
+        self.assertEqual(resp_op.status_code, 200)
+        self.assertTrue(resp_op.context["user"].is_authenticated)
+        self.assertContains(resp_op, "Dashboard Criptográfico")
 
     def test_dashboard_home_requires_login(self) -> None:
         """Verifica que usuarios anónimos sean redirigidos al login."""
@@ -460,3 +479,281 @@ class DashboardTestCase(TestCase):
         # Intentar acceder al detalle del documento de Legal debe devolver 403 Forbidden
         resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": doc_legal.file_hash}))
         self.assertEqual(resp_detail.status_code, 403)
+
+    def test_superuser_mode_selection_and_switch(self) -> None:
+        """Verifica que el superusuario pueda seleccionar y conmutar entre Gobernanza y Operativa."""
+        self.client.force_login(self.admin_user)
+
+        # GET a selector de modo
+        resp_get = self.client.get(reverse("dashboard:mode_selection"))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, "Gobernanza y Administración")
+        self.assertContains(resp_get, "Operativa Documental")
+
+        # Conmutar a modo Operativo vía POST
+        resp_post = self.client.post(reverse("dashboard:mode_selection"), {"mode": "operational"}, follow=True)
+        self.assertEqual(resp_post.status_code, 200)
+        self.assertEqual(self.client.session.get("dashboard_mode"), "operational")
+
+        # En modo operativo, el sidebar oculta secciones complejas de gobernanza global
+        self.assertNotContains(resp_post, "API Tokens (M2M)")
+        self.assertContains(resp_post, "Modo Operativa")
+
+        # Conmutar de vuelta a modo Gobernanza vía GET query param (?set=governance)
+        resp_switch = self.client.get(
+            reverse("dashboard:mode_selection") + "?set=governance",
+            follow=True,
+        )
+        self.assertEqual(resp_switch.status_code, 200)
+        self.assertEqual(self.client.session.get("dashboard_mode"), "governance")
+        self.assertContains(resp_switch, "API Tokens (M2M)")
+        self.assertContains(resp_switch, "Usuarios y Accesos")
+        self.assertContains(resp_switch, "Modo Gobernanza")
+
+    def test_regular_user_skips_mode_selection(self) -> None:
+        """Verifica que un usuario regular no tenga acceso al selector de modo (403)."""
+        self.client.force_login(self.operator_user)
+        resp = self.client.get(reverse("dashboard:mode_selection"))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_superuser_can_create_and_edit_any_uo(self) -> None:
+        """Verifica que el superusuario pueda crear y editar cualquier UO."""
+        self.client.force_login(self.admin_user)
+
+        # Crear nueva UO
+        create_data = {
+            "numeric_code": 2001,
+            "alias": "AUDITORIA",
+            "name": "Departamento de Auditoría Interna",
+            "email": "auditoria@arcamitte.local",
+            "description": "Inspección y control",
+            "is_active": True,
+        }
+        resp_create = self.client.post(reverse("dashboard:uo_create"), create_data, follow=True)
+        self.assertEqual(resp_create.status_code, 200)
+        self.assertTrue(OrganizationalUnit.objects.filter(alias="AUDITORIA").exists())
+
+        # Editar UO
+        uo_audit = OrganizationalUnit.objects.get(alias="AUDITORIA")
+        edit_data = {
+            "numeric_code": 2001,
+            "alias": "AUDITORIA",
+            "name": "Dirección General de Auditoría Interna",
+            "email": "auditoria_gral@arcamitte.local",
+            "description": "Actualizado por superadmin",
+            "is_active": True,
+        }
+        resp_edit = self.client.post(reverse("dashboard:uo_edit", kwargs={"uo_id": uo_audit.id}), edit_data, follow=True)
+        self.assertEqual(resp_edit.status_code, 200)
+        uo_audit.refresh_from_db()
+        self.assertEqual(uo_audit.name, "Dirección General de Auditoría Interna")
+
+    def test_uo_admin_can_edit_own_uo_but_not_others(self) -> None:
+        """Verifica que un Administrador de UO solo modifique su propia UO y no otras."""
+        # Crear usuario Admin de Legal
+        uo_admin = User.objects.create_user(
+            username="admin_legal",
+            email="admin_legal@arcamitte.local",
+            password="AdminPassword123!",
+        )
+        UserUOMembership.objects.create(
+            user=uo_admin,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.client.force_login(uo_admin)
+
+        # 1. Modificar su propia UO (Legal) -> Permitido
+        edit_own = {
+            "name": "Asesoría Jurídica y Regulatoria",
+            "email": "legal_mod@arcamitte.local",
+            "description": "Actualizado por admin UO",
+        }
+        resp_own = self.client.post(reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_legal.id}), edit_own, follow=True)
+        self.assertEqual(resp_own.status_code, 200)
+        self.uo_legal.refresh_from_db()
+        self.assertEqual(self.uo_legal.name, "Asesoría Jurídica y Regulatoria")
+
+        # 2. Intentar modificar otra UO (Seguridad) -> 403 Forbidden
+        resp_other = self.client.get(reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_security.id}))
+        self.assertEqual(resp_other.status_code, 403)
+
+    def test_uo_admin_can_manage_members_in_own_uo(self) -> None:
+        """Verifica que un Administrador de UO gestione miembros exclusivamente en su UO."""
+        uo_admin = User.objects.create_user(
+            username="admin_legal_2",
+            email="admin_legal_2@arcamitte.local",
+            password="AdminPassword123!",
+        )
+        UserUOMembership.objects.create(
+            user=uo_admin,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.ADMIN,
+            is_active=True,
+        )
+
+        new_user = User.objects.create_user(
+            username="nuevo_abogado",
+            email="abogado@arcamitte.local",
+            password="PassWord123!",
+        )
+
+        self.client.force_login(uo_admin)
+
+        # 1. Añadir miembro a UO Legal
+        resp_add = self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "add_member", "user_id": new_user.id, "role": UserUOMembership.Role.OPERATOR},
+            follow=True,
+        )
+        self.assertEqual(resp_add.status_code, 200)
+        m = UserUOMembership.objects.get(user=new_user, uo=self.uo_legal)
+        self.assertEqual(m.role, UserUOMembership.Role.OPERATOR)
+
+        # 2. Modificar rol a Auditor
+        self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "update_role", "membership_id": m.id, "role": UserUOMembership.Role.AUDITOR},
+            follow=True,
+        )
+        m.refresh_from_db()
+        self.assertEqual(m.role, UserUOMembership.Role.AUDITOR)
+
+        # 3. Desactivar membresía
+        self.client.post(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
+            {"action": "toggle_active", "membership_id": m.id},
+            follow=True,
+        )
+        m.refresh_from_db()
+        self.assertFalse(m.is_active)
+
+        # 4. Intentar gestionar miembros en otra UO (Seguridad) -> 403 Forbidden
+        resp_sec = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_security.id}))
+        self.assertEqual(resp_sec.status_code, 403)
+
+    def test_admin_reset_password_flow(self) -> None:
+        """Verifica que el reseteo administrativo genere una clave temporal y exija cambio en primer acceso."""
+        target_user = User.objects.create_user(
+            username="usuario_reset",
+            email="reset@arcamitte.local",
+            password="InitialPassword123!",
+        )
+
+        self.client.force_login(self.admin_user)
+
+        resp = self.client.post(
+            reverse("dashboard:user_reset_password", kwargs={"user_id": target_user.id}),
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # Verificar que el perfil tiene must_change_password activo
+        profile = get_or_create_user_profile(target_user)
+        profile.refresh_from_db()
+        self.assertTrue(profile.must_change_password)
+
+    def test_mandatory_password_change_middleware(self) -> None:
+        """Verifica que el middleware obligue a cambiar la contraseña a usuarios con clave temporal."""
+        temp_user = User.objects.create_user(
+            username="temp_user",
+            email="temp@arcamitte.local",
+            password="OldPassword123!",
+        )
+        profile = get_or_create_user_profile(temp_user)
+        profile.must_change_password = True
+        profile.save()
+
+        # Loguear con el usuario
+        self.client.force_login(temp_user)
+
+        # Intentar acceder a home -> Debe redirigir a cambiar-password
+        resp_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(resp_home.status_code, 302)
+        self.assertEqual(resp_home.url, reverse("dashboard:password_change"))
+
+        # Acceder a la pantalla de cambio de clave
+        resp_form = self.client.get(reverse("dashboard:password_change"))
+        self.assertEqual(resp_form.status_code, 200)
+        self.assertContains(resp_form, "Primer acceso detectado")
+
+        # Enviar actualización con contraseña válida
+        resp_change = self.client.post(
+            reverse("dashboard:password_change"),
+            {
+                "current_password": "OldPassword123!",
+                "new_password": "NewCompl3xP@ssw0rd!2026",
+                "confirm_password": "NewCompl3xP@ssw0rd!2026",
+            },
+            follow=True,
+        )
+        self.assertEqual(resp_change.status_code, 200)
+
+        # Verificar que must_change_password es ahora False y accede al dashboard
+        profile.refresh_from_db()
+        temp_user.refresh_from_db()
+        self.assertFalse(profile.must_change_password)
+        self.assertTrue(temp_user.check_password("NewCompl3xP@ssw0rd!2026"))
+
+    def test_forgot_password_self_service(self) -> None:
+        """Verifica el flujo público de autoservicio '¿Olvidó su contraseña?'."""
+        self.client.logout()
+
+        # 1. GET a la pantalla
+        resp_get = self.client.get(reverse("dashboard:password_reset_request"))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, "Restablecer Contraseña")
+
+        # 2. POST con email existente
+        resp_post = self.client.post(
+            reverse("dashboard:password_reset_request"),
+            {"identity": self.operator_user.email},
+            follow=True,
+        )
+        self.assertEqual(resp_post.status_code, 200)
+        profile = get_or_create_user_profile(self.operator_user)
+        profile.refresh_from_db()
+        self.assertTrue(profile.must_change_password)
+
+    def test_django_admin_links_completely_removed_from_ui(self) -> None:
+        """Verifica que ningún enlace a Django Admin (/admin/) exista en la interfaz de usuario."""
+        self.client.force_login(self.admin_user)
+
+        # Cargar home en modo gobernanza
+        resp_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(resp_home.status_code, 200)
+        self.assertNotContains(resp_home, "href=\"/admin/\"")
+        self.assertNotContains(resp_home, "href=\"/admin\"")
+        self.assertNotContains(resp_home, "Django Admin Clásico")
+        self.assertNotContains(resp_home, "Django Admin")
+
+        # Cargar pantalla de login
+        self.client.logout()
+        resp_login = self.client.get(reverse("dashboard:login"))
+        self.assertNotContains(resp_login, "/admin")
+
+    def test_dashboard_full_i18n_translation_english_and_spanish(self) -> None:
+        """Verifica que la interfaz se traduzca al 100% al cambiar a idioma inglés."""
+        self.client.force_login(self.admin_user)
+
+        # 1. Cambiar a inglés
+        self.client.get(reverse("arcamitte:set-language") + "?lang=en&next=" + reverse("dashboard:home"))
+
+        # 2. Cargar home en inglés
+        resp_home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(resp_home.status_code, 200)
+        self.assertContains(resp_home, "Cryptographic Dashboard")
+        self.assertContains(resp_home, "Encrypt Record")
+        self.assertContains(resp_home, "Forensic Traceability")
+        self.assertContains(resp_home, "Organizational Units")
+        self.assertContains(resp_home, "Users and Access")
+
+        # 3. Cargar selector de modo en inglés
+        resp_mode = self.client.get(reverse("dashboard:mode_selection"))
+        self.assertEqual(resp_mode.status_code, 200)
+        self.assertContains(resp_mode, "Entry Mode Selection")
+        self.assertContains(resp_mode, "Governance and Administration")
+        self.assertContains(resp_mode, "Document Operations")
+

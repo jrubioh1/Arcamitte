@@ -7,7 +7,7 @@ import os
 import re
 import secrets
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from cryptography.fernet import Fernet
 from django.conf import settings
@@ -27,6 +27,7 @@ from arcamitte.models import (
     OrganizationalUnit,
     UserUOMembership,
     default_document_expiry,
+    get_or_create_user_profile,
 )
 from arcamitte.validators import (
     normalize_and_validate_email_list,
@@ -46,7 +47,7 @@ TIMING_ATTACK_PBKDF2_ITERATIONS: int = int(
     getattr(settings, "ARCAMITTE_TIMING_PBKDF2_ITERATIONS", 20_000)
 )
 
-_EMAIL_EXECUTOR: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_EMAIL_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
 
 
 def get_email_executor() -> concurrent.futures.ThreadPoolExecutor:
@@ -65,7 +66,7 @@ def _send_mail_worker(
     subject: str,
     message: str,
     from_email: str,
-    recipient_list: List[str],
+    recipient_list: list[str],
     fail_silently: bool,
 ) -> None:
     try:
@@ -83,11 +84,11 @@ def _send_mail_worker(
 def dispatch_email(
     subject: str,
     message: str,
-    from_email: Optional[str] = None,
-    recipient_list: Optional[List[str]] = None,
+    from_email: str | None = None,
+    recipient_list: list[str] | None = None,
     fail_silently: bool = True,
-    sync: Optional[bool] = None,
-) -> Optional[concurrent.futures.Future]:
+    sync: bool | None = None,
+) -> concurrent.futures.Future | None:
     """
     Despacha el envío de correos de forma desacoplada y no bloqueante.
     Bajo alta concurrencia, utiliza un ThreadPoolExecutor acotado para no saturar
@@ -128,14 +129,14 @@ def dispatch_email(
         )
 
 
-def get_uo_recipient_emails(uo: Optional[OrganizationalUnit], include_members: bool = True) -> List[str]:
+def get_uo_recipient_emails(uo: OrganizationalUnit | None, include_members: bool = True) -> list[str]:
     """
     Obtiene la lista de correos destinatarios disponibles para una Unidad Organizativa:
     su buzón general oficial y opcionalmente los correos de sus miembros activos.
     """
     if not uo:
         return []
-    emails: List[str] = []
+    emails: list[str] = []
     if uo.email:
         clean_uo_email = uo.email.strip().lower()
         if clean_uo_email not in emails:
@@ -242,16 +243,16 @@ def get_server_fernet_key() -> bytes:
 def reactivate_document(
     document: EncryptedDocument,
     original_file: Any,
-    new_emails: Union[List[str], str, Any] = None,
-    burn_policy: Optional[str] = None,
-    new_description: Optional[str] = None,
-    origin_uo: Optional[OrganizationalUnit] = None,
-    target_uo: Optional[OrganizationalUnit] = None,
+    new_emails: list[str] | str | Any = None,
+    burn_policy: str | None = None,
+    new_description: str | None = None,
+    origin_uo: OrganizationalUnit | None = None,
+    target_uo: OrganizationalUnit | None = None,
     uploaded_by: Any = None,
     admin_user: Any = None,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    expires_at: Optional[Any] = None,
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+    expires_at: Any | None = None,
 ) -> EncryptedDocument:
     """
     Reactiva un documento existente (consumido o activo) re-cifrándolo con una nueva DEK,
@@ -338,10 +339,10 @@ def reactivate_document(
 def terminate_document_manually(
     document: EncryptedDocument,
     admin_user: Any,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
+    client_ip: str | None = None,
+    user_agent: str | None = None,
     reason: str = "",
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Finaliza deliberadamente el asiento de un documento en la pasarela segura.
     Garantiza la inmutabilidad del asiento y de los logs de auditoría:
@@ -388,8 +389,8 @@ def terminate_document_manually(
 
 def check_and_expire_document(
     document: EncryptedDocument,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
+    client_ip: str | None = None,
+    user_agent: str | None = None,
 ) -> bool:
     """
     Comprueba si un documento ha sobrepasado su plazo de caducidad (expires_at).
@@ -459,18 +460,18 @@ def process_expired_documents() -> int:
 
 def upload_and_encrypt_document(
     original_file: Any,
-    allowed_emails: Union[List[str], str, Any],
+    allowed_emails: list[str] | str | Any,
     burn_policy: str = EncryptedDocument.BurnPolicy.FIRST_ACCESS,
-    description: Optional[str] = None,
+    description: str | None = None,
     reopen_existing: bool = False,
-    origin_uo: Optional[OrganizationalUnit] = None,
-    target_uo: Optional[OrganizationalUnit] = None,
+    origin_uo: OrganizationalUnit | None = None,
+    target_uo: OrganizationalUnit | None = None,
     uploaded_by: Any = None,
     admin_user: Any = None,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    precalculated_hash: Optional[str] = None,
-    expires_at: Optional[Any] = None,
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+    precalculated_hash: str | None = None,
+    expires_at: Any | None = None,
 ) -> EncryptedDocument:
     """
     Servicio de registro y cifrado desatendido de documentos confidenciales.
@@ -571,10 +572,10 @@ def upload_and_encrypt_document(
 def request_document_access(
     file_hash: str,
     email: str,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> Tuple[bool, str]:
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+    base_url: str | None = None,
+) -> tuple[bool, str]:
     """
     Servicio de solicitud desatendida de acceso a documentos confidenciales.
     Mitigación de enumeración y timing attacks con PBKDF2 simulado.
@@ -767,7 +768,7 @@ def request_document_access(
     return True, GENERIC_ACCESS_MESSAGE
 
 
-def generate_corporate_email_text(document: EncryptedDocument, base_url: Optional[str] = None) -> str:
+def generate_corporate_email_text(document: EncryptedDocument, base_url: str | None = None) -> str:
     """
     Genera el texto formal para notificar al destinatario,
     incluyendo nombre del archivo, descripción, identificador SHA-256 e instrucciones de acceso.
@@ -805,9 +806,9 @@ def consume_document_with_otp(
     file_hash: str,
     email: str,
     entered_otp: str,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-) -> Tuple[bool, bytes, str, str]:
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[bool, bytes, str, str]:
     """
     Servicio de canje, descifrado en memoria y gestión de política destructiva por OTP.
     Aplica política BurnPolicy.FIRST_ACCESS o BurnPolicy.ALL_RECIPIENTS.
@@ -958,9 +959,9 @@ def consume_document_with_otp(
 def admin_decrypt_document(
     document: EncryptedDocument,
     admin_user: Any = None,
-    client_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-) -> Tuple[bool, bytes, str, str]:
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[bool, bytes, str, str]:
     """
     Descarga de auditoría administrativa preservada:
     Permite al personal de auditoría descargar una copia descifrada mientras el documento
@@ -986,9 +987,7 @@ def admin_decrypt_document(
             ).values_list("uo_id", flat=True)
         )
         is_authorized_uo = False
-        if document.origin_uo_id and document.origin_uo_id in user_uos:
-            is_authorized_uo = True
-        elif document.target_uo_id and document.target_uo_id in user_uos:
+        if document.origin_uo_id and document.origin_uo_id in user_uos or document.target_uo_id and document.target_uo_id in user_uos:
             is_authorized_uo = True
         elif not document.origin_uo_id and not document.target_uo_id:
             # Documento sin UO asignada (legado / staging)
@@ -1035,7 +1034,7 @@ def admin_decrypt_document(
         return False, b"", "", _("Error al descifrar el documento para auditoría.")
 
 
-ROLE_PERMISSIONS_MAP: Dict[str, List[str]] = {
+ROLE_PERMISSIONS_MAP: dict[str, list[str]] = {
     UserUOMembership.Role.OPERATOR: [
         "view_encrypteddocument",
         "add_encrypteddocument",
@@ -1066,7 +1065,7 @@ ROLE_PERMISSIONS_MAP: Dict[str, List[str]] = {
 }
 
 
-def sync_user_role_permissions(user: Any, role: Optional[str] = None) -> List[str]:
+def sync_user_role_permissions(user: Any, role: str | None = None) -> list[str]:
     """
     Sincroniza y asigna los permisos y grupos de Django nativos correspondientes
     a las membresías activas del usuario en Unidades Organizativas (OPERATOR, AUDITOR, ADMIN).
@@ -1119,7 +1118,7 @@ def sync_user_role_permissions(user: Any, role: Optional[str] = None) -> List[st
     return list(assigned_codenames)
 
 
-def process_batch_import_json(data: Any) -> Tuple[int, int, List[str]]:
+def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
     """
     Importa masivamente Unidades Organizativas y Usuarios desde un diccionario JSON estructurado.
     Formato esperado:
@@ -1281,6 +1280,122 @@ def process_batch_import_json(data: Any) -> Tuple[int, int, List[str]]:
     return uos_processed, users_processed, feedback_notes
 
 
+def generate_secure_temporary_password(length: int = 14) -> str:
+    """
+    Genera una contraseña temporal criptográficamente robusta utilizando secrets.
+    Garantiza la presencia de caracteres en mayúsculas, minúsculas, dígitos y símbolos.
+    """
+    import string
+
+    length = max(length, 10)
+
+    upper = string.ascii_uppercase
+    lower = string.ascii_lowercase
+    digits = string.digits
+    symbols = "!@#$%&*+-_="
+
+    pwd_chars = [
+        secrets.choice(upper),
+        secrets.choice(upper),
+        secrets.choice(lower),
+        secrets.choice(lower),
+        secrets.choice(digits),
+        secrets.choice(digits),
+        secrets.choice(symbols),
+        secrets.choice(symbols),
+    ]
+
+    all_chars = upper + lower + digits + symbols
+    for _idx in range(length - len(pwd_chars)):
+        pwd_chars.append(secrets.choice(all_chars))
+
+    secrets.SystemRandom().shuffle(pwd_chars)
+    return "".join(pwd_chars)
+
+
+def reset_user_password_and_notify(user: Any, requested_by: Any = None) -> tuple[bool, str]:
+    """
+    Restablece la contraseña de un usuario a una clave temporal generada aleatoriamente,
+    activa la exigencia de cambio en el primer acceso (must_change_password = True)
+    y remite la credencial temporal a la dirección de correo del usuario.
+    """
+    if not user or not getattr(user, "is_active", False):
+        return False, str(_("El usuario no existe o se encuentra inactivo."))
+
+    if not getattr(user, "email", None):
+        return False, str(_("El usuario no tiene una dirección de correo configurada."))
+
+    temp_password = generate_secure_temporary_password(length=14)
+    user.set_password(temp_password)
+    user.save(update_fields=["password"])
+
+    profile = get_or_create_user_profile(user)
+    profile.must_change_password = True
+    profile.save(update_fields=["must_change_password", "updated_at"])
+
+    subject = str(_("[Arcamitte] Credenciales de acceso temporal y cambio obligatorio"))
+    full_name = user.get_full_name() or user.username
+    message = (
+        f"Estimado/a {full_name},\n\n"
+        f"Se ha generado una clave de acceso temporal para su cuenta en la plataforma Arcamitte.\n\n"
+        f"DATOS DE ACCESO TEMPORAL:\n"
+        f"• Usuario: {user.username}\n"
+        f"• Contraseña temporal: {temp_password}\n\n"
+        f"INSTRUCCIONES DE SEGURIDAD:\n"
+        f"1. Inicie sesión en la plataforma utilizando estas credenciales temporales.\n"
+        f"2. El sistema le exigirá de forma obligatoria establecer una nueva contraseña personal y segura en su primer acceso.\n"
+        f"3. Esta clave temporal no debe ser compartida con terceros.\n\n"
+        f"Atentamente,\n"
+        f"Seguridad y Gobernanza de Acceso - Arcamitte"
+    )
+
+    dispatch_email(
+        subject=subject,
+        message=message,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+    req_info = getattr(requested_by, "username", "Autoservicio") if requested_by else "Autoservicio"
+    logger.info(
+        f"[ARCAMITTE SECURITY] Reseteo de contraseña ejecutado para usuario '{user.username}' por '{req_info}'."
+    )
+    return True, str(_("Se ha restablecido la contraseña y se ha remitido la clave temporal al correo del usuario."))
+
+
+def is_uo_admin(user: Any, uo: OrganizationalUnit) -> bool:
+    """
+    Verifica si el usuario dispone de privilegios de administración sobre la UO especificada.
+    Los superusuarios tienen privilegios sobre todas las UOs.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return UserUOMembership.objects.filter(
+        user=user,
+        uo=uo,
+        role=UserUOMembership.Role.ADMIN,
+        is_active=True,
+    ).exists()
+
+
+def get_user_administered_uos(user: Any) -> Any:
+    """
+    Retorna el conjunto de Unidades Organizativas donde el usuario tiene rol de Administrador.
+    Si es superusuario, retorna todas las UOs del sistema.
+    """
+    if not user or not user.is_authenticated:
+        return OrganizationalUnit.objects.none()
+    if user.is_superuser:
+        return OrganizationalUnit.objects.all().order_by("numeric_code")
+    return OrganizationalUnit.objects.filter(
+        memberships__user=user,
+        memberships__role=UserUOMembership.Role.ADMIN,
+        memberships__is_active=True,
+    ).order_by("numeric_code").distinct()
+
+
 class DocumentManagementService:
     """
     Clase de servicio unificada para operaciones sobre documentos confidenciales.
@@ -1289,16 +1404,16 @@ class DocumentManagementService:
     def upload_and_encrypt_document(
         self,
         original_file: Any,
-        allowed_emails: Union[List[str], str, Any],
+        allowed_emails: list[str] | str | Any,
         burn_policy: str = EncryptedDocument.BurnPolicy.FIRST_ACCESS,
-        description: Optional[str] = None,
+        description: str | None = None,
         reopen_existing: bool = False,
-        origin_uo: Optional[OrganizationalUnit] = None,
-        target_uo: Optional[OrganizationalUnit] = None,
+        origin_uo: OrganizationalUnit | None = None,
+        target_uo: OrganizationalUnit | None = None,
         uploaded_by: Any = None,
         admin_user: Any = None,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
         **kwargs: Any,
     ) -> EncryptedDocument:
         return upload_and_encrypt_document(
@@ -1319,15 +1434,15 @@ class DocumentManagementService:
         self,
         document: EncryptedDocument,
         original_file: Any,
-        new_emails: Union[List[str], str, Any] = None,
-        burn_policy: Optional[str] = None,
-        new_description: Optional[str] = None,
-        origin_uo: Optional[OrganizationalUnit] = None,
-        target_uo: Optional[OrganizationalUnit] = None,
+        new_emails: list[str] | str | Any = None,
+        burn_policy: str | None = None,
+        new_description: str | None = None,
+        origin_uo: OrganizationalUnit | None = None,
+        target_uo: OrganizationalUnit | None = None,
         uploaded_by: Any = None,
         admin_user: Any = None,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
     ) -> EncryptedDocument:
         return reactivate_document(
             document=document,
@@ -1346,7 +1461,7 @@ class DocumentManagementService:
     def generate_corporate_email_text(
         self,
         document: EncryptedDocument,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
     ) -> str:
         return generate_corporate_email_text(document=document, base_url=base_url)
 
@@ -1354,11 +1469,11 @@ class DocumentManagementService:
         self,
         file_hash: str,
         email: str,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        base_url: Optional[str] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
+        base_url: str | None = None,
         **kwargs: Any,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         return request_document_access(
             file_hash=file_hash,
             email=email,
@@ -1372,9 +1487,9 @@ class DocumentManagementService:
         file_hash: str,
         email: str,
         entered_otp: str,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, bytes, str, str]:
+        client_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, bytes, str, str]:
         return consume_document_with_otp(
             file_hash=file_hash,
             email=email,
@@ -1387,9 +1502,9 @@ class DocumentManagementService:
         self,
         document: EncryptedDocument,
         admin_user: Any = None,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, bytes, str, str]:
+        client_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, bytes, str, str]:
         return admin_decrypt_document(
             document=document,
             admin_user=admin_user,
@@ -1401,10 +1516,10 @@ class DocumentManagementService:
         self,
         document: EncryptedDocument,
         admin_user: Any,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
         reason: str = "",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         return terminate_document_manually(
             document=document,
             admin_user=admin_user,
@@ -1416,8 +1531,8 @@ class DocumentManagementService:
     def check_and_expire_document(
         self,
         document: EncryptedDocument,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
     ) -> bool:
         return check_and_expire_document(
             document=document,

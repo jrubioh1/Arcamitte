@@ -4,18 +4,17 @@ import datetime
 import json
 import logging
 import os
-from typing import Any, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from django import forms
 from django.contrib import messages
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth import views as auth_views
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.paginator import Paginator
 from django.db import models
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -24,6 +23,12 @@ from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import ListView, TemplateView
 
+from arcamitte.forms import (
+    OrganizationalUnitForm,
+    PasswordChangeCustomForm,
+    PasswordResetRequestForm,
+    UserManagementForm,
+)
 from arcamitte.models import (
     APIToken,
     DocumentAccessLog,
@@ -31,13 +36,23 @@ from arcamitte.models import (
     OrganizationalUnit,
     UserUOMembership,
     default_document_expiry,
+    get_or_create_user_profile,
 )
 from arcamitte.services import (
+    get_user_administered_uos,
+    is_uo_admin,
+    reset_user_password_and_notify,
     terminate_document_manually,
     upload_and_encrypt_document,
 )
+
+User = get_user_model()
+
 from arcamitte.utils import get_client_ip
-from arcamitte.validators import normalize_and_validate_email_list, validate_document_file
+from arcamitte.validators import (
+    normalize_and_validate_email_list,
+    validate_document_file,
+)
 
 
 def get_user_accessible_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
@@ -81,7 +96,46 @@ class DashboardLoginView(auth_views.LoginView):
     redirect_authenticated_user = True
 
     def get_success_url(self) -> str:
+        if self.request.user.is_superuser:
+            return reverse_lazy("dashboard:mode_selection")
         return reverse_lazy("dashboard:home")
+
+
+class DashboardModeSelectionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Selector de modo de trabajo exclusivo para superusuarios (Mode Gateway).
+    Permite alternar entre el Modo Gobernanza Global y el Modo Operativa Documental.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/mode_selection.html"
+
+    def test_func(self) -> bool:
+        return self.request.user.is_superuser
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        set_mode = request.GET.get("set")
+        if set_mode in ["governance", "operational"]:
+            request.session["dashboard_mode"] = set_mode
+            next_url = request.GET.get("next") or reverse("dashboard:home")
+            return redirect(next_url)
+
+        current_mode = request.session.get("dashboard_mode", "governance")
+        return render(
+            request,
+            self.template_name,
+            {
+                "current_mode": current_mode,
+                "active_nav": "mode_selection",
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        mode = request.POST.get("mode", "governance")
+        if mode not in ["governance", "operational"]:
+            mode = "governance"
+        request.session["dashboard_mode"] = mode
+        return redirect("dashboard:home")
 
 
 class DashboardLogoutView(auth_views.LogoutView):
@@ -208,7 +262,7 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
         user = request.user
         available_uos = get_user_accessible_uos(user)
         all_uos = OrganizationalUnit.objects.filter(is_active=True).order_by("name")
-        errors: List[str] = []
+        errors: list[str] = []
 
         file_obj = request.FILES.get("original_file")
         if not file_obj:
@@ -220,7 +274,7 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                 errors.extend(ve.messages)
 
         origin_uo_id = request.POST.get("origin_uo", "").strip()
-        origin_uo: Optional[OrganizationalUnit] = None
+        origin_uo: OrganizationalUnit | None = None
         if origin_uo_id:
             if user.is_superuser:
                 origin_uo = all_uos.filter(id=origin_uo_id).first()
@@ -232,19 +286,19 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                     errors.append(_("No tiene autorización operativa sobre la UO emisora seleccionada."))
 
         target_uo_id = request.POST.get("target_uo", "").strip()
-        target_uo: Optional[OrganizationalUnit] = None
+        target_uo: OrganizationalUnit | None = None
         if target_uo_id:
             target_uo = all_uos.filter(id=target_uo_id).first()
 
         raw_emails_list = request.POST.getlist("allowed_emails")
-        split_emails: List[str] = []
+        split_emails: list[str] = []
         for item in raw_emails_list:
             for e in item.replace("\n", ",").replace(";", ",").split(","):
                 cleaned = e.strip()
                 if cleaned:
                     split_emails.append(cleaned)
 
-        validated_emails: List[str] = []
+        validated_emails: list[str] = []
         if not split_emails:
             errors.append(_("Debe especificar al menos una dirección de correo para el canje."))
         else:
@@ -258,7 +312,7 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
             burn_policy = EncryptedDocument.BurnPolicy.FIRST_ACCESS
 
         raw_expires = request.POST.get("expires_at", "").strip()
-        expires_at: Optional[datetime.datetime] = None
+        expires_at: datetime.datetime | None = None
         if raw_expires:
             parsed = parse_datetime(raw_expires)
             if not parsed:
@@ -515,6 +569,10 @@ class DashboardUOListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["active_nav"] = "uos"
+        context["administered_uo_ids"] = set(
+            get_user_administered_uos(self.request.user).values_list("id", flat=True)
+        )
+        context["is_superuser"] = self.request.user.is_superuser
         return context
 
 
@@ -659,4 +717,475 @@ class DashboardUOMembersAjaxView(LoginRequiredMixin, View):
                 "members": members_list,
             }
         )
+
+
+class DashboardUOCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Creación de una nueva Unidad Organizativa (restringido a superusuarios).
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/uo_form.html"
+
+    def test_func(self) -> bool:
+        return self.request.user.is_superuser
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        form = OrganizationalUnitForm(is_superuser=True)
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "is_new": True, "active_nav": "uos"},
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        form = OrganizationalUnitForm(request.POST, is_superuser=True)
+        if form.is_valid():
+            uo = form.save()
+            messages.success(
+                request,
+                _("Unidad Organizativa %(alias)s creada exitosamente.") % {"alias": uo.alias},
+            )
+            return redirect("dashboard:uo_list")
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "is_new": True, "active_nav": "uos"},
+        )
+
+
+class DashboardUOEditView(LoginRequiredMixin, View):
+    """
+    Edición de una Unidad Organizativa existente.
+    Permitido para superusuarios (todos los campos) y Administradores de la propia UO (campos descriptivos).
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/uo_form.html"
+
+    def get_uo(self, request: HttpRequest, uo_id: int) -> OrganizationalUnit:
+        uo = get_object_or_404(OrganizationalUnit, pk=uo_id)
+        if not is_uo_admin(request.user, uo):
+            raise PermissionDenied(_("No tiene privilegios para administrar esta Unidad Organizativa."))
+        return uo
+
+    def get(self, request: HttpRequest, uo_id: int) -> HttpResponse:
+        uo = self.get_uo(request, uo_id)
+        form = OrganizationalUnitForm(instance=uo, is_superuser=request.user.is_superuser)
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "uo": uo, "is_new": False, "active_nav": "uos"},
+        )
+
+    def post(self, request: HttpRequest, uo_id: int) -> HttpResponse:
+        uo = self.get_uo(request, uo_id)
+        form = OrganizationalUnitForm(
+            request.POST,
+            instance=uo,
+            is_superuser=request.user.is_superuser,
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                _("Unidad Organizativa %(alias)s actualizada exitosamente.") % {"alias": uo.alias},
+            )
+            return redirect("dashboard:uo_list")
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "uo": uo, "is_new": False, "active_nav": "uos"},
+        )
+
+
+class DashboardUOMembersView(LoginRequiredMixin, View):
+    """
+    Administración de personal y roles de una Unidad Organizativa.
+    Permite incorporar miembros, cambiar roles, activar/desactivar y desvincular.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/uo_members.html"
+
+    def get_uo(self, request: HttpRequest, uo_id: int) -> OrganizationalUnit:
+        uo = get_object_or_404(OrganizationalUnit, pk=uo_id)
+        if not is_uo_admin(request.user, uo):
+            raise PermissionDenied(_("No tiene privilegios para administrar miembros en esta Unidad Organizativa."))
+        return uo
+
+    def get(self, request: HttpRequest, uo_id: int) -> HttpResponse:
+        uo = self.get_uo(request, uo_id)
+        memberships = (
+            UserUOMembership.objects.filter(uo=uo)
+            .select_related("user")
+            .order_by("user__username")
+        )
+        current_user_ids = memberships.values_list("user_id", flat=True)
+        available_users = (
+            User.objects.exclude(id__in=current_user_ids)
+            .filter(is_active=True)
+            .order_by("username")
+        )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "uo": uo,
+                "memberships": memberships,
+                "available_users": available_users,
+                "roles": UserUOMembership.Role.choices,
+                "active_nav": "uos",
+            },
+        )
+
+    def post(self, request: HttpRequest, uo_id: int) -> HttpResponse:
+        uo = self.get_uo(request, uo_id)
+        action = request.POST.get("action")
+
+        if action == "add_member":
+            user_id = request.POST.get("user_id")
+            role = request.POST.get("role", UserUOMembership.Role.OPERATOR)
+            target_user = get_object_or_404(User, pk=user_id)
+            membership, created = UserUOMembership.objects.get_or_create(
+                user=target_user,
+                uo=uo,
+                defaults={"role": role, "is_active": True},
+            )
+            if not created:
+                membership.role = role
+                membership.is_active = True
+                membership.save(update_fields=["role", "is_active"])
+            messages.success(
+                request,
+                _("Usuario %(username)s asignado a %(alias)s.") % {"username": target_user.username, "alias": uo.alias},
+            )
+
+        elif action == "update_role":
+            membership_id = request.POST.get("membership_id")
+            new_role = request.POST.get("role")
+            membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+            if new_role in dict(UserUOMembership.Role.choices):
+                membership.role = new_role
+                membership.save(update_fields=["role"])
+                messages.success(
+                    request,
+                    _("Rol de %(username)s actualizado a %(role)s.") % {
+                        "username": membership.user.username,
+                        "role": membership.get_role_display(),
+                    },
+                )
+
+        elif action == "toggle_active":
+            membership_id = request.POST.get("membership_id")
+            membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+            membership.is_active = not membership.is_active
+            membership.save(update_fields=["is_active"])
+            state_str = _("activada") if membership.is_active else _("desactivada")
+            messages.info(
+                request,
+                _("Membresía de %(username)s %(state)s.") % {
+                    "username": membership.user.username,
+                    "state": state_str,
+                },
+            )
+
+        elif action == "remove_member":
+            membership_id = request.POST.get("membership_id")
+            membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
+            username = membership.user.username
+            membership.delete()
+            messages.warning(
+                request,
+                _("Usuario %(username)s retirado de %(alias)s.") % {"username": username, "alias": uo.alias},
+            )
+
+        return redirect("dashboard:uo_members", uo_id=uo.id)
+
+
+class DashboardUserListView(LoginRequiredMixin, View):
+    """
+    Listado y gestión de usuarios.
+    Superusuarios: visión y gestión global de todos los usuarios.
+    Administradores de UO: gestión de los usuarios que forman parte de sus UOs.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/user_list.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if request.user.is_superuser:
+            users = User.objects.all().prefetch_related("uo_memberships__uo").order_by("username")
+            can_create_user = True
+        else:
+            admin_uos = get_user_administered_uos(request.user)
+            if not admin_uos.exists():
+                raise PermissionDenied(_("No tiene permisos para administrar usuarios ni Unidades Organizativas."))
+            users = (
+                User.objects.filter(uo_memberships__uo__in=admin_uos)
+                .distinct()
+                .prefetch_related("uo_memberships__uo")
+                .order_by("username")
+            )
+            can_create_user = True
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "users": users,
+                "can_create_user": can_create_user,
+                "active_nav": "users",
+            },
+        )
+
+
+class DashboardUserCreateView(LoginRequiredMixin, View):
+    """
+    Alta de un nuevo usuario en la plataforma.
+    Genera automáticamente una contraseña temporal robusta y la remite por email.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/user_form.html"
+
+    def get_admin_uos(self, request: HttpRequest) -> Any:
+        if request.user.is_superuser:
+            return OrganizationalUnit.objects.all().order_by("numeric_code")
+        return get_user_administered_uos(request.user)
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        admin_uos = self.get_admin_uos(request)
+        if not request.user.is_superuser and not admin_uos.exists():
+            raise PermissionDenied(_("No tiene permisos para crear usuarios."))
+
+        form = UserManagementForm(is_superuser=request.user.is_superuser)
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "is_new": True,
+                "admin_uos": admin_uos,
+                "roles": UserUOMembership.Role.choices,
+                "active_nav": "users",
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        admin_uos = self.get_admin_uos(request)
+        if not request.user.is_superuser and not admin_uos.exists():
+            raise PermissionDenied(_("No tiene permisos para crear usuarios."))
+
+        form = UserManagementForm(request.POST, is_superuser=request.user.is_superuser)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.set_unusable_password()
+            user.save()
+
+            uo_id = request.POST.get("initial_uo")
+            initial_role = request.POST.get("initial_role", UserUOMembership.Role.OPERATOR)
+            if uo_id:
+                try:
+                    uo = admin_uos.get(pk=uo_id)
+                    UserUOMembership.objects.create(
+                        user=user,
+                        uo=uo,
+                        role=initial_role,
+                        is_active=True,
+                    )
+                except OrganizationalUnit.DoesNotExist:
+                    pass
+
+            if user.email:
+                reset_user_password_and_notify(user, requested_by=request.user)
+                messages.success(
+                    request,
+                    _("Usuario %(username)s creado exitosamente. Se ha remitido una contraseña temporal a su correo.")
+                    % {"username": user.username},
+                )
+            else:
+                messages.warning(
+                    request,
+                    _("Usuario %(username)s creado sin correo electrónico. Deberá asignarle uno para remitirle la contraseña.")
+                    % {"username": user.username},
+                )
+
+            return redirect("dashboard:user_list")
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "is_new": True,
+                "admin_uos": admin_uos,
+                "roles": UserUOMembership.Role.choices,
+                "active_nav": "users",
+            },
+        )
+
+
+class DashboardUserEditView(LoginRequiredMixin, View):
+    """
+    Edición de los datos de un usuario existente.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/user_form.html"
+
+    def get_target_user(self, request: HttpRequest, user_id: int) -> User:
+        target = get_object_or_404(User, pk=user_id)
+        if request.user.is_superuser:
+            return target
+        admin_uos = get_user_administered_uos(request.user)
+        if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
+            raise PermissionDenied(_("No tiene permisos para administrar a este usuario."))
+        return target
+
+    def get(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        target = self.get_target_user(request, user_id)
+        form = UserManagementForm(instance=target, is_superuser=request.user.is_superuser)
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "target_user": target,
+                "is_new": False,
+                "active_nav": "users",
+            },
+        )
+
+    def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        target = self.get_target_user(request, user_id)
+        form = UserManagementForm(
+            request.POST,
+            instance=target,
+            is_superuser=request.user.is_superuser,
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                _("Usuario %(username)s actualizado exitosamente.") % {"username": target.username},
+            )
+            return redirect("dashboard:user_list")
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "target_user": target,
+                "is_new": False,
+                "active_nav": "users",
+            },
+        )
+
+
+class DashboardUserResetPasswordView(LoginRequiredMixin, View):
+    """
+    Acción administrativa para resetear la contraseña de un usuario, generando una clave
+    temporal aleatoria y forzando el cambio en el próximo acceso.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        target = get_object_or_404(User, pk=user_id)
+        if not request.user.is_superuser:
+            admin_uos = get_user_administered_uos(request.user)
+            if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
+                raise PermissionDenied(_("No tiene permisos para resetear la contraseña de este usuario."))
+
+        ok, msg = reset_user_password_and_notify(target, requested_by=request.user)
+        if ok:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
+
+        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("dashboard:user_list")
+        return redirect(next_url)
+
+
+class DashboardPasswordResetRequestView(View):
+    """
+    Autoservicio público «¿Olvidó su contraseña?».
+    Genera clave temporal y la envía al buzón registrado, forzando cambio en primer acceso.
+    """
+
+    template_name = "arcamitte/password_reset_request.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        form = PasswordResetRequestForm()
+        return render(request, self.template_name, {"form": form})
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            identity = form.cleaned_data["identity"]
+            user = User.objects.filter(
+                models.Q(username__iexact=identity) | models.Q(email__iexact=identity)
+            ).first()
+            if user and user.email and user.is_active:
+                reset_user_password_and_notify(user, requested_by=None)
+
+            messages.success(
+                request,
+                _("Si la cuenta indicada existe y dispone de un correo configurado, se ha enviado una clave temporal con instrucciones."),
+            )
+            return redirect("dashboard:login")
+
+        return render(request, self.template_name, {"form": form})
+
+
+class DashboardPasswordChangeView(LoginRequiredMixin, View):
+    """
+    Formulario de actualización de contraseña.
+    Obligatorio para cuentas con must_change_password=True y accesible voluntariamente.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/password_change.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        form = PasswordChangeCustomForm(user=request.user)
+        profile = getattr(request.user, "arcamitte_profile", None)
+        is_mandatory = profile.must_change_password if profile else False
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "is_mandatory": is_mandatory,
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        form = PasswordChangeCustomForm(request.user, request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data["new_password"]
+            request.user.set_password(new_password)
+            request.user.save(update_fields=["password"])
+
+            profile = get_or_create_user_profile(request.user)
+            profile.must_change_password = False
+            profile.save(update_fields=["must_change_password", "updated_at"])
+
+            update_session_auth_hash(request, request.user)
+            messages.success(request, _("Su contraseña ha sido actualizada con éxito."))
+            return redirect("dashboard:home")
+
+        profile = getattr(request.user, "arcamitte_profile", None)
+        is_mandatory = profile.must_change_password if profile else False
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "is_mandatory": is_mandatory,
+            },
+        )
+
 

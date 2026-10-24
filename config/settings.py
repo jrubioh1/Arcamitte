@@ -78,6 +78,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "arcamitte.middleware.RequirePasswordChangeMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -94,6 +95,7 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "arcamitte.context_processors.arcamitte_dashboard_context",
             ],
         },
     },

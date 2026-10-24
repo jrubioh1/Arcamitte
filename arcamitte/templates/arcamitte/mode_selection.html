@@ -1,0 +1,154 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'es' }}">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>{% trans "Selección de Modo de Trabajo" %} | Arcamitte</title>
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="shortcut icon" href="{% static 'arcamitte/img/logo.jpg' %}" />
+
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
+	<style>
+		.arca-mode-card {
+			transition: transform 0.2s ease, box-shadow 0.2s ease;
+			cursor: pointer;
+			border: 2px solid transparent;
+		}
+		.arca-mode-card:hover {
+			transform: translateY(-4px);
+			box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+		}
+		.arca-mode-card.selected {
+			border-color: #2b6cb0;
+		}
+	</style>
+</head>
+
+<body class="bg-light">
+	<main class="d-flex w-100 min-vh-100 align-items-center justify-content-center py-5">
+		<div class="container" style="max-width: 900px;">
+
+			<!-- Barra superior: Idioma y Cerrar sesión -->
+			<div class="d-flex justify-content-between align-items-center mb-4">
+				<div class="d-flex align-items-center gap-2">
+					<img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte Logo" class="rounded shadow-sm" style="width: 38px; height: 38px; object-fit: cover;">
+					<span class="fw-bold fs-5 text-dark">Arcamitte</span>
+					<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-2">{% trans "Superadministrador" %}</span>
+				</div>
+				<div class="d-flex align-items-center gap-3">
+					<div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Idioma' %}">
+						<a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
+						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold">
+							ES
+						</a>
+						<a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
+						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold">
+							EN
+						</a>
+					</div>
+					<form action="{% url 'dashboard:logout' %}" method="post" class="d-inline">
+						{% csrf_token %}
+						<button type="submit" class="btn btn-sm btn-outline-danger">
+							<i data-feather="log-out" style="width:14px;height:14px;" class="me-1"></i> {% trans "Cerrar sesión" %}
+						</button>
+					</form>
+				</div>
+			</div>
+
+			<div class="text-center mb-5">
+				<h1 class="h3 fw-bold text-dark mb-2">{% trans "¿Cómo desea ingresar a la plataforma?" %}</h1>
+				<p class="text-muted" style="max-width: 580px; margin: 0 auto;">
+					{% trans "Seleccione el entorno adaptado a la tarea que va a desempeñar. Podrá conmutar de modo en cualquier momento desde el menú superior." %}
+				</p>
+			</div>
+
+			<div class="row g-4 justify-content-center">
+				<!-- Tarjeta 1: Modo Gobernanza Global -->
+				<div class="col-md-6">
+					<div class="card h-100 shadow-sm border-0 arca-mode-card {% if current_mode == 'governance' %}selected{% endif %}">
+						<div class="card-body p-4 d-flex flex-column">
+							<div class="d-flex align-items-center gap-3 mb-3">
+								<div class="rounded-3 bg-danger-subtle text-danger p-3 d-inline-flex align-items-center justify-content-center">
+									<i data-feather="shield" style="width: 28px; height: 28px;"></i>
+								</div>
+								<div>
+									<h2 class="h5 fw-bold mb-1">{% trans "Gobernanza y Administración" %}</h2>
+									<span class="badge bg-secondary-subtle text-secondary">{% trans "Control Global" %}</span>
+								</div>
+							</div>
+
+							<p class="text-muted small mb-4 flex-grow-1">
+								{% trans "Entorno integral para la supervisión global del sistema: gestión de Unidades Organizativas, administración de usuarios y permisos, auditoría forense de accesos y configuración de Tokens API M2M." %}
+							</p>
+
+							<form method="post" action="{% url 'dashboard:mode_selection' %}">
+								{% csrf_token %}
+								<input type="hidden" name="mode" value="governance">
+								<button type="submit" class="btn btn-outline-danger w-100 fw-semibold d-flex align-items-center justify-content-center gap-2">
+									<span>{% trans "Ingresar en Modo Gobernanza" %}</span>
+									<i data-feather="arrow-right" style="width:16px;height:16px;"></i>
+								</button>
+							</form>
+						</div>
+					</div>
+				</div>
+
+				<!-- Tarjeta 2: Modo Operativa Documental -->
+				<div class="col-md-6">
+					<div class="card h-100 shadow-sm border-0 arca-mode-card {% if current_mode == 'operational' %}selected{% endif %}">
+						<div class="card-body p-4 d-flex flex-column">
+							<div class="d-flex align-items-center gap-3 mb-3">
+								<div class="rounded-3 bg-primary-subtle text-primary p-3 d-inline-flex align-items-center justify-content-center">
+									<i data-feather="file-text" style="width: 28px; height: 28px;"></i>
+								</div>
+								<div>
+									<h2 class="h5 fw-bold mb-1">{% trans "Operativa Documental" %}</h2>
+									<span class="badge bg-success-subtle text-success">{% trans "Enfoque Simplificado" %}</span>
+								</div>
+							</div>
+
+							<p class="text-muted small mb-4 flex-grow-1">
+								{% trans "Interfaz ágil y sin distracciones diseñada para la operativa diaria: cifrado y depósito de nuevos asientos confidenciales, consulta de documentos bajo custodia y supervisión de trámites departamentales." %}
+							</p>
+
+							<form method="post" action="{% url 'dashboard:mode_selection' %}">
+								{% csrf_token %}
+								<input type="hidden" name="mode" value="operational">
+								<button type="submit" class="btn btn-primary w-100 fw-semibold d-flex align-items-center justify-content-center gap-2">
+									<span>{% trans "Ingresar en Modo Operativa" %}</span>
+									<i data-feather="arrow-right" style="width:16px;height:16px;"></i>
+								</button>
+							</form>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="text-center mt-5">
+				<span class="text-muted small">
+					<i data-feather="info" style="width:14px;height:14px;" class="me-1"></i>
+					{% trans "Podrá alternar entre estos dos modos en todo momento desde la barra superior de navegación." %}
+				</span>
+			</div>
+
+		</div>
+	</main>
+
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+	<script>
+		document.addEventListener("DOMContentLoaded", function () {
+			if (typeof feather !== "undefined") {
+				feather.replace();
+			}
+		});
+	</script>
+</body>
+</html>

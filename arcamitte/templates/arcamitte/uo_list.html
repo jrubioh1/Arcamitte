@@ -4,14 +4,22 @@
 {% block title %}{% trans "Unidades Organizativas" %}{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-	<h1 class="h3 fw-bold mb-1">{% trans "Malla de Unidades Organizativas" %}</h1>
-	<p class="text-muted small mb-0">
-		{% trans "Estructura departamental para la custodia y derivación de documentos confidenciales." %}
-	</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Malla de Unidades Organizativas" %}</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Estructura departamental para la custodia y derivación de documentos confidenciales." %}
+		</p>
+	</div>
+	{% if is_superuser %}
+		<a href="{% url 'dashboard:uo_create' %}" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="plus" style="width:16px;height:16px;"></i>
+			<span>{% trans "Nueva Unidad Organizativa" %}</span>
+		</a>
+	{% endif %}
 </div>
 
-<div class="card">
+<div class="card shadow-sm border-0">
 	<div class="table-responsive">
 		<table class="table table-hover align-middle mb-0">
 			<thead>
@@ -22,6 +30,7 @@
 					<th>{% trans "Buzón Institucional" %}</th>
 					<th>{% trans "Miembros Asignados" %}</th>
 					<th>{% trans "Estado" %}</th>
+					<th class="text-end">{% trans "Acciones" %}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -58,10 +67,26 @@
 								<span class="badge bg-secondary">{% trans "Inactiva" %}</span>
 							{% endif %}
 						</td>
+						<td class="text-end">
+							{% if is_superuser or uo.id in administered_uo_ids %}
+								<div class="btn-group btn-group-sm" role="group">
+									<a href="{% url 'dashboard:uo_edit' uo.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar UO' %}">
+										<i data-feather="edit" style="width:14px;height:14px;"></i>
+										<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
+									</a>
+									<a href="{% url 'dashboard:uo_members' uo.id %}" class="btn btn-outline-primary" title="{% trans 'Gestionar personal y roles' %}">
+										<i data-feather="users" style="width:14px;height:14px;"></i>
+										<span class="d-none d-md-inline ms-1">{% trans "Miembros" %}</span>
+									</a>
+								</div>
+							{% else %}
+								<span class="text-muted small">{% trans "Consulta" %}</span>
+							{% endif %}
+						</td>
 					</tr>
 				{% empty %}
 					<tr>
-						<td colspan="6" class="text-center py-5 text-muted">
+						<td colspan="7" class="text-center py-5 text-muted">
 							<i data-feather="inbox" style="width: 36px; height: 36px;" class="mb-2"></i>
 							<h5>{% trans "No hay Unidades Organizativas registradas" %}</h5>
 						</td>

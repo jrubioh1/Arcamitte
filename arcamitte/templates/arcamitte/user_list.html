@@ -1,0 +1,116 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Gestión de Usuarios y Accesos" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Directorio de Usuarios y Accesos" %}</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Control de cuentas de acceso, membresías departamentales y directivas de autenticación." %}
+		</p>
+	</div>
+	{% if can_create_user %}
+		<a href="{% url 'dashboard:user_create' %}" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="user-plus" style="width:16px;height:16px;"></i>
+			<span>{% trans "Nuevo Usuario" %}</span>
+		</a>
+	{% endif %}
+</div>
+
+<div class="card shadow-sm border-0">
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>{% trans "Usuario" %}</th>
+					<th>{% trans "Nombre Completo" %}</th>
+					<th>{% trans "Correo Electrónico" %}</th>
+					<th>{% trans "Unidades Organizativas (Roles)" %}</th>
+					<th>{% trans "Tipo de Cuenta" %}</th>
+					<th>{% trans "Estado" %}</th>
+					<th class="text-end">{% trans "Acciones" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for u in users %}
+					<tr>
+						<td>
+							<strong class="font-mono text-dark">{{ u.username }}</strong>
+							{% if u.arcamitte_profile.must_change_password %}
+								<span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1" style="font-size: 0.65rem;" title="{% trans 'Debe cambiar su contraseña en el próximo acceso' %}">
+									{% trans "Clave temporal" %}
+								</span>
+							{% endif %}
+						</td>
+						<td>
+							{{ u.get_full_name|default:"-" }}
+						</td>
+						<td class="small">
+							{% if u.email %}
+								<a href="mailto:{{ u.email }}" class="text-muted text-decoration-none">
+									{{ u.email }}
+								</a>
+							{% else %}
+								<span class="text-muted italic">{% trans "Sin correo" %}</span>
+							{% endif %}
+						</td>
+						<td>
+							{% for m in u.uo_memberships.all %}
+								{% if m.is_active %}
+									<span class="badge bg-light text-dark border font-mono me-1" title="{{ m.uo.name }}">
+										{{ m.uo.alias }} <span class="text-muted">({{ m.get_role_display }})</span>
+									</span>
+								{% endif %}
+							{% empty %}
+								<span class="badge bg-secondary-subtle text-secondary small">{% trans "Sin UO asignada" %}</span>
+							{% endfor %}
+						</td>
+						<td>
+							{% if u.is_superuser %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superadmin" %}</span>
+							{% elif u.is_staff %}
+								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal Staff" %}</span>
+							{% else %}
+								<span class="badge bg-light text-secondary border">{% trans "Usuario Estándar" %}</span>
+							{% endif %}
+						</td>
+						<td>
+							{% if u.is_active %}
+								<span class="badge bg-success">{% trans "Activo" %}</span>
+							{% else %}
+								<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
+							{% endif %}
+						</td>
+						<td class="text-end">
+							<div class="btn-group btn-group-sm" role="group">
+								<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar cuenta' %}">
+									<i data-feather="edit-2" style="width:14px;height:14px;"></i>
+									<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
+								</a>
+
+								<form method="post" action="{% url 'dashboard:user_reset_password' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una nueva clave temporal y enviarla al correo de este usuario?' %}');">
+									{% csrf_token %}
+									<input type="hidden" name="next" value="{{ request.get_full_path }}">
+									<button type="submit" class="btn btn-outline-warning" title="{% trans 'Resetear y enviar clave temporal' %}">
+										<i data-feather="key" style="width:14px;height:14px;"></i>
+										<span class="d-none d-md-inline ms-1">{% trans "Reset" %}</span>
+									</button>
+								</form>
+							</div>
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="7" class="text-center py-5 text-muted">
+							<i data-feather="users" style="width: 36px; height: 36px;" class="mb-2"></i>
+							<h5>{% trans "No se encontraron usuarios administrables." %}</h5>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}

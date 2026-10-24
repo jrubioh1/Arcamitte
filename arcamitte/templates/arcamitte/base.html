@@ -1,6 +1,6 @@
 {% load static i18n %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ LANGUAGE_CODE|default:'es' }}">
 
 <head>
 	<meta charset="utf-8">
@@ -55,6 +55,7 @@
 					</a>
 				</li>
 
+				{% if request.user.is_superuser and dashboard_mode != 'operational' %}
 				<li class="arca-nav-header">
 					{% trans "Seguridad y Auditoría" %}
 				</li>
@@ -70,7 +71,9 @@
 						<i data-feather="key"></i> <span>{% trans "API Tokens (M2M)" %}</span>
 					</a>
 				</li>
+				{% endif %}
 
+				{% if request.user.is_superuser and dashboard_mode != 'operational' or user_is_uo_admin and not request.user.is_superuser %}
 				<li class="arca-nav-header">
 					{% trans "Gobernanza" %}
 				</li>
@@ -81,14 +84,15 @@
 					</a>
 				</li>
 
+				<li class="arca-nav-item {% if active_nav == 'users' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:user_list' %}">
+						<i data-feather="users"></i> <span>{% trans "Usuarios y Accesos" %}</span>
+					</a>
+				</li>
+				{% endif %}
+
 				<li class="arca-nav-header">
 					{% trans "Enlaces y Sistemas" %}
-				</li>
-
-				<li class="arca-nav-item">
-					<a class="arca-nav-link" href="{% url 'admin:index' %}" target="_blank">
-						<i data-feather="settings"></i> <span>{% trans "Django Admin Clásico" %}</span>
-					</a>
 				</li>
 
 				<li class="arca-nav-item">
@@ -123,6 +127,40 @@
 				</div>
 
 				<div class="d-flex align-items-center gap-2">
+					{% if request.user.is_superuser %}
+					<!-- Selector Ágil de Modo Superusuario -->
+					<div class="dropdown me-1">
+						<button class="btn btn-sm {% if dashboard_mode == 'governance' %}btn-outline-danger{% else %}btn-outline-primary{% endif %} dropdown-toggle d-flex align-items-center gap-1 shadow-sm" type="button" id="modeSwitchBtn" data-bs-toggle="dropdown" aria-expanded="false">
+							{% if dashboard_mode == 'governance' %}
+								<i data-feather="shield" style="width:13px;height:13px;"></i>
+								<span class="d-none d-md-inline small fw-bold">{% trans "Modo Gobernanza" %}</span>
+							{% else %}
+								<i data-feather="file-text" style="width:13px;height:13px;"></i>
+								<span class="d-none d-md-inline small fw-bold">{% trans "Modo Operativa" %}</span>
+							{% endif %}
+						</button>
+						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="modeSwitchBtn">
+							<li><h6 class="dropdown-header small text-uppercase fw-bold">{% trans "Modo de Interfaz" %}</h6></li>
+							<li>
+								<a class="dropdown-item {% if dashboard_mode == 'governance' %}active{% endif %}" href="{% url 'dashboard:mode_selection' %}?set=governance&next={{ request.get_full_path|urlencode }}">
+									<i data-feather="shield" style="width:14px;height:14px;" class="me-2"></i> {% trans "Gobernanza Global" %}
+								</a>
+							</li>
+							<li>
+								<a class="dropdown-item {% if dashboard_mode == 'operational' %}active{% endif %}" href="{% url 'dashboard:mode_selection' %}?set=operational&next={{ request.get_full_path|urlencode }}">
+									<i data-feather="file-text" style="width:14px;height:14px;" class="me-2"></i> {% trans "Operativa Documental" %}
+								</a>
+							</li>
+							<li><hr class="dropdown-divider"></li>
+							<li>
+								<a class="dropdown-item small" href="{% url 'dashboard:mode_selection' %}">
+									<i data-feather="sliders" style="width:14px;height:14px;" class="me-2"></i> {% trans "Pantalla de Selección de Modo" %}
+								</a>
+							</li>
+						</ul>
+					</div>
+					{% endif %}
+
 					<!-- Selector de Idioma (ES / EN) -->
 					<div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Idioma' %}">
 						<a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
@@ -149,10 +187,17 @@
 						</button>
 						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userMenuBtn">
 							<li>
-								<a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank">
-									<i data-feather="settings" style="width:14px;height:14px;" class="me-2"></i> {% trans "Django Admin" %}
+								<a class="dropdown-item" href="{% url 'dashboard:password_change' %}">
+									<i data-feather="lock" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Contraseña" %}
 								</a>
 							</li>
+							{% if request.user.is_superuser %}
+							<li>
+								<a class="dropdown-item" href="{% url 'dashboard:mode_selection' %}">
+									<i data-feather="sliders" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Modo de Inicio" %}
+								</a>
+							</li>
+							{% endif %}
 							<li>
 								<a class="dropdown-item" href="{% url 'arcamitte:request-access' %}" target="_blank">
 									<i data-feather="globe" style="width:14px;height:14px;" class="me-2"></i> {% trans "Portal Público Canje" %}
@@ -163,6 +208,14 @@
 								<form action="{% url 'dashboard:logout' %}" method="post" class="d-inline">
 									{% csrf_token %}
 									<button type="submit" class="dropdown-item text-danger">
+										<i data-feather="log-out" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cerrar sesión" %}
+									</button>
+								</form>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</header>
 										<i data-feather="log-out" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cerrar sesión" %}
 									</button>
 								</form>
