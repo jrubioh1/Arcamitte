@@ -9,7 +9,7 @@ import secrets
 import sys
 from typing import Any
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -251,8 +251,66 @@ def shred_and_delete_file(file_field: Any) -> bool:
         return False
 
 
+def get_fernet_engine() -> MultiFernet:
+    """
+    Retorna una instancia de MultiFernet con el llavero de claves maestras configuradas.
+    La primera clave es la clave activa primaria para operaciones de cifrado nuevas.
+    Las restantes claves secundarias permiten el descifrado transparente de documentos
+    históricos durante procesos de migración o rotación (NIST SP 800-57 Part 1).
+    Garantiza que cualquier override dinámico de ARCAMITTE_FERNET_KEY tenga prioridad inmediata.
+    """
+    primary_key = getattr(settings, "ARCAMITTE_FERNET_KEY", None)
+    configured_keys = getattr(settings, "ARCAMITTE_FERNET_KEYS", [])
+
+    keys: list[str | bytes] = []
+    if primary_key:
+        keys.append(primary_key)
+    for k in configured_keys:
+        if k != primary_key and k not in keys:
+            keys.append(k)
+
+    if not keys:
+        raise ValueError("settings.ARCAMITTE_FERNET_KEY no se encuentra configurada.")
+
+    fernets: list[Fernet] = []
+    for k in keys:
+        k_bytes = k.encode("utf-8") if isinstance(k, str) else k
+        fernets.append(Fernet(k_bytes))
+    return MultiFernet(fernets)
+
+
+def record_audit_log(
+    action: str,
+    email: str = "",
+    ip: str | None = None,
+    user_agent: str = "",
+    details: str | dict[str, Any] = "",
+    document: Any = None,
+) -> Any:
+    """
+    Crea y persiste un registro de auditoría en DocumentAccessLog con encadenamiento
+    criptográfico íntegro (Hash Chaining) conforme a ENS ALTA / eIDAS.
+    """
+    import json
+    from arcamitte.models import DocumentAccessLog
+
+    details_str = (
+        json.dumps(details, ensure_ascii=False)
+        if isinstance(details, dict)
+        else str(details or "")
+    )
+    return DocumentAccessLog.objects.create(
+        document=document,
+        email=email,
+        action=action,
+        details=details_str,
+        ip_address=ip,
+        user_agent=user_agent,
+    )
+
+
 def get_server_fernet_key() -> bytes:
-    """Obtiene y normaliza la clave de servidor ARCAMITTE_FERNET_KEY en bytes."""
+    """Obtiene y normaliza la clave activa de servidor ARCAMITTE_FERNET_KEY en bytes."""
     key = getattr(settings, "ARCAMITTE_FERNET_KEY", None)
     if not key:
         raise ValueError("settings.ARCAMITTE_FERNET_KEY no se encuentra configurada.")
@@ -296,9 +354,8 @@ def reactivate_document(
     file_bytes = original_file.read()
     encrypted_bytes = fernet_dek.encrypt(file_bytes)
 
-    server_key = get_server_fernet_key()
-    server_fernet = Fernet(server_key)
-    encrypted_dek_str = server_fernet.encrypt(dek).decode("utf-8")
+    engine = get_fernet_engine()
+    encrypted_dek_str = engine.encrypt(dek).decode("utf-8")
 
     # Triturar archivo anterior en disco
     if document.encrypted_file:
@@ -616,9 +673,8 @@ def upload_and_encrypt_document(
     original_bytes: bytes = original_file.read()
     ciphertext_bytes: bytes = fernet_dek.encrypt(original_bytes)
 
-    server_key = get_server_fernet_key()
-    server_fernet = Fernet(server_key)
-    encrypted_dek_str: str = server_fernet.encrypt(dek).decode("utf-8")
+    engine = get_fernet_engine()
+    encrypted_dek_str: str = engine.encrypt(dek).decode("utf-8")
 
     filename = getattr(original_file, "name", "documento")
     clean_filename = os.path.basename(filename)
@@ -1053,9 +1109,8 @@ def consume_document_with_otp(
             token.is_used = True
             token.save(update_fields=["is_used"])
 
-            server_key = get_server_fernet_key()
-            server_fernet = Fernet(server_key)
-            dek_bytes = server_fernet.decrypt(document.encrypted_dek.encode("utf-8"))
+            engine = get_fernet_engine()
+            dek_bytes = engine.decrypt(document.encrypted_dek.encode("utf-8"))
 
             if not document.encrypted_file:
                 return (
@@ -1279,9 +1334,8 @@ def admin_decrypt_document(
             )
 
     try:
-        server_key = get_server_fernet_key()
-        server_fernet = Fernet(server_key)
-        dek_bytes = server_fernet.decrypt(document.encrypted_dek.encode("utf-8"))
+        engine = get_fernet_engine()
+        dek_bytes = engine.decrypt(document.encrypted_dek.encode("utf-8"))
 
         document.encrypted_file.seek(0)
         ciphertext = document.encrypted_file.read()
@@ -2059,6 +2113,16 @@ def record_failed_login(username: str, client_ip: str | None = None) -> dict[str
                         "attempts": failed_count,
                     },
                 )
+                dispatch_siem_event(
+                    event_type="user_lockout",
+                    details={
+                        "username": user.username,
+                        "failed_attempts": failed_count,
+                        "lockout_minutes": lockout_min,
+                    },
+                    actor=user.username,
+                    ip=client_ip,
+                )
                 logger.warning(
                     f"[ARCAMITTE SECURITY] Usuario {user.username} bloqueado por superar {failed_count} fallos."
                 )
@@ -2140,6 +2204,17 @@ def ban_ip(
             "banned_until": str(banned_until),
             "operator": admin_str,
         },
+    )
+    dispatch_siem_event(
+        event_type="ip_ban",
+        details={
+            "ip_address": clean_ip,
+            "reason": reason,
+            "duration_hours": duration_hours,
+            "banned_until": banned_until.isoformat() if banned_until else "permanent",
+        },
+        actor=admin_str,
+        ip=clean_ip,
     )
     return banned_obj
 
@@ -2240,26 +2315,38 @@ def verify_audit_log_chain() -> dict[str, Any]:
             expected_prev = log.previous_hash or ("0" * 64)
 
         if log.previous_hash != expected_prev:
+            err_msg = (
+                f"Ruptura de cadena en registro #{log.id}: previous_hash '{log.previous_hash[:12]}...' "
+                f"no coincide con el bloque anterior '{expected_prev[:12]}...'."
+            )
+            dispatch_siem_event(
+                event_type="log_tamper",
+                details={"corrupted_log_id": log.id, "error": err_msg},
+                actor="Auditor / Sistema",
+            )
             return {
                 "is_valid": False,
                 "total_verified": idx,
                 "corrupted_log_id": log.id,
-                "error": (
-                    f"Ruptura de cadena en registro #{log.id}: previous_hash '{log.previous_hash[:12]}...' "
-                    f"no coincide con el bloque anterior '{expected_prev[:12]}...'."
-                ),
+                "error": err_msg,
             }
 
         recalculated = log.calculate_payload_hash(expected_prev)
         if log.log_hash != recalculated:
+            err_msg = (
+                f"Manipulación de datos en registro #{log.id}: log_hash '{log.log_hash[:12]}...' "
+                f"difiere del hash recalculado sobre el payload '{recalculated[:12]}...'."
+            )
+            dispatch_siem_event(
+                event_type="log_tamper",
+                details={"corrupted_log_id": log.id, "error": err_msg},
+                actor="Auditor / Sistema",
+            )
             return {
                 "is_valid": False,
                 "total_verified": idx,
                 "corrupted_log_id": log.id,
-                "error": (
-                    f"Manipulación de datos en registro #{log.id}: log_hash '{log.log_hash[:12]}...' "
-                    f"difiere del hash recalculado sobre el payload '{recalculated[:12]}...'."
-                ),
+                "error": err_msg,
             }
 
         expected_prev = log.log_hash
@@ -2389,6 +2476,18 @@ def create_certified_audit_export(
         ip_address=client_ip,
     )
 
+    dispatch_siem_event(
+        event_type="audit_export",
+        details={
+            "receipt_id": receipt_code,
+            "records_count": count,
+            "export_hash": export_hash,
+            "reason": reason,
+        },
+        actor=operator_email,
+        ip=client_ip,
+    )
+
     return csv_bytes, receipt
 
 
@@ -2497,3 +2596,216 @@ def send_security_alert_admin(
         recipient_list=recipients,
         fail_silently=True,
     )
+
+
+def dispatch_siem_event(
+    event_type: str,
+    details: dict[str, Any],
+    actor: str = "Sistema",
+    ip: str | None = None,
+) -> None:
+    """
+    Despacha un evento de telemetría de seguridad en formato JSON estructurado hacia
+    el endpoint SIEM / Webhook configurado (Splunk HEC, Elastic, Sentinel, etc.)
+    en un hilo asíncrono no bloqueante (ENS ALTA / NIST SP 800-53 AU-6 / AU-12).
+    """
+    webhook_url = getattr(settings, "ARCAMITTE_SIEM_WEBHOOK_URL", "")
+    if not webhook_url:
+        return
+
+    subscribed_events = getattr(settings, "ARCAMITTE_SIEM_WEBHOOK_EVENTS", [])
+    if event_type.lower() not in [e.lower() for e in subscribed_events]:
+        return
+
+    payload = {
+        "timestamp": timezone.now().isoformat(),
+        "event": event_type.upper(),
+        "actor": actor,
+        "client_ip": ip or "127.0.0.1",
+        "service": "arcamitte",
+        "details": details,
+    }
+
+    token = getattr(settings, "ARCAMITTE_SIEM_WEBHOOK_TOKEN", "")
+
+    def _send_webhook() -> None:
+        try:
+            import json
+            import urllib.request
+
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "Arcamitte-SIEM-Connector/2.0",
+            }
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
+            req = urllib.request.Request(
+                webhook_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status not in (200, 201, 202, 204):
+                    logger.warning(
+                        f"[ARCAMITTE SIEM] Respuesta inusual del webhook SIEM ({resp.status})"
+                    )
+        except Exception as exc:
+            logger.warning(
+                f"[ARCAMITTE SIEM] Error al enviar evento de seguridad a {webhook_url}: {exc}"
+            )
+
+    executor = get_email_executor()
+    if executor:
+        executor.submit(_send_webhook)
+    else:
+        _send_webhook()
+
+
+def rotate_master_keys(
+    new_primary_key: str,
+    operator: Any = None,
+    client_ip: str | None = None,
+) -> dict[str, Any]:
+    """
+    Ejecuta el recifrado atómico de todas las claves de datos (DEK) de documentos
+    y secretos TOTP en base de datos con una nueva clave maestra Fernet primaria
+    (NIST SP 800-57 Part 1 Rev. 5 / ENS op.sec.4).
+    """
+    from arcamitte.models import DocumentAccessLog, EncryptedDocument, UserProfile
+
+    clean_key = new_primary_key.strip()
+    try:
+        Fernet(clean_key.encode("utf-8"))
+    except Exception as exc:
+        raise ValidationError(
+            f"La clave maestra proporcionada no es una clave Fernet válida: {exc}"
+        )
+
+    existing_keys = getattr(
+        settings, "ARCAMITTE_FERNET_KEYS", [settings.ARCAMITTE_FERNET_KEY]
+    )
+    all_keys = [clean_key] + [k for k in existing_keys if k != clean_key]
+    rotation_engine = MultiFernet(
+        [Fernet(k.encode("utf-8") if isinstance(k, str) else k) for k in all_keys]
+    )
+
+    rotated_docs_count = 0
+    rotated_profiles_count = 0
+
+    with transaction.atomic():
+        # 1. Recifrado de DEKs de documentos
+        docs = EncryptedDocument.objects.select_for_update().exclude(encrypted_dek="")
+        for doc in docs:
+            rotated_dek = rotation_engine.rotate(
+                doc.encrypted_dek.encode("utf-8")
+            ).decode("utf-8")
+            doc.encrypted_dek = rotated_dek
+            doc.save(update_fields=["encrypted_dek", "updated_at"])
+            rotated_docs_count += 1
+
+        # 2. Recifrado de secretos TOTP de perfiles de usuario
+        profiles = UserProfile.objects.select_for_update().exclude(totp_secret="")
+        for profile in profiles:
+            rotated_totp = rotation_engine.rotate(
+                profile.totp_secret.encode("utf-8")
+            ).decode("utf-8")
+            profile.totp_secret = rotated_totp
+            profile.save(update_fields=["totp_secret", "updated_at"])
+            rotated_profiles_count += 1
+
+        operator_email = getattr(operator, "email", "") or getattr(
+            operator, "username", "Sistema"
+        )
+        key_fingerprint = hashlib.sha256(clean_key.encode("utf-8")).hexdigest()[:16]
+
+        DocumentAccessLog.objects.create(
+            document=None,
+            email=operator_email,
+            action=DocumentAccessLog.Action.ROTACION_CLAVE_MAESTRA,
+            details=(
+                f"Rotación de clave maestra completada exitosamente. "
+                f"Documentos recifrados: {rotated_docs_count}. Perfiles TOTP recifrados: {rotated_profiles_count}. "
+                f"Huella nueva clave maestra (SHA-256): {key_fingerprint}..."
+            ),
+            ip_address=client_ip,
+        )
+
+    dispatch_siem_event(
+        event_type="master_key_rotated",
+        details={
+            "rotated_documents": rotated_docs_count,
+            "rotated_profiles": rotated_profiles_count,
+            "new_key_fingerprint": key_fingerprint,
+        },
+        actor=operator_email,
+        ip=client_ip,
+    )
+
+    return {
+        "status": "success",
+        "rotated_documents": rotated_docs_count,
+        "rotated_profiles": rotated_profiles_count,
+        "new_key_fingerprint": key_fingerprint,
+    }
+
+
+def is_totp_required_for_user(user: Any) -> bool:
+    """
+    Determina si el usuario debe pasar por el segundo factor de autenticación (2FA / TOTP).
+    Retorna True si el usuario tiene 2FA activado en su perfil O si la directiva institucional
+    ARCAMITTE_MFA_REQUIRED_FOR_STAFF exige 2FA obligatorio a miembros de staff o superusuarios.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    profile = getattr(user, "arcamitte_profile", None)
+    if profile and profile.is_totp_enabled:
+        return True
+    if getattr(settings, "ARCAMITTE_MFA_REQUIRED_FOR_STAFF", False):
+        if user.is_staff or user.is_superuser:
+            return True
+    return False
+
+
+def verify_user_totp_or_scratch(
+    user: Any,
+    code: str,
+    client_ip: str | None = None,
+) -> tuple[bool, str]:
+    """
+    Valida un código de segundo factor (TOTP de 6 dígitos o código de rescate).
+    Retorna (es_valido, tipo_resultado: 'totp' | 'scratch' | 'not_required' | 'invalid').
+    """
+    from arcamitte.models import DocumentAccessLog, get_or_create_user_profile
+    from arcamitte.totp import verify_totp_code
+
+    profile = get_or_create_user_profile(user)
+    if not profile.is_totp_enabled:
+        return True, "not_required"
+
+    clean_code = (code or "").strip().replace(" ", "")
+    if not clean_code:
+        return False, "invalid"
+
+    # 1. Comprobar si es un código numérico TOTP de 6 dígitos
+    if len(clean_code) == 6 and clean_code.isdigit():
+        secret = profile.get_totp_secret()
+        if secret and verify_totp_code(secret, clean_code):
+            return True, "totp"
+
+    # 2. Comprobar si es un código de rescate (scratch code)
+    if profile.consume_scratch_code(clean_code):
+        DocumentAccessLog.objects.create(
+            document=None,
+            email=getattr(user, "email", "") or user.username,
+            action=DocumentAccessLog.Action.TOTP_RECUPERACION_USADO,
+            details=(
+                f"Código de recuperación de emergencia 2FA consumido para '{user.username}'. "
+                f"Códigos de rescate restantes: {len(profile.totp_scratch_codes)}."
+            ),
+            ip_address=client_ip,
+        )
+        return True, "scratch"
+
+    return False, "invalid"

@@ -54,6 +54,18 @@ password_history_limit = 5
 password_expiration_days = 90
 # Buzón para alertas de incidentes y seguridad (si se omite, usa default_from_email)
 security_alerts_email = admin@arcamitte.local
+# Exigir 2FA obligatorio para administradores y superusuarios (por defecto: false)
+mfa_required_for_staff = false
+# Llavero de claves maestras Fernet (separadas por coma; la primera es la clave activa de cifrado)
+fernet_keys = 
+# Protección de Sesión: Forzar sesión única por usuario (invalida sesiones previas)
+single_session_per_user = true
+# Protección de Sesión: Vincular sesión a la dirección IP inicial del operador
+session_ip_binding = true
+# Conector Webhook / SIEM para telemetría y alertas en tiempo real
+siem_webhook_url = 
+siem_webhook_token = 
+siem_webhook_events = ip_ban,user_lockout,log_tamper,audit_export,master_key_rotated
 
 [email]
 # Backend de correo: estándar corporativo SMTP (o 'django.core.mail.backends.console.EmailBackend' para terminal)

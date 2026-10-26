@@ -187,6 +187,36 @@ class UserProfile(models.Model):
             "Marca temporal del último cambio de contraseña para control de caducidad."
         ),
     )
+    totp_secret = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("Secreto TOTP cifrado"),
+        help_text=_("Secreto Base32 cifrado con la clave maestra de servidor."),
+    )
+    is_totp_enabled = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name=_("¿2FA activo?"),
+        help_text=_(
+            "Indica si el usuario tiene activo el segundo factor de autenticación TOTP."
+        ),
+    )
+    totp_scratch_codes = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_("Hashes de códigos de rescate"),
+        help_text=_("Hashes SHA-256 de los códigos de recuperación de emergencia."),
+    )
+    current_session_key = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        verbose_name=_("Clave de sesión activa"),
+        help_text=_(
+            "Identificador de la última sesión activa del usuario para control de concurrencia."
+        ),
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Fecha de creación"),
@@ -247,6 +277,80 @@ class UserProfile(models.Model):
             self.save(
                 update_fields=["failed_login_attempts", "locked_until", "updated_at"]
             )
+
+    def set_totp_secret(self, plain_secret: str) -> None:
+        """Cifra el secreto TOTP con el motor Fernet maestro del servidor."""
+        from cryptography.fernet import MultiFernet, Fernet
+
+        keys = getattr(
+            settings, "ARCAMITTE_FERNET_KEYS", [settings.ARCAMITTE_FERNET_KEY]
+        )
+        engine = MultiFernet(
+            [Fernet(k.encode("utf-8") if isinstance(k, str) else k) for k in keys]
+        )
+        self.totp_secret = engine.encrypt(plain_secret.strip().encode("utf-8")).decode(
+            "utf-8"
+        )
+
+    def get_totp_secret(self) -> str:
+        """Descifra y retorna el secreto TOTP en claro utilizando el llavero maestro."""
+        if not self.totp_secret:
+            return ""
+        from cryptography.fernet import MultiFernet, Fernet
+
+        keys = getattr(
+            settings, "ARCAMITTE_FERNET_KEYS", [settings.ARCAMITTE_FERNET_KEY]
+        )
+        engine = MultiFernet(
+            [Fernet(k.encode("utf-8") if isinstance(k, str) else k) for k in keys]
+        )
+        try:
+            return engine.decrypt(self.totp_secret.encode("utf-8")).decode("utf-8")
+        except Exception:
+            return ""
+
+    def enable_totp(self, secret: str, scratch_hashes: list[str]) -> None:
+        """Habilita formalmente 2FA para el usuario guardando el secreto cifrado y los rescates."""
+        self.set_totp_secret(secret)
+        self.totp_scratch_codes = scratch_hashes
+        self.is_totp_enabled = True
+        self.save(
+            update_fields=[
+                "totp_secret",
+                "totp_scratch_codes",
+                "is_totp_enabled",
+                "updated_at",
+            ]
+        )
+
+    def disable_totp(self) -> None:
+        """Desactiva 2FA para el usuario purgando el secreto y los rescates."""
+        self.is_totp_enabled = False
+        self.totp_secret = ""
+        self.totp_scratch_codes = []
+        self.save(
+            update_fields=[
+                "is_totp_enabled",
+                "totp_secret",
+                "totp_scratch_codes",
+                "updated_at",
+            ]
+        )
+
+    def consume_scratch_code(self, candidate_code: str) -> bool:
+        """
+        Valida si el código de rescate es válido, lo consume eliminándolo de la lista y persiste.
+        """
+        from .totp import hash_scratch_code
+
+        candidate_hash = hash_scratch_code(candidate_code)
+        current_hashes: list[str] = list(self.totp_scratch_codes or [])
+        if candidate_hash in current_hashes:
+            current_hashes.remove(candidate_hash)
+            self.totp_scratch_codes = current_hashes
+            self.save(update_fields=["totp_scratch_codes", "updated_at"])
+            return True
+        return False
 
 
 class PasswordHistory(models.Model):
@@ -733,6 +837,21 @@ class DocumentAccessLog(models.Model):
             "Bloqueo de seguridad de cuenta de usuario"
         )
         BANEO_IP = "baneo_ip", _("Baneo de dirección IP en lista negra")
+        ROTACION_CLAVE_MAESTRA = "rotacion_clave_maestra", _(
+            "Rotación de clave maestra de cifrado"
+        )
+        SECUESTRO_SESION_DETECTADO = "secuestro_sesion_detectado", _(
+            "Detección de posible secuestro de sesión (discrepancia IP)"
+        )
+        SESION_CONCURRENTE_TERMINADA = "sesion_concurrente_terminada", _(
+            "Sesión concurrente anterior cerrada"
+        )
+        TOTP_CONFIGURADO = "totp_configurado", _(
+            "Autenticación 2FA configurada/modificada"
+        )
+        TOTP_RECUPERACION_USADO = "totp_recuperacion_usado", _(
+            "Código de recuperación 2FA consumido"
+        )
 
     document = models.ForeignKey(
         EncryptedDocument,

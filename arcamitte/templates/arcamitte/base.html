@@ -263,6 +263,11 @@
 									<i data-feather="lock" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Contraseña" %}
 								</a>
 							</li>
+							<li>
+								<a class="dropdown-item" href="{% url 'dashboard:totp_setup' %}">
+									<i data-feather="shield" style="width:14px;height:14px;" class="me-2"></i> {% trans "Seguridad 2FA (TOTP)" %}
+								</a>
+							</li>
 							{% if request.user.is_superuser %}
 							<li>
 								<a class="dropdown-item" href="{% url 'dashboard:mode_selection' %}">

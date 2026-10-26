@@ -106,6 +106,29 @@ ARCAMITTE_PASSWORD_EXPIRATION_DAYS = config.getint(
 ARCAMITTE_SECURITY_ALERTS_EMAIL = config.get(
     "security", "security_alerts_email", fallback=""
 ).strip()
+ARCAMITTE_MFA_REQUIRED_FOR_STAFF = config.getboolean(
+    "security", "mfa_required_for_staff", fallback=False
+)
+ARCAMITTE_SINGLE_SESSION_PER_USER = config.getboolean(
+    "security", "single_session_per_user", fallback=True
+)
+ARCAMITTE_SESSION_IP_BINDING = config.getboolean(
+    "security", "session_ip_binding", fallback=True
+)
+ARCAMITTE_SIEM_WEBHOOK_URL = config.get(
+    "security", "siem_webhook_url", fallback=""
+).strip()
+ARCAMITTE_SIEM_WEBHOOK_TOKEN = config.get(
+    "security", "siem_webhook_token", fallback=""
+).strip()
+_raw_siem_events = config.get(
+    "security",
+    "siem_webhook_events",
+    fallback="ip_ban,user_lockout,log_tamper,audit_export,master_key_rotated",
+)
+ARCAMITTE_SIEM_WEBHOOK_EVENTS = [
+    e.strip().lower() for e in _raw_siem_events.split(",") if e.strip()
+]
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = config.getboolean(
@@ -141,6 +164,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "arcamitte.middleware.SessionSecurityMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "arcamitte.middleware.RequirePasswordChangeMiddleware",
 ]
@@ -249,26 +273,44 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CONFIGURACIÓN DE ARCAMITTE Y CRIPTOGRAFÍA
 # ==============================================================================
 
-# Clave maestra Fernet (32 bytes url-safe base64) para cifrar las claves de datos (DEK).
+# Claves maestras Fernet (Llavero MultiFernet para rotación sin downtime)
 raw_fernet = config.get(
     "security",
     "fernet_key",
     fallback="cambiame-cambiame-cambiame-cambiame-cambiame=",
-)
+).strip()
+raw_fernet_keys = config.get("security", "fernet_keys", fallback="").strip()
 
-try:
-    Fernet(raw_fernet.encode("utf-8"))
-    ARCAMITTE_FERNET_KEY = raw_fernet
-except Exception as exc:
-    if DEBUG:
-        ARCAMITTE_FERNET_KEY = Fernet.generate_key().decode()
-    else:
-        from django.core.exceptions import ImproperlyConfigured
+if raw_fernet_keys:
+    configured_keys = [k.strip() for k in raw_fernet_keys.split(",") if k.strip()]
+elif raw_fernet and raw_fernet != "cambiame-cambiame-cambiame-cambiame-cambiame=":
+    configured_keys = [raw_fernet]
+elif raw_fernet:
+    configured_keys = [raw_fernet]
+else:
+    configured_keys = []
 
-        raise ImproperlyConfigured(
-            f"[ARCAMITTE SECURITY CRITICAL] 'ARCAMITTE_FERNET_KEY' no es válida o mantiene el valor de plantilla ('cambiame...'): {exc}. "
-            "En entornos de producción (DEBUG=False) es obligatorio configurar una clave simétrica real de 32 bytes base64 url-safe."
-        ) from exc
+validated_keys: list[str] = []
+for idx, key_candidate in enumerate(configured_keys):
+    try:
+        Fernet(key_candidate.encode("utf-8"))
+        validated_keys.append(key_candidate)
+    except Exception as exc:
+        if DEBUG:
+            validated_keys.append(Fernet.generate_key().decode())
+        else:
+            from django.core.exceptions import ImproperlyConfigured
+
+            raise ImproperlyConfigured(
+                f"[ARCAMITTE SECURITY CRITICAL] Clave Fernet #{idx + 1} no es válida o mantiene el valor de plantilla: {exc}. "
+                "En entornos de producción (DEBUG=False) es obligatorio configurar claves simétricas reales de 32 bytes base64 url-safe."
+            ) from exc
+
+if not validated_keys:
+    validated_keys = [Fernet.generate_key().decode()]
+
+ARCAMITTE_FERNET_KEYS = validated_keys
+ARCAMITTE_FERNET_KEY = validated_keys[0]
 
 # Tamaño máximo de archivo permitido (50 MB)
 ARCAMITTE_MAX_FILE_SIZE = config.getint(

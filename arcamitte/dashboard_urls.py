@@ -149,6 +149,21 @@ urlpatterns = [
         dashboard_views.DashboardAuditVerifyReceiptView.as_view(),
         name="audit_verify_receipt",
     ),
+    path(
+        "totp/verificar/",
+        dashboard_views.DashboardTOTPVerifyView.as_view(),
+        name="totp_verify",
+    ),
+    path(
+        "seguridad/2fa/",
+        dashboard_views.DashboardTOTPSetupView.as_view(),
+        name="totp_setup",
+    ),
+    path(
+        "seguridad/2fa/desactivar/",
+        dashboard_views.DashboardTOTPDisableView.as_view(),
+        name="totp_disable",
+    ),
     path("tokens/", dashboard_views.DashboardApiTokenView.as_view(), name="api_tokens"),
     path(
         "tokens/<int:token_id>/revocar/",

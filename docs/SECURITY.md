@@ -1,6 +1,9 @@
 # Modelo y Controles de Seguridad de Arcamitte
 
-Este documento expone los controles técnicos de ciberseguridad implementados en **Arcamitte**, alineados con **NIST SP 800-53 Rev. 5**, **NIST SP 800-88 Rev. 1** y **OWASP API Security Top 10 (2023)**.
+> 📖 **Guía Didáctica para Operadores y Administradores:**  
+> Para una explicación pedagógica paso a paso orientada a usuarios no criptógrafos (explicación del Cifrado de Sobre, cómo funciona la rotación de claves maestras y el diccionario exhaustivo de directivas de `arcamitte.ini`), consulte el nuevo **[Manual de Ciberseguridad y Guía de Configuración para Operadores (docs/SECURITY_CONFIG_GUIDE.md)](SECURITY_CONFIG_GUIDE.md)**.
+
+Este documento expone los controles técnicos de ciberseguridad implementados en **Arcamitte**, alineados con **ENS Categoría ALTA**, **NIST SP 800-53 Rev. 5**, **NIST SP 800-57 Part 1**, **NIST SP 800-63B**, **NIST SP 800-88 Rev. 1** y **OWASP API Security Top 10 (2023)**.
 
 ---
 

@@ -189,11 +189,27 @@ class DashboardLoginView(auth_views.LoginView):
         cache.delete(bf_key)
 
         client_ip = get_client_ip(self.request)
+        user = form.get_user()
+
+        from arcamitte.services import is_totp_required_for_user
+
+        if is_totp_required_for_user(user):
+            self.request.session["_totp_preauth_user_id"] = user.pk
+            self.request.session["_totp_preauth_client_ip"] = client_ip
+            return redirect("dashboard:totp_verify")
+
         from arcamitte.services import record_successful_login
 
-        record_successful_login(user=form.get_user(), client_ip=client_ip)
+        record_successful_login(user=user, client_ip=client_ip)
+        response = super().form_valid(form)
 
-        return super().form_valid(form)
+        self.request.session["_arca_client_ip"] = client_ip
+        profile = getattr(user, "arcamitte_profile", None)
+        if profile and self.request.session.session_key:
+            profile.current_session_key = self.request.session.session_key
+            profile.save(update_fields=["current_session_key", "updated_at"])
+
+        return response
 
     def get_success_url(self) -> str:
         if self.request.user.is_superuser:
@@ -1799,6 +1815,10 @@ class DashboardPasswordChangeView(LoginRequiredMixin, View):
             record_password_change(request.user, new_password)
 
             update_session_auth_hash(request, request.user)
+            profile = getattr(request.user, "arcamitte_profile", None)
+            if profile and request.session.session_key:
+                profile.current_session_key = request.session.session_key
+                profile.save(update_fields=["current_session_key", "updated_at"])
             messages.success(request, _("Su contraseña ha sido actualizada con éxito."))
             return redirect("dashboard:home")
 
@@ -3076,3 +3096,428 @@ class DashboardAuditVerifyReceiptView(LoginRequiredMixin, View):
                 "result": result,
             },
         )
+
+
+class DashboardTOTPVerifyView(View):
+    """
+    Vista de verificación de segundo factor (2FA / TOTP RFC 6238).
+    Intercepta usuarios preautenticados que requieren validación de código temporal
+    o código de recuperación de rescate antes de establecer la sesión completa.
+    """
+
+    template_name = "arcamitte/totp_verify.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        user_id = request.session.get("_totp_preauth_user_id")
+        if not user_id:
+            return redirect("dashboard:login")
+
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if not user:
+            return redirect("dashboard:login")
+
+        profile = getattr(user, "arcamitte_profile", None)
+        must_setup_first = bool(profile and not profile.is_totp_enabled)
+
+        # Si debe configurarlo por primera vez (por política mfa_required_for_staff)
+        setup_qr_data_uri = None
+        setup_secret = None
+        if must_setup_first:
+            from arcamitte.totp import (
+                generate_qr_svg_data_uri,
+                generate_totp_secret,
+                get_totp_uri,
+            )
+
+            setup_secret = request.session.get("_totp_pending_secret")
+            if not setup_secret:
+                setup_secret = generate_totp_secret()
+                request.session["_totp_pending_secret"] = setup_secret
+            uri = get_totp_uri(secret=setup_secret, username=user.username)
+            setup_qr_data_uri = generate_qr_svg_data_uri(uri)
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "username": user.username,
+                "must_setup_first": must_setup_first,
+                "setup_qr_data_uri": setup_qr_data_uri,
+                "setup_secret": setup_secret,
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        user_id = request.session.get("_totp_preauth_user_id")
+        if not user_id:
+            return redirect("dashboard:login")
+
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if not user:
+            return redirect("dashboard:login")
+
+        profile = getattr(user, "arcamitte_profile", None)
+        client_ip = get_client_ip(request)
+        code = request.POST.get("code", "").strip()
+
+        # Caso 1: Activación inicial obligatoria para staff
+        if profile and not profile.is_totp_enabled:
+            setup_secret = request.session.get("_totp_pending_secret")
+            from arcamitte.totp import (
+                generate_qr_svg_data_uri,
+                generate_scratch_codes,
+                get_totp_uri,
+                verify_totp_code,
+            )
+
+            if not setup_secret or not verify_totp_code(setup_secret, code):
+                uri = get_totp_uri(secret=setup_secret or "", username=user.username)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        "username": user.username,
+                        "must_setup_first": True,
+                        "setup_qr_data_uri": (
+                            generate_qr_svg_data_uri(uri) if setup_secret else None
+                        ),
+                        "setup_secret": setup_secret,
+                        "error": _(
+                            "El código de 6 dígitos introducido es incorrecto o no coincide con la aplicación autenticadora."
+                        ),
+                    },
+                    status=400,
+                )
+
+            plain_codes, hashed_codes = generate_scratch_codes(8)
+            profile.enable_totp(secret=setup_secret, scratch_hashes=hashed_codes)
+            request.session.pop("_totp_pending_secret", None)
+            from arcamitte.models import DocumentAccessLog
+            from arcamitte.services import record_audit_log
+
+            record_audit_log(
+                action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+                email=user.email or user.username,
+                ip=client_ip,
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                details={
+                    "usuario": user.username,
+                    "evento": "2fa_activado_inicial_obligatorio",
+                },
+            )
+            # Login formal
+            from django.contrib.auth import login as auth_login
+
+            auth_login(request, user)
+            request.session.pop("_totp_preauth_user_id", None)
+            request.session.pop("_totp_preauth_client_ip", None)
+            request.session["_arca_client_ip"] = client_ip
+            if request.session.session_key:
+                profile.current_session_key = request.session.session_key
+                profile.save(update_fields=["current_session_key", "updated_at"])
+
+            from arcamitte.services import record_successful_login
+
+            record_successful_login(user=user, client_ip=client_ip)
+            # Guardamos scratch codes en sesión para mostrárselos al usuario
+            request.session["_just_generated_scratch_codes"] = plain_codes
+            messages.success(
+                request,
+                _(
+                    "Autenticación en Dos Pasos (2FA) configurada con éxito. Guarde sus códigos de rescate."
+                ),
+            )
+            return redirect("dashboard:totp_setup")
+
+        # Caso 2: Verificación normal de TOTP o código de rescate
+        from arcamitte.services import verify_user_totp_or_scratch
+
+        is_valid, method = verify_user_totp_or_scratch(
+            user=user, code=code, client_ip=client_ip
+        )
+        if not is_valid:
+            return render(
+                request,
+                self.template_name,
+                {
+                    "username": user.username,
+                    "must_setup_first": False,
+                    "error": _(
+                        "El código de 6 dígitos o código de rescate es inválido o ha expirado."
+                    ),
+                },
+                status=400,
+            )
+
+        # Autenticación completada con éxito
+        from django.contrib.auth import login as auth_login
+
+        auth_login(request, user)
+        request.session.pop("_totp_preauth_user_id", None)
+        request.session.pop("_totp_preauth_client_ip", None)
+        request.session["_arca_client_ip"] = client_ip
+
+        if profile and request.session.session_key:
+            profile.current_session_key = request.session.session_key
+            profile.save(update_fields=["current_session_key", "updated_at"])
+
+        from arcamitte.services import record_successful_login
+
+        record_successful_login(user=user, client_ip=client_ip)
+
+        if method == "scratch":
+            messages.warning(
+                request,
+                _(
+                    f"Ha accedido utilizando un código de rescate de emergencia. "
+                    f"Le quedan {len(profile.totp_scratch_codes)} códigos disponibles."
+                ),
+            )
+
+        if user.is_superuser:
+            return redirect("dashboard:mode_selection")
+        return redirect("dashboard:home")
+
+
+class DashboardTOTPSetupView(LoginRequiredMixin, View):
+    """
+    Vista de administración de Autenticación de Doble Factor (2FA / TOTP)
+    para el usuario autenticado (alta de 2FA, generación de códigos de rescate).
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/totp_setup.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        profile = getattr(request.user, "arcamitte_profile", None)
+        if not profile:
+            from arcamitte.models import get_or_create_user_profile
+
+            profile = get_or_create_user_profile(request.user)
+
+        just_generated = request.session.pop("_just_generated_scratch_codes", None)
+
+        if profile.is_totp_enabled:
+            return render(
+                request,
+                self.template_name,
+                {
+                    "is_enabled": True,
+                    "scratch_codes_count": len(profile.totp_scratch_codes),
+                    "just_generated_scratch_codes": just_generated,
+                },
+            )
+
+        from arcamitte.totp import (
+            generate_qr_svg_data_uri,
+            generate_totp_secret,
+            get_totp_uri,
+        )
+
+        secret = request.session.get("_totp_pending_secret")
+        if not secret:
+            secret = generate_totp_secret()
+            request.session["_totp_pending_secret"] = secret
+
+        uri = get_totp_uri(secret=secret, username=request.user.username)
+        qr_data_uri = generate_qr_svg_data_uri(uri)
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "is_enabled": False,
+                "secret": secret,
+                "qr_data_uri": qr_data_uri,
+                "uri": uri,
+                "just_generated_scratch_codes": just_generated,
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        profile = getattr(request.user, "arcamitte_profile", None)
+        if not profile:
+            from arcamitte.models import get_or_create_user_profile
+
+            profile = get_or_create_user_profile(request.user)
+
+        action = request.POST.get("action")
+
+        # Regeneración de códigos de rescate
+        if action == "regenerate_scratch":
+            if not profile.is_totp_enabled:
+                return redirect("dashboard:totp_setup")
+
+            confirm_code = request.POST.get("confirmation_code", "").strip()
+            from arcamitte.services import verify_user_totp_or_scratch
+
+            is_valid, _ = verify_user_totp_or_scratch(request.user, confirm_code)
+            if not is_valid and not request.user.check_password(confirm_code):
+                messages.error(
+                    request,
+                    _(
+                        "Debe confirmar la operación introduciendo un código TOTP actual o su contraseña."
+                    ),
+                )
+                return redirect("dashboard:totp_setup")
+
+            from arcamitte.totp import generate_scratch_codes
+
+            plain_codes, hashed_codes = generate_scratch_codes(8)
+            profile.totp_scratch_codes = hashed_codes
+            profile.save(update_fields=["totp_scratch_codes", "updated_at"])
+
+            from arcamitte.models import DocumentAccessLog
+            from arcamitte.services import record_audit_log
+
+            record_audit_log(
+                action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+                email=request.user.email or request.user.username,
+                ip=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                details={
+                    "usuario": request.user.username,
+                    "evento": "codigos_rescate_regenerados",
+                },
+            )
+            messages.success(
+                request,
+                _(
+                    "Se han generado nuevos códigos de rescate. Guarde los nuevos códigos inmediatamente."
+                ),
+            )
+            return render(
+                request,
+                self.template_name,
+                {
+                    "is_enabled": True,
+                    "scratch_codes_count": 8,
+                    "just_generated_scratch_codes": plain_codes,
+                },
+            )
+
+        # Activación inicial voluntaria
+        secret = request.session.get("_totp_pending_secret")
+        if not secret:
+            messages.error(
+                request,
+                _(
+                    "La sesión de configuración de 2FA ha expirado. Por favor, vuelva a intentarlo."
+                ),
+            )
+            return redirect("dashboard:totp_setup")
+
+        code = request.POST.get("code", "").strip()
+        from arcamitte.totp import (
+            generate_qr_svg_data_uri,
+            generate_scratch_codes,
+            get_totp_uri,
+            verify_totp_code,
+        )
+
+        if not verify_totp_code(secret, code):
+            uri = get_totp_uri(secret=secret, username=request.user.username)
+            return render(
+                request,
+                self.template_name,
+                {
+                    "is_enabled": False,
+                    "secret": secret,
+                    "qr_data_uri": generate_qr_svg_data_uri(uri),
+                    "uri": uri,
+                    "error": _(
+                        "El código de 6 dígitos introducido es incorrecto o no coincide con la aplicación autenticadora."
+                    ),
+                },
+                status=400,
+            )
+
+        plain_codes, hashed_codes = generate_scratch_codes(8)
+        profile.enable_totp(secret=secret, scratch_hashes=hashed_codes)
+        request.session.pop("_totp_pending_secret", None)
+
+        from arcamitte.models import DocumentAccessLog
+        from arcamitte.services import record_audit_log
+
+        record_audit_log(
+            action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+            email=request.user.email or request.user.username,
+            ip=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            details={"usuario": request.user.username, "evento": "2fa_activado"},
+        )
+        messages.success(
+            request,
+            _(
+                "¡Autenticación de Doble Factor activada exitosamente! Guarde sus códigos de rescate en un lugar seguro."
+            ),
+        )
+        return render(
+            request,
+            self.template_name,
+            {
+                "is_enabled": True,
+                "scratch_codes_count": 8,
+                "just_generated_scratch_codes": plain_codes,
+            },
+        )
+
+
+class DashboardTOTPDisableView(LoginRequiredMixin, View):
+    """
+    Vista para desactivar la Autenticación de Doble Factor (2FA).
+    Requiere confirmación expresa de contraseña o código TOTP vigente.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        if getattr(settings, "ARCAMITTE_MFA_REQUIRED_FOR_STAFF", False) and (
+            request.user.is_staff or request.user.is_superuser
+        ):
+            messages.error(
+                request,
+                _(
+                    "La directiva de seguridad corporativa exige 2FA obligatorio para perfiles de administración. "
+                    "No tiene permisos para desactivar este control."
+                ),
+            )
+            return redirect("dashboard:totp_setup")
+
+        confirm_input = request.POST.get("confirmation_code", "").strip()
+        from arcamitte.services import verify_user_totp_or_scratch
+
+        is_valid, _ = verify_user_totp_or_scratch(request.user, confirm_input)
+        if not is_valid and not request.user.check_password(confirm_input):
+            messages.error(
+                request,
+                _(
+                    "Debe proporcionar un código TOTP vigente o su contraseña actual para desactivar 2FA."
+                ),
+            )
+            return redirect("dashboard:totp_setup")
+
+        profile = getattr(request.user, "arcamitte_profile", None)
+        if profile:
+            profile.disable_totp()
+
+        from arcamitte.models import DocumentAccessLog
+        from arcamitte.services import record_audit_log
+
+        record_audit_log(
+            action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+            email=request.user.email or request.user.username,
+            ip=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            details={
+                "usuario": request.user.username,
+                "evento": "2fa_desactivado",
+            },
+        )
+        messages.success(
+            request,
+            _(
+                "La autenticación en dos pasos (2FA) ha sido desactivada para su cuenta."
+            ),
+        )
+        return redirect("dashboard:totp_setup")
