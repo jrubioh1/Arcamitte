@@ -259,6 +259,7 @@ def reactivate_document(
     client_ip: str | None = None,
     user_agent: str | None = None,
     expires_at: Any | None = None,
+    api_token: Any = None,
 ) -> EncryptedDocument:
     """
     Reactiva un documento existente (consumido o activo) re-cifrándolo con una nueva DEK,
@@ -307,6 +308,8 @@ def reactivate_document(
         document.target_uo = target_uo
     if uploaded_by is not None:
         document.uploaded_by = uploaded_by
+    if api_token is not None:
+        document.uploaded_by_token = api_token
 
     if expires_at is not None:
         document.expires_at = expires_at
@@ -477,6 +480,7 @@ def upload_and_encrypt_document(
     user_agent: str | None = None,
     precalculated_hash: str | None = None,
     expires_at: Any | None = None,
+    api_token: Any = None,
 ) -> EncryptedDocument:
     """
     Servicio de registro y cifrado desatendido de documentos confidenciales.
@@ -544,6 +548,7 @@ def upload_and_encrypt_document(
                 client_ip=client_ip,
                 user_agent=user_agent,
                 expires_at=expires_at,
+                api_token=api_token,
             )
             reactivated._is_reactivated = True
             return reactivated
@@ -574,6 +579,7 @@ def upload_and_encrypt_document(
         "origin_uo": origin_uo,
         "target_uo": target_uo,
         "uploaded_by": uploaded_by,
+        "uploaded_by_token": api_token,
     }
     if description is not None:
         doc_kwargs["description"] = description
@@ -1528,14 +1534,19 @@ def get_scoped_documents_for_request(request: Any) -> models.QuerySet[EncryptedD
     if token and isinstance(token, APIToken) and token.is_valid():
         if token.uo:
             return EncryptedDocument.objects.filter(
-                models.Q(origin_uo=token.uo) | models.Q(target_uo=token.uo)
-            ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
+                models.Q(origin_uo=token.uo)
+                | models.Q(target_uo=token.uo)
+                | models.Q(uploaded_by_token=token)
+            ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token").distinct()
         if token.created_by and token.created_by.is_superuser:
-            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
+            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token")
         if token.created_by:
             return EncryptedDocument.objects.filter(
-                uploaded_by=token.created_by
-            ).select_related("origin_uo", "target_uo", "uploaded_by")
+                models.Q(uploaded_by=token.created_by) | models.Q(uploaded_by_token=token)
+            ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token").distinct()
+        return EncryptedDocument.objects.filter(
+            uploaded_by_token=token
+        ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token")
 
     # 2. Autenticación interactiva de usuario
     user = getattr(request, "user", None)

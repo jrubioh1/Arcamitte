@@ -79,6 +79,9 @@ class ArcamitteSecurityAndServicesTestCase(TestCase):
         super().tearDownClass()
 
     def setUp(self):
+        from django.conf import settings
+
+        settings.ARCAMITTE_FERNET_KEY = TEST_FERNET_KEY
         self.test_content = MINIMAL_TEST_PDF
         self.expected_sha256 = hashlib.sha256(self.test_content).hexdigest().lower()
         self.allowed_email = "destinatario@seguro.gob.es"
@@ -697,20 +700,44 @@ class ArcamitteSecurityAndServicesTestCase(TestCase):
         self.assertTrue(AccessVerificationToken.objects.filter(pk=tok_valid.pk).exists())
 
     def test_setup_staging_command(self):
-        """El comando setup_staging inicializa el sandbox desatendido con UOs, superusuario y documentos."""
+        """El comando setup_staging inicializa el sandbox desatendido con UOs, superusuario y documentos descifrables."""
         from io import StringIO
+        from pathlib import Path
+        from django.conf import settings
         from django.core.management import call_command
         from arcamitte.models import OrganizationalUnit, EncryptedDocument
 
-        out = StringIO()
-        call_command("setup_staging", stdout=out)
-        output = out.getvalue()
+        ini_path = Path(settings.BASE_DIR) / "arcamitte.ini"
+        ini_existed = ini_path.exists()
+        ini_backup = ini_path.read_bytes() if ini_existed else None
 
-        self.assertIn("ENTORNO DE STAGING SANDBOX MONTADO EXITOSAMENTE", output)
-        self.assertTrue(OrganizationalUnit.objects.filter(alias="RRHH").exists())
-        self.assertTrue(OrganizationalUnit.objects.filter(alias="LEGAL").exists())
-        self.assertTrue(EncryptedDocument.objects.filter(original_filename="expediente_laboral_confidencial.pdf").exists())
-        self.assertTrue(EncryptedDocument.objects.filter(original_filename="acuerdo_confidencial_junta.pdf").exists())
+        out = StringIO()
+        try:
+            call_command("setup_staging", stdout=out)
+            output = out.getvalue()
+
+            self.assertIn("ENTORNO DE STAGING SANDBOX MONTADO EXITOSAMENTE", output)
+            self.assertTrue(OrganizationalUnit.objects.filter(alias="RRHH").exists())
+            self.assertTrue(OrganizationalUnit.objects.filter(alias="LEGAL").exists())
+
+            doc_rrhh = EncryptedDocument.objects.filter(original_filename="expediente_laboral_confidencial.pdf").first()
+            doc_legal = EncryptedDocument.objects.filter(original_filename="acuerdo_confidencial_junta.pdf").first()
+            self.assertIsNotNone(doc_rrhh)
+            self.assertIsNotNone(doc_legal)
+
+            # Verificar que los documentos precargados en staging pueden descifrarse en memoria sin InvalidToken
+            ok_rrhh, decrypted_rrhh, _, msg_rrhh = admin_decrypt_document(doc_rrhh, admin_user=self.admin_user)
+            ok_legal, decrypted_legal, _, msg_legal = admin_decrypt_document(doc_legal, admin_user=self.admin_user)
+            self.assertTrue(ok_rrhh, msg_rrhh)
+            self.assertTrue(ok_legal, msg_legal)
+            self.assertTrue(decrypted_rrhh.startswith(b"%PDF-1.4"))
+            self.assertTrue(decrypted_legal.startswith(b"%PDF-1.4"))
+        finally:
+            settings.ARCAMITTE_FERNET_KEY = TEST_FERNET_KEY
+            if ini_existed and ini_backup is not None:
+                ini_path.write_bytes(ini_backup)
+            elif not ini_existed and ini_path.exists():
+                ini_path.unlink()
 
     def test_arcamitte_ini_template_integrity(self):
         """Valida que la plantilla arcamitte.ini.template contenga todas las secciones requeridas."""

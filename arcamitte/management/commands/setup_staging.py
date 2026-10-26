@@ -15,7 +15,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from arcamitte.models import DocumentAccessLog, EncryptedDocument, OrganizationalUnit, UserUOMembership
+from arcamitte.models import APIToken, DocumentAccessLog, EncryptedDocument, OrganizationalUnit, UserUOMembership
 from arcamitte.services import (
     process_batch_import_json,
     shred_and_delete_file,
@@ -76,7 +76,7 @@ class Command(BaseCommand):
 
         # En Staging garantizamos que el backend de correo sea ConsoleBackend
         # para que los correos y códigos OTP se muestren de forma directa y desatendida en terminal
-        cfg = configparser.ConfigParser()
+        cfg = configparser.ConfigParser(interpolation=None)
         cfg.read(ini_file, encoding="utf-8")
         if not cfg.has_section("django"):
             cfg.add_section("django")
@@ -90,20 +90,44 @@ class Command(BaseCommand):
             cfg.add_section("email")
         cfg.set("email", "backend", "django.core.mail.backends.console.EmailBackend")
 
-        # Si la clave Fernet contiene el valor provisional 'cambiame',
-        # generamos una clave segura para este entorno de pruebas y la persistimos en arcamitte.ini
-        current_fernet = cfg.get("security", "fernet_key", fallback="")
-        if not current_fernet or "cambiame" in current_fernet.lower():
-            from cryptography.fernet import Fernet
-            new_key = Fernet.generate_key().decode()
+        # Validar criptográficamente la clave Fernet en arcamitte.ini; si contiene 'cambiame'
+        # o no es una clave Fernet válida de 32 bytes base64 url-safe, generamos una y la persistimos.
+        from cryptography.fernet import Fernet
+
+        current_fernet = cfg.get("security", "fernet_key", fallback="").strip()
+        valid_ini_fernet = False
+        if current_fernet and "cambiame" not in current_fernet.lower():
+            try:
+                Fernet(current_fernet.encode("utf-8"))
+                valid_ini_fernet = True
+            except Exception:
+                valid_ini_fernet = False
+
+        if not valid_ini_fernet:
+            mem_fernet = getattr(settings, "ARCAMITTE_FERNET_KEY", "").strip()
+            valid_mem_fernet = False
+            if mem_fernet and "cambiame" not in mem_fernet.lower():
+                try:
+                    Fernet(mem_fernet.encode("utf-8"))
+                    valid_mem_fernet = True
+                except Exception:
+                    valid_mem_fernet = False
+
+            new_key = mem_fernet if valid_mem_fernet else Fernet.generate_key().decode()
             if not cfg.has_section("security"):
                 cfg.add_section("security")
             cfg.set("security", "fernet_key", new_key)
+            current_fernet = new_key
             self.stdout.write(self.style.SUCCESS("✓ Generada clave 'fernet_key' para staging y guardada en arcamitte.ini."))
+
+        # CRÍTICO: Sincronizar la clave en memoria de Django con la clave persistida en arcamitte.ini
+        # para que los documentos cifrados durante setup_staging utilicen exactamente la misma clave
+        # maestra que cargará posteriormente el servidor web (runserver / gunicorn).
+        settings.ARCAMITTE_FERNET_KEY = current_fernet
 
         with open(ini_file, "w", encoding="utf-8") as f:
             cfg.write(f)
-        self.stdout.write(self.style.SUCCESS("✓ Configuración de staging guardada (correo en 'console', CSRF trusted origins y base de datos configurada)."))
+        self.stdout.write(self.style.SUCCESS("✓ Configuración de staging guardada y clave Fernet sincronizada en memoria."))
 
         # ----------------------------------------------------------------------
         # 2. Limpieza opcional y migraciones
@@ -236,7 +260,19 @@ class Command(BaseCommand):
         user_rrhh = User.objects.filter(username="gestor_rrhh").first()
         user_legal = User.objects.filter(username="gestor_legal").first()
 
-        # Documento 1: RRHH -> LEGAL (FIRST_ACCESS)
+        # Token M2M de demostración para pruebas de inspección de API Tokens y asientos M2M
+        staging_token = APIToken.objects.filter(name="ERP Corporativo RRHH (M2M)").first()
+        if not staging_token:
+            staging_token, _ = APIToken.generate_token(
+                name="ERP Corporativo RRHH (M2M)",
+                uo=uo_rrhh,
+                created_by=admin_user,
+                scopes=[APIToken.Scope.DOCUMENTS_CREATE, APIToken.Scope.DOCUMENTS_READ, APIToken.Scope.UOS_READ],
+                rate_limit=120,
+                expires_at=timezone.now() + timezone.timedelta(days=365),
+            )
+
+        # Documento 1: RRHH -> LEGAL (FIRST_ACCESS, asociado también al token M2M de demostración)
         pdf_bytes_1 = MINIMAL_VALID_PDF + b"% Expediente RRHH confidencial de prueba 2026\n"
         upload_1 = SimpleUploadedFile("expediente_laboral_confidencial.pdf", pdf_bytes_1, content_type="application/pdf")
         doc_1 = upload_and_encrypt_document(
@@ -247,6 +283,7 @@ class Command(BaseCommand):
             origin_uo=uo_rrhh,
             target_uo=uo_legal,
             uploaded_by=user_rrhh,
+            api_token=staging_token,
             reopen_existing=True,
         )
 

@@ -46,9 +46,9 @@
 					<thead>
 						<tr>
 							<th>{% trans "Nombre / Servicio" %}</th>
-							<th>{% trans "Prefijo" %}</th>
+							<th>{% trans "Prefijo / UO" %}</th>
 							<th>{% trans "Permisos (Scopes)" %}</th>
-							<th>{% trans "Límite" %}</th>
+							<th>{% trans "Asientos" %}</th>
 							<th>{% trans "Último Uso" %}</th>
 							<th>{% trans "Estado" %}</th>
 							<th class="text-end">{% trans "Acciones" %}</th>
@@ -58,13 +58,20 @@
 						{% for token in tokens %}
 							<tr>
 								<td>
-									<strong>{{ token.name }}</strong>
+									<a href="{% url 'dashboard:api_token_detail' token.id %}" class="fw-bold text-dark text-decoration-none">
+										{{ token.name }}
+									</a>
 									<div class="text-muted small">
 										{% trans "Expira:" %} {{ token.expires_at|date:"d/m/Y"|default:"Permanente" }}
 									</div>
 								</td>
-								<td class="font-mono small text-muted">
-									{{ token.prefix }}...
+								<td>
+									<div class="font-mono small text-muted">{{ token.prefix }}...</div>
+									{% if token.uo %}
+										<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.7rem;">{{ token.uo.alias }}</span>
+									{% else %}
+										<span class="badge bg-light text-muted border" style="font-size:0.7rem;">{% trans "Global" %}</span>
+									{% endif %}
 								</td>
 								<td>
 									{% for scope in token.scopes %}
@@ -73,8 +80,11 @@
 										<span class="badge bg-light text-muted border badge-scope font-mono">documents:*</span>
 									{% endfor %}
 								</td>
-								<td class="small">
-									{{ token.rate_limit }} <span class="text-muted">req/min</span>
+								<td>
+									<a href="{% url 'dashboard:api_token_detail' token.id %}" class="badge bg-light text-dark border text-decoration-none">
+										{{ token.documents_count|default:0 }} {% trans "asientos" %}
+									</a>
+									<div class="text-muted" style="font-size:0.72rem;">{{ token.rate_limit }} req/min</div>
 								</td>
 								<td class="small text-muted">
 									{% if token.last_used_at %}
@@ -93,16 +103,17 @@
 										<span class="badge bg-success">{% trans "Activo" %}</span>
 									{% endif %}
 								</td>
-								<td class="text-end">
+								<td class="text-end text-nowrap">
+									<a href="{% url 'dashboard:api_token_detail' token.id %}" class="btn btn-sm btn-outline-primary" title="{% trans 'Inspeccionar Token y Asientos' %}">
+										<i data-feather="eye" style="width:14px;height:14px;"></i> {% trans "Inspeccionar" %}
+									</a>
 									{% if token.is_active and not token.is_expired %}
-										<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}" class="d-inline" onsubmit="return confirm('¿Está seguro de revocar inmediatamente este token? Los servicios asociados perderán el acceso de forma instantánea.');">
+										<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}" class="d-inline ms-1" onsubmit="return confirm('¿Está seguro de revocar inmediatamente este token? Los servicios asociados perderán el acceso de forma instantánea.');">
 											{% csrf_token %}
 											<button type="submit" class="btn btn-sm btn-outline-danger" title="{% trans 'Revocar Token' %}">
-												<i data-feather="slash" style="width:14px;height:14px;"></i> {% trans "Revocar" %}
+												<i data-feather="slash" style="width:14px;height:14px;"></i>
 											</button>
 										</form>
-									{% else %}
-										<span class="text-muted small">&mdash;</span>
 									{% endif %}
 								</td>
 							</tr>
@@ -137,6 +148,17 @@
 						<label class="form-label fw-semibold">{% trans "Nombre del Servicio / Cliente" %} <span class="text-danger">*</span></label>
 						<input type="text" name="name" class="form-control" placeholder="ej. Microservicio RRHH" required>
 						<div class="form-text small text-muted">{% trans "Identificador descriptivo de la aplicación cliente." %}</div>
+					</div>
+
+					<div class="mb-3">
+						<label class="form-label fw-semibold">{% trans "Unidad Organizativa Asignada (Opcional)" %}</label>
+						<select name="uo" class="form-select">
+							<option value="">-- {% trans "Token Global (Sin restricción de UO)" %} --</option>
+							{% for uo in available_uos %}
+								<option value="{{ uo.id }}">[{{ uo.numeric_code }}] {{ uo.alias }} - {{ uo.name }}</option>
+							{% endfor %}
+						</select>
+						<div class="form-text small text-muted">{% trans "Si se selecciona una UO, el token quedará circunscrito automáticamente a dicha unidad." %}</div>
 					</div>
 
 					<div class="mb-3">

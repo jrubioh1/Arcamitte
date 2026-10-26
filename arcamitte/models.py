@@ -275,6 +275,15 @@ class EncryptedDocument(models.Model):
         verbose_name=_("Subido por"),
         help_text=_("Usuario que dio de alta el documento en el sistema."),
     )
+    uploaded_by_token = models.ForeignKey(
+        "APIToken",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_documents",
+        verbose_name=_("API Token emisor"),
+        help_text=_("Credencial M2M utilizada cuando el asiento fue registrado a través de la API REST."),
+    )
     consumed_recipients = models.JSONField(
         default=list,
         blank=True,

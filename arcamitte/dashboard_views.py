@@ -832,12 +832,18 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         if not (request.user.is_superuser or request.user.is_staff):
             raise PermissionDenied(_("Se requieren privilegios administrativos para gestionar API Tokens."))
 
-        tokens = APIToken.objects.all().order_by("-created_at")
+        tokens = (
+            APIToken.objects.select_related("uo", "created_by")
+            .annotate(documents_count=models.Count("uploaded_documents"))
+            .order_by("-created_at")
+        )
+        available_uos = get_user_accessible_uos(request.user).order_by("numeric_code")
         new_token = request.session.pop("new_raw_token", None)
 
         context = {
             "active_nav": "tokens",
             "tokens": tokens,
+            "available_uos": available_uos,
             "new_raw_token": new_token,
         }
         return render(request, self.template_name, context)
@@ -865,10 +871,17 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         except ValueError:
             validity_days = 365
 
+        uo_obj = None
+        uo_id = request.POST.get("uo", "").strip()
+        if uo_id:
+            accessible_uos = get_user_accessible_uos(request.user)
+            uo_obj = accessible_uos.filter(pk=uo_id).first()
+
         expires_at = timezone.now() + datetime.timedelta(days=validity_days)
 
         token_obj, raw_secret = APIToken.generate_token(
             name=name,
+            uo=uo_obj,
             scopes=scopes,
             rate_limit=rate_limit,
             expires_at=expires_at,
@@ -884,6 +897,113 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         request.session["new_raw_token"] = raw_secret
         messages.success(request, _(f"API Token '{token_obj.name}' generado correctamente."))
         return redirect("dashboard:api_tokens")
+
+
+class DashboardApiTokenDetailView(LoginRequiredMixin, View):
+    """
+    Vista de inspección en detalle de un API Token M2M, incluyendo sus metadatos
+    criptográficos, estadísticas operativas, asientos documentales emitidos o dentro
+    de su alcance y trazas forenses de auditoría asociadas.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/api_token_detail.html"
+
+    def get(self, request: HttpRequest, token_id: int) -> HttpResponse:
+        if not (request.user.is_superuser or request.user.is_staff):
+            raise PermissionDenied(_("Se requieren privilegios administrativos para inspeccionar API Tokens."))
+
+        token = get_object_or_404(
+            APIToken.objects.select_related("uo", "created_by"),
+            pk=token_id,
+        )
+
+        # Aislar visibilidad si el usuario no es superusuario
+        if not request.user.is_superuser:
+            user_uos = get_user_accessible_uos(request.user)
+            if token.uo and token.uo not in user_uos and token.created_by_id != request.user.id:
+                raise PermissionDenied(_("No tiene autorización para inspeccionar este API Token."))
+
+        scope_mode = request.GET.get("scope", "emitted").strip().lower()
+        status_filter = request.GET.get("status", "").strip().lower()
+        query = request.GET.get("q", "").strip()
+        now = timezone.now()
+
+        # Conjunto base de asientos emitidos directamente con este API Token
+        emitted_docs_qs = EncryptedDocument.objects.filter(
+            uploaded_by_token=token
+        ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token")
+
+        # Conjunto ampliado al perímetro de la UO del token (si tiene UO asignada)
+        if token.uo:
+            perimeter_docs_qs = EncryptedDocument.objects.filter(
+                models.Q(uploaded_by_token=token)
+                | models.Q(origin_uo=token.uo)
+                | models.Q(target_uo=token.uo)
+            ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token").distinct()
+        else:
+            perimeter_docs_qs = emitted_docs_qs
+
+        # Si el usuario selecciona 'perimeter' (o si no hay documentos con uploaded_by_token pero el token tiene UO),
+        # permitimos conmutar limpiamente entre asientos emitidos por el token y asientos del perímetro de su UO.
+        if scope_mode == "perimeter" and token.uo:
+            base_qs = perimeter_docs_qs
+        else:
+            scope_mode = "emitted"
+            base_qs = emitted_docs_qs
+
+        # Métricas sobre el conjunto activo seleccionado
+        total_docs = base_qs.count()
+        emitted_count = emitted_docs_qs.count()
+        perimeter_count = perimeter_docs_qs.count()
+        consumed_docs = base_qs.filter(is_consumed=True).count()
+        active_docs = base_qs.filter(is_consumed=False).filter(
+            models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)
+        ).count()
+        expired_docs = base_qs.filter(is_consumed=False, expires_at__lte=now).count()
+
+        filtered_qs = base_qs
+        if query:
+            filtered_qs = filtered_qs.filter(
+                models.Q(original_filename__icontains=query)
+                | models.Q(file_hash__icontains=query)
+                | models.Q(description__icontains=query)
+            )
+
+        if status_filter == "active":
+            filtered_qs = filtered_qs.filter(is_consumed=False).filter(
+                models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)
+            )
+        elif status_filter == "consumed":
+            filtered_qs = filtered_qs.filter(is_consumed=True)
+        elif status_filter == "expired":
+            filtered_qs = filtered_qs.filter(is_consumed=False, expires_at__lte=now)
+
+        documents = filtered_qs.order_by("-created_at")[:100]
+
+        # Trazas forenses de los asientos vinculados
+        access_logs = (
+            DocumentAccessLog.objects.filter(document__in=base_qs)
+            .select_related("document", "origin_uo", "target_uo")
+            .order_by("-created_at")[:30]
+        )
+
+        context = {
+            "active_nav": "tokens",
+            "token": token,
+            "documents": documents,
+            "access_logs": access_logs,
+            "scope_mode": scope_mode,
+            "status_filter": status_filter,
+            "query": query,
+            "total_docs": total_docs,
+            "emitted_count": emitted_count,
+            "perimeter_count": perimeter_count,
+            "active_docs": active_docs,
+            "consumed_docs": consumed_docs,
+            "expired_docs": expired_docs,
+        }
+        return render(request, self.template_name, context)
 
 
 class DashboardApiTokenRevokeView(LoginRequiredMixin, View):

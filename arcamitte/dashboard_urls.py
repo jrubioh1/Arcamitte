@@ -32,5 +32,6 @@ urlpatterns = [
     path("usuarios/<int:user_id>/editar/", dashboard_views.DashboardUserEditView.as_view(), name="user_edit"),
     path("usuarios/<int:user_id>/reset-password/", dashboard_views.DashboardUserResetPasswordView.as_view(), name="user_reset_password"),
     path("tokens/", dashboard_views.DashboardApiTokenView.as_view(), name="api_tokens"),
+    path("tokens/<int:token_id>/", dashboard_views.DashboardApiTokenDetailView.as_view(), name="api_token_detail"),
     path("tokens/<int:token_id>/revocar/", dashboard_views.DashboardApiTokenRevokeView.as_view(), name="api_token_revoke"),
 ]

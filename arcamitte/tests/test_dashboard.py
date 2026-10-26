@@ -1656,6 +1656,42 @@ class DashboardTestCase(TestCase):
         self.assertEqual(audit_resp.status_code, 200)
         self.assertIn("no-store", audit_resp["Cache-Control"])
 
+    def test_api_token_detail_inspection_and_document_linking(self) -> None:
+        """Verifica la inspección en detalle de un API Token M2M y de los asientos documentales que emite."""
+        token_obj, _ = APIToken.generate_token(
+            name="Conector M2M Finanzas",
+            uo=self.uo_security,
+            created_by=self.admin_user,
+            scopes=[APIToken.Scope.DOCUMENTS_CREATE, APIToken.Scope.DOCUMENTS_READ],
+        )
+
+        doc_m2m = upload_and_encrypt_document(
+            original_file=SimpleUploadedFile("nomina_m2m.pdf", b"%PDF-1.4\nNomina M2M\n%%EOF", content_type="application/pdf"),
+            allowed_emails=["empleado@empresa.com"],
+            origin_uo=self.uo_security,
+            uploaded_by=self.admin_user,
+            api_token=token_obj,
+        )
+        self.assertEqual(doc_m2m.uploaded_by_token, token_obj)
+
+        self.client.force_login(self.admin_user)
+
+        # 1. Inspeccionar la ficha detallada del API Token
+        detail_url = reverse("dashboard:api_token_detail", kwargs={"token_id": token_obj.id})
+        resp = self.client.get(detail_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Conector M2M Finanzas")
+        self.assertContains(resp, token_obj.hashed_token)
+        self.assertContains(resp, "nomina_m2m.pdf")
+        self.assertContains(resp, "Emitido por este Token")
+
+        # 2. En el detalle del asiento documental aparece el vínculo al API Token emisor
+        doc_detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc_m2m.file_hash})
+        resp_doc = self.client.get(doc_detail_url)
+        self.assertEqual(resp_doc.status_code, 200)
+        self.assertContains(resp_doc, "API Token: Conector M2M Finanzas")
+
+
 
 
 
