@@ -273,7 +273,7 @@ curl -X GET http://127.0.0.1:8000/api/v1/documents/c5f590b2b80041d8e1f5f3e9c68c3
 
 ## 10. Verificación de Seguridad y Pruebas Unitarias
 
-La suite de pruebas incluye **124 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica y defensas anti-fuerza bruta:
+La suite de pruebas incluye **162 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, casos de abuso y pruebas de no repudio:
 
 ```bash
 poetry run pytest -v
@@ -281,13 +281,22 @@ poetry run pytest -v
 
 Resultado verificado:
 ```text
-============================= 124 passed in 31.25s =============================
+============================= 162 passed in 54.28s =============================
 ```
+
+### Casos de Prueba Avanzados y Escenarios de Abuso (Adversarial Testing)
+La batería de tests incluye pruebas específicas contra vectores de ataque y escenarios de abuso:
+- **Ataques de Fuerza Bruta y Credential Stuffing:** Bloqueo automático de cuentas tras 5 intentos fallidos consecutivos, baneo de IPs tras 10 fallos e intercepción perimetral con `HTTP 403 Forbidden` en `IPBanMiddleware`.
+- **Evasión de Contraseñas (Password Reuse Bypass):** Verificación con `PasswordHistoryValidator` impidiendo alternar o reutilizar cualquiera de las últimas 5 contraseñas previas.
+- **Manipulación de Base de Datos (Data Tampering):** Detección inmediata de adulteración de registros mediante verificación de cadena criptográfica (*Hash Chaining* secuencial).
+- **Inyección de Fórmulas CSV (CWE-1236):** Neutralización de comandos y macros DDE (`=CMD`, `+SUM`, `@IMPORTXML`, `-FORMULA`) en todas las exportaciones certificadas.
+- **Falsificación Documental de Auditoría:** Detección de alteraciones en volcados CSV mediante contraste del hash SHA-256 contra el recibo oficial inmutable `AuditExportReceipt`.
+- **Bypass de Privilegios:** Intentos de desbloqueo no autorizados o revocación de baneo por usuarios sin rol adecuado rechazados con `403 Forbidden`.
 
 ### Controles de Seguridad Verificados (SAST & SCA)
 El código y las dependencias han sido sometidos a auditoría de seguridad exhaustiva:
-- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 50.0.2`, `djangorestframework >= 3.18.3`).
-- **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 10.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
+- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 44.0.1`, `djangorestframework >= 3.18.2`).
+- **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 12.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
 - **SAST OWASP (Semgrep OSS):** 0 hallazgos bloqueantes sobre 456 reglas activas (OWASP Top 10, CWE, inyecciones y CSRF).
 - **Subresource Integrity (SRI):** Atributos `integrity="sha384-..."` y `crossorigin="anonymous"` obligatorios en todos los recursos externos CDN.
 - **Hardening de Cabeceras y Cookies:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `LANGUAGE_COOKIE_SECURE`, `SECURE_CONTENT_TYPE_NOSNIFF`, `X_FRAME_OPTIONS = "DENY"` y HSTS activo en producción (`DEBUG=False`).
@@ -296,11 +305,17 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
 
 ## 11. Cumplimiento de Estándares de Seguridad
 
+- **Esquema Nacional de Seguridad (ENS - Categoría ALTA) & eIDAS:**
+  - `op.acc.5 / op.acc.6`: Complejidad mínima de contraseñas (12 caracteres), prohibición de reutilización (historial de 5), caducidad periódica a 90 días y limitación de intentos fallidos.
+  - `op.exp.8`: Trazabilidad, integridad inalterable de registros mediante *Hash Chaining* y no repudio legal de exportaciones de auditoría mediante recibos oficiales `AuditExportReceipt` y huellas SHA-256.
+  - `op.seg.4`: Detección perimetral y baneo en lista negra de IPs atacantes.
 - **NIST SP 800-88 Rev. 1 (Media Sanitization):** Sobrescritura aleatoria de almacenamiento físico previa desvinculación de inodo.
+- **NIST SP 800-63B (Digital Identity Guidelines):** Verificación contra contraseñas comunes, longitud y control de ciclos de vida de autenticación.
 - **NIST SP 800-53 Rev. 5:**
+  - `AC-7`: Bloqueo automático de cuentas ante intentos no exitosos y alertas de seguridad.
   - `SC-13 / SC-28`: Cifrado criptográfico fuerte en reposo y en tránsito.
   - `AC-3 / AC-6`: Menor privilegio y aislamiento departamental por UO.
-  - `AU-2 / AU-9`: Registro inmutable de eventos de acceso y auditoría forense.
+  - `AU-2 / AU-9 / AU-10`: Registro inmutable de eventos de acceso, no repudio e integridad de registros de auditoría.
 - **OWASP API Security Top 10 (2023):**
   - `API1:2023 (BOLA)`: Aislamiento estricto de documentos por pertenencia de UO y usuario.
   - `API2:2023 (Broken Auth)`: Tokens de conocimiento cero y OTPs efímeros con caducidad forzada.

@@ -1,0 +1,148 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Verificación de No Repudio de Exportación" %} | Arcamitte{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Verificación de No Repudio de Archivos de Auditoría" %}</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Compruebe la autenticidad e inalterabilidad de un archivo CSV de auditoría contrastándolo contra el registro oficial inmutable." %}
+		</p>
+	</div>
+	<a href="{% url 'dashboard:audit_receipt_list' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1 shadow-sm">
+		<i data-feather="arrow-left" style="width:15px;height:15px;"></i>
+		<span>{% trans "Ver Todos los Recibos" %}</span>
+	</a>
+</div>
+
+<div class="row g-4">
+	<div class="col-lg-6">
+		<div class="card shadow-sm border-0 h-100">
+			<div class="card-header bg-white py-3">
+				<h5 class="fw-bold mb-0 d-flex align-items-center gap-2">
+					<i data-feather="check-square" class="text-primary" style="width:18px;height:18px;"></i>
+					<span>{% trans "Consultar y Contrastar Documento" %}</span>
+				</h5>
+			</div>
+			<div class="card-body p-4">
+				<form method="post" enctype="multipart/form-data" action="{% url 'dashboard:audit_verify_receipt' %}">
+					{% csrf_token %}
+					<div class="mb-3">
+						<label for="id_term" class="form-label small fw-bold">{% trans "Identificador de Recibo o Hash SHA-256" %}</label>
+						<input type="text" name="term" id="id_term" value="{{ term|default:'' }}" class="form-control font-mono" placeholder="Ej. ARCA-EXP-20261026-A1B2C3D4 o huella de 64 caracteres..." required>
+						<div class="form-text small">{% trans "Puede encontrar este código en la cabecera del archivo CSV o en el resguardo de entrega." %}</div>
+					</div>
+
+					<div class="mb-4">
+						<label for="id_csv_file" class="form-label small fw-bold">{% trans "Subir Archivo CSV Original para Verificación Criptográfica (Opcional)" %}</label>
+						<input type="file" name="csv_file" id="id_csv_file" class="form-control" accept=".csv">
+						<div class="form-text small">{% trans "Si sube el archivo, Arcamitte calculará su huella SHA-256 en memoria para certificar que no ha sido alterado ni una sola coma." %}</div>
+					</div>
+
+					<button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm">
+						<i data-feather="search" style="width:16px;height:16px;"></i>
+						<span>{% trans "Verificar Autenticidad y No Repudio" %}</span>
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-6">
+		<div class="card shadow-sm border-0 h-100">
+			<div class="card-header bg-white py-3">
+				<h5 class="fw-bold mb-0 d-flex align-items-center gap-2">
+					<i data-feather="file-text" class="text-secondary" style="width:18px;height:18px;"></i>
+					<span>{% trans "Resultado del Dictamen Criptográfico" %}</span>
+				</h5>
+			</div>
+			<div class="card-body p-4">
+				{% if result %}
+					{% if result.found %}
+						{% if result.is_valid %}
+							<div class="alert alert-success d-flex align-items-center gap-3 p-3 mb-4">
+								<i data-feather="shield-check" style="width:36px;height:36px;" class="text-success flex-shrink-0"></i>
+								<div>
+									<h5 class="alert-heading fw-bold mb-1">{% trans "Recibo Auténtico y Válido" %}</h5>
+									<p class="mb-0 small">
+										{% if result.hash_match %}
+											{% trans "El archivo CSV subido coincide al 100% con la huella digital registrada oficialmente. Integridad certificada sin repudio." %}
+										{% else %}
+											{% trans "El recibo oficial consta en los libros inmutables del sistema con la huella registrada." %}
+										{% endif %}
+									</p>
+								</div>
+							</div>
+						{% else %}
+							<div class="alert alert-danger d-flex align-items-center gap-3 p-3 mb-4">
+								<i data-feather="alert-octagon" style="width:36px;height:36px;" class="text-danger flex-shrink-0"></i>
+								<div>
+									<h5 class="alert-heading fw-bold mb-1">{% trans "¡Alerta: El Archivo Ha Sido Manipulado!" %}</h5>
+									<p class="mb-0 small">
+										{% trans "La huella digital del archivo CSV subido NO coincide con la huella registrada en el recibo oficial. El archivo ha sido modificado o alterado." %}
+									</p>
+								</div>
+							</div>
+						{% endif %}
+
+						<table class="table table-sm table-borderless small mb-0">
+							<tbody>
+								<tr>
+									<td class="text-muted fw-bold" style="width:40%;">{% trans "Código de Recibo:" %}</td>
+									<td class="font-mono fw-bold text-dark">{{ result.receipt_id }}</td>
+								</tr>
+								<tr>
+									<td class="text-muted fw-bold">{% trans "Fecha de Emisión:" %}</td>
+									<td class="font-mono text-dark">{{ result.created_at|date:"d/m/Y H:i:s" }} UTC</td>
+								</tr>
+								<tr>
+									<td class="text-muted fw-bold">{% trans "Operador Responsable:" %}</td>
+									<td>{{ result.exported_by }}</td>
+								</tr>
+								<tr>
+									<td class="text-muted fw-bold">{% trans "Registros Certificados:" %}</td>
+									<td>{{ result.records_count }}</td>
+								</tr>
+								<tr>
+									<td class="text-muted fw-bold">{% trans "Motivo Legal Declarado:" %}</td>
+									<td class="text-break">{{ result.reason|default:"-" }}</td>
+								</tr>
+								<tr>
+									<td class="text-muted fw-bold">{% trans "Hash Oficial Registrado:" %}</td>
+									<td><code class="font-mono text-primary text-break" style="font-size:0.75rem;">{{ result.expected_hash }}</code></td>
+								</tr>
+								{% if result.computed_hash %}
+									<tr>
+										<td class="text-muted fw-bold">{% trans "Hash del Archivo Subido:" %}</td>
+										<td>
+											<code class="font-mono {% if result.hash_match %}text-success{% else %}text-danger{% endif %} text-break" style="font-size:0.75rem;">
+												{{ result.computed_hash }}
+											</code>
+										</td>
+									</tr>
+								{% endif %}
+							</tbody>
+						</table>
+					{% else %}
+						<div class="alert alert-warning d-flex align-items-center gap-3 p-3 mb-0">
+							<i data-feather="alert-circle" style="width:28px;height:28px;" class="text-warning flex-shrink-0"></i>
+							<div>
+								<h6 class="fw-bold mb-1">{% trans "Recibo No Encontrado" %}</h6>
+								<p class="mb-0 small">{{ result.error }}</p>
+							</div>
+						</div>
+					{% endif %}
+				{% else %}
+					<div class="text-center py-5 text-muted">
+						<i data-feather="search" style="width:36px;height:36px;" class="mb-2 opacity-50"></i>
+						<h6>{% trans "Esperando consulta" %}</h6>
+						<p class="small mb-0">{% trans "Introduzca un código de recibo o suba un archivo CSV para emitir el dictamen forense." %}</p>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

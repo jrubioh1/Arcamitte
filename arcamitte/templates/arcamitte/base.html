@@ -77,6 +77,11 @@
 						<i data-feather="key"></i> <span>{% trans "API Tokens (M2M)" %}</span>
 					</a>
 				</li>
+				<li class="arca-nav-item {% if active_nav == 'security_ips' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:ip_ban_list' %}">
+						<i data-feather="shield-off"></i> <span>{% trans "Lista Negra IPs" %}</span>
+					</a>
+				</li>
 				{% endif %}
 				{% endif %}
 

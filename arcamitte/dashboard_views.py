@@ -86,13 +86,19 @@ def get_scoped_documents_queryset(user: Any) -> models.QuerySet[EncryptedDocumen
       o cualquier asiento que hayan subido personalmente.
     """
     if getattr(user, "is_superuser", False):
-        return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
+        return EncryptedDocument.objects.all().select_related(
+            "origin_uo", "target_uo", "uploaded_by"
+        )
     user_uos = get_user_accessible_uos(user)
-    return EncryptedDocument.objects.filter(
-        models.Q(origin_uo__in=user_uos)
-        | models.Q(target_uo__in=user_uos)
-        | models.Q(uploaded_by=user)
-    ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
+    return (
+        EncryptedDocument.objects.filter(
+            models.Q(origin_uo__in=user_uos)
+            | models.Q(target_uo__in=user_uos)
+            | models.Q(uploaded_by=user)
+        )
+        .select_related("origin_uo", "target_uo", "uploaded_by")
+        .distinct()
+    )
 
 
 class DashboardLoginView(auth_views.LoginView):
@@ -113,6 +119,36 @@ class DashboardLoginView(auth_views.LoginView):
         return f"arcamitte_login_bf_{client_ip}_{username}"
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        username = (request.POST.get("username") or "").strip()
+        client_ip = get_client_ip(request)
+
+        # 1. Comprobación preventiva de cuenta bloqueada
+        if username:
+            candidate_user = User.objects.filter(
+                models.Q(username__iexact=username) | models.Q(email__iexact=username)
+            ).first()
+            if candidate_user:
+                profile = getattr(candidate_user, "arcamitte_profile", None)
+                if profile and profile.is_locked:
+                    form = self.get_form()
+                    unlock_time_str = (
+                        profile.locked_until.strftime("%H:%M:%S UTC")
+                        if profile.locked_until
+                        else ""
+                    )
+                    form.add_error(
+                        None,
+                        _(
+                            f"Esta cuenta de usuario se encuentra temporalmente bloqueada por reiterados "
+                            f"intentos fallidos de acceso. Podrá reintentarlo automáticamente a las {unlock_time_str} "
+                            f"o contactar a un administrador para su desbloqueo inmediato."
+                        ),
+                    )
+                    return self.render_to_response(
+                        self.get_context_data(form=form), status=429
+                    )
+
+        # 2. Control anti-fuerza bruta rápido en memoria
         bf_key = self._get_bf_cache_key(request)
         attempts = cache.get(bf_key, 0)
         if attempts >= self.max_failed_attempts:
@@ -131,11 +167,32 @@ class DashboardLoginView(auth_views.LoginView):
         bf_key = self._get_bf_cache_key(self.request)
         attempts = cache.get(bf_key, 0) + 1
         cache.set(bf_key, attempts, timeout=self.lockout_seconds)
+
+        client_ip = get_client_ip(self.request)
+        username = (self.request.POST.get("username") or "").strip()
+        from arcamitte.services import record_failed_login
+
+        res = record_failed_login(username=username, client_ip=client_ip)
+        if res.get("user_locked"):
+            form.add_error(
+                None,
+                _(
+                    "Se ha superado el límite de intentos permitidos para esta cuenta. "
+                    "La cuenta ha sido bloqueada temporalmente por seguridad y se ha remitido un aviso a su buzón de correo."
+                ),
+            )
+
         return super().form_invalid(form)
 
     def form_valid(self, form: Any) -> HttpResponse:
         bf_key = self._get_bf_cache_key(self.request)
         cache.delete(bf_key)
+
+        client_ip = get_client_ip(self.request)
+        from arcamitte.services import record_successful_login
+
+        record_successful_login(user=form.get_user(), client_ip=client_ip)
+
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
@@ -212,17 +269,25 @@ class DashboardHomeView(LoginRequiredMixin, TemplateView):
         docs_qs = get_scoped_documents_queryset(user)
         total_docs = docs_qs.count()
         consumed_docs = docs_qs.filter(is_consumed=True).count()
-        active_docs = docs_qs.filter(is_consumed=False).filter(models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)).count()
+        active_docs = (
+            docs_qs.filter(is_consumed=False)
+            .filter(models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True))
+            .count()
+        )
         expired_docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).count()
 
         recent_docs = docs_qs.order_by("-created_at")[:6]
 
         if user.is_superuser:
-            logs_qs = DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo")
+            logs_qs = DocumentAccessLog.objects.all().select_related(
+                "document", "origin_uo", "target_uo"
+            )
         else:
-            logs_qs = DocumentAccessLog.objects.filter(
-                models.Q(document__in=docs_qs)
-            ).select_related("document", "origin_uo", "target_uo").distinct()
+            logs_qs = (
+                DocumentAccessLog.objects.filter(models.Q(document__in=docs_qs))
+                .select_related("document", "origin_uo", "target_uo")
+                .distinct()
+            )
 
         recent_logs = logs_qs.order_by("-created_at")[:6]
 
@@ -265,7 +330,9 @@ class DashboardDocumentListView(LoginRequiredMixin, ListView):
         status_filter = self.request.GET.get("status", "").strip().lower()
         now = timezone.now()
         if status_filter == "active":
-            qs = qs.filter(is_consumed=False).filter(models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True))
+            qs = qs.filter(is_consumed=False).filter(
+                models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)
+            )
         elif status_filter == "consumed":
             qs = qs.filter(is_consumed=True)
         elif status_filter == "expired":
@@ -295,7 +362,10 @@ class DashboardDocumentListView(LoginRequiredMixin, ListView):
                 d.id
                 for d in docs_list
                 if (d.origin_uo_id and d.origin_uo_id in admin_uos)
-                or (d.origin_uo_id is None and d.uploaded_by_id == getattr(user, "id", None))
+                or (
+                    d.origin_uo_id is None
+                    and d.uploaded_by_id == getattr(user, "id", None)
+                )
             }
         return context
 
@@ -313,7 +383,9 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
         available_uos = get_user_accessible_uos(user)
         all_uos = OrganizationalUnit.objects.filter(is_active=True).order_by("name")
 
-        primary_membership = UserUOMembership.objects.filter(user=user, is_active=True).first()
+        primary_membership = UserUOMembership.objects.filter(
+            user=user, is_active=True
+        ).first()
         default_origin_uo = str(primary_membership.uo_id) if primary_membership else ""
 
         context = {
@@ -355,7 +427,11 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
             else:
                 origin_uo = available_uos.filter(id=origin_uo_id).first()
                 if not origin_uo:
-                    errors.append(_("No tiene autorización operativa sobre la UO emisora seleccionada."))
+                    errors.append(
+                        _(
+                            "No tiene autorización operativa sobre la UO emisora seleccionada."
+                        )
+                    )
 
         target_uo_id = request.POST.get("target_uo", "").strip()
         target_uo: OrganizationalUnit | None = None
@@ -372,15 +448,22 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
 
         validated_emails: list[str] = []
         if not split_emails:
-            errors.append(_("Debe especificar al menos una dirección de correo para el canje."))
+            errors.append(
+                _("Debe especificar al menos una dirección de correo para el canje.")
+            )
         else:
             try:
                 validated_emails = normalize_and_validate_email_list(split_emails)
             except ValidationError as ve:
                 errors.extend(ve.messages)
 
-        burn_policy = request.POST.get("burn_policy", EncryptedDocument.BurnPolicy.FIRST_ACCESS)
-        if burn_policy not in (EncryptedDocument.BurnPolicy.FIRST_ACCESS, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS):
+        burn_policy = request.POST.get(
+            "burn_policy", EncryptedDocument.BurnPolicy.FIRST_ACCESS
+        )
+        if burn_policy not in (
+            EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+            EncryptedDocument.BurnPolicy.ALL_RECIPIENTS,
+        ):
             burn_policy = EncryptedDocument.BurnPolicy.FIRST_ACCESS
 
         raw_expires = request.POST.get("expires_at", "").strip()
@@ -399,7 +482,11 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                 if timezone.is_naive(parsed):
                     parsed = timezone.make_aware(parsed)
             if parsed and parsed <= timezone.now():
-                errors.append(_("La fecha de caducidad debe ser posterior a la fecha y hora actual."))
+                errors.append(
+                    _(
+                        "La fecha de caducidad debe ser posterior a la fecha y hora actual."
+                    )
+                )
             expires_at = parsed
         else:
             expires_at = default_document_expiry()
@@ -411,7 +498,8 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                 "active_nav": "upload",
                 "available_origin_uos": available_uos,
                 "all_target_uos": all_uos,
-                "default_expires_at": raw_expires or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
+                "default_expires_at": raw_expires
+                or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
                 "form_errors": errors,
                 "allowed_emails_list": split_emails or [""],
                 "allowed_emails_json": json.dumps(split_emails or [""]),
@@ -446,7 +534,8 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
                 "active_nav": "upload",
                 "available_origin_uos": available_uos,
                 "all_target_uos": all_uos,
-                "default_expires_at": raw_expires or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
+                "default_expires_at": raw_expires
+                or default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
                 "form_errors": errors,
                 "allowed_emails_list": split_emails or [""],
                 "allowed_emails_json": json.dumps(split_emails or [""]),
@@ -467,7 +556,8 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
         else:
             messages.success(
                 request,
-                _("Asiento cifrado con éxito. Hash SHA-256: %(hash)s") % {"hash": doc.file_hash},
+                _("Asiento cifrado con éxito. Hash SHA-256: %(hash)s")
+                % {"hash": doc.file_hash},
             )
         return redirect("dashboard:document_detail", file_hash=doc.file_hash)
 
@@ -490,11 +580,15 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
             has_uo_access = (doc.origin_uo in user_uos) or (doc.target_uo in user_uos)
             is_uploader = bool(doc.uploaded_by_id and doc.uploaded_by_id == user.id)
             if not (has_uo_access or is_uploader):
-                raise PermissionDenied(_("No tiene autorización para inspeccionar este documento."))
+                raise PermissionDenied(
+                    _("No tiene autorización para inspeccionar este documento.")
+                )
 
         client_ip = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
-        user_id_str = getattr(user, "email", None) or getattr(user, "username", "sistema@arcamitte.local")
+        user_id_str = getattr(user, "email", None) or getattr(
+            user, "username", "sistema@arcamitte.local"
+        )
         file_exists = check_and_auto_close_if_file_missing(
             document=doc,
             user_identifier=user_id_str,
@@ -533,11 +627,15 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
         download_logs_by_email: dict[str, DocumentAccessLog] = {}
         for log in logs:
             log_email = (log.email or "").strip().lower()
-            if log.action in download_actions and log_email and log_email not in download_logs_by_email:
+            if (
+                log.action in download_actions
+                and log_email
+                and log_email not in download_logs_by_email
+            ):
                 download_logs_by_email[log_email] = log
 
         recipient_status_list = []
-        for raw_email in (doc.allowed_emails or []):
+        for raw_email in doc.allowed_emails or []:
             if not isinstance(raw_email, str):
                 continue
             email_clean = raw_email.strip().lower()
@@ -558,10 +656,18 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
                     consumed_at = None
             elif log_match:
                 consumed_at = log_match.created_at
-            elif doc.is_consumed and doc.consumed_at and (doc.consumed_by or "").strip().lower() == email_clean:
+            elif (
+                doc.is_consumed
+                and doc.consumed_at
+                and (doc.consumed_by or "").strip().lower() == email_clean
+            ):
                 consumed_at = doc.consumed_at
 
-            consumed_ip = info.get("ip_address") or (log_match.ip_address if log_match else "") or ""
+            consumed_ip = (
+                info.get("ip_address")
+                or (log_match.ip_address if log_match else "")
+                or ""
+            )
 
             recipient_status_list.append(
                 {
@@ -581,20 +687,33 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
                     UserUOMembership.objects.filter(
                         user=user,
                         is_active=True,
-                        role__in=[UserUOMembership.Role.AUDITOR, UserUOMembership.Role.ADMIN],
+                        role__in=[
+                            UserUOMembership.Role.AUDITOR,
+                            UserUOMembership.Role.ADMIN,
+                        ],
                     ).values_list("uo_id", flat=True)
                 )
                 is_auditor_user = bool(user_auditor_uos)
                 is_uo_match = (
-                    (doc.origin_uo_id and doc.origin_uo_id in user_auditor_uos)
-                    or (doc.target_uo_id and doc.target_uo_id in user_auditor_uos)
+                    doc.origin_uo_id and doc.origin_uo_id in user_auditor_uos
+                ) or (doc.target_uo_id and doc.target_uo_id in user_auditor_uos)
+                is_own_upload = bool(
+                    doc.uploaded_by_id and doc.uploaded_by_id == user.id
                 )
-                is_own_upload = bool(doc.uploaded_by_id and doc.uploaded_by_id == user.id)
-                if is_uo_match or (is_auditor_user and is_own_upload) or (doc.origin_uo_id is None and is_own_upload):
+                if (
+                    is_uo_match
+                    or (is_auditor_user and is_own_upload)
+                    or (doc.origin_uo_id is None and is_own_upload)
+                ):
                     can_audit_download = True
 
         can_terminate = False
-        if file_exists and doc.is_active and not doc.is_consumed and not doc.is_expired():
+        if (
+            file_exists
+            and doc.is_active
+            and not doc.is_consumed
+            and not doc.is_expired()
+        ):
             if user.is_superuser:
                 can_terminate = True
             elif doc.origin_uo_id:
@@ -649,9 +768,18 @@ class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
             return redirect("dashboard:document_detail", file_hash=doc.file_hash)
 
         import mimetypes
-        raw_filename = original_filename or getattr(doc, "original_filename", "documento_auditado")
-        safe_filename = sanitize_content_disposition_filename(raw_filename, default="documento_auditado")
-        mtype = getattr(doc, "mime_type", None) or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream"
+
+        raw_filename = original_filename or getattr(
+            doc, "original_filename", "documento_auditado"
+        )
+        safe_filename = sanitize_content_disposition_filename(
+            raw_filename, default="documento_auditado"
+        )
+        mtype = (
+            getattr(doc, "mime_type", None)
+            or mimetypes.guess_type(safe_filename)[0]
+            or "application/octet-stream"
+        )
         response = HttpResponse(
             decrypted_bytes,
             content_type=mtype,
@@ -674,7 +802,7 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
         if not user.is_superuser:
-            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by_id == user.id)
+            is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
             is_origin_admin = bool(
                 doc.origin_uo_id
                 and UserUOMembership.objects.filter(
@@ -686,7 +814,9 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
             )
             if not (is_origin_admin or is_personal_owner):
                 raise PermissionDenied(
-                    _("Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento.")
+                    _(
+                        "Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."
+                    )
                 )
 
         if not doc.is_active:
@@ -704,7 +834,7 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
         if not user.is_superuser:
-            is_personal_owner = (doc.origin_uo is None and doc.uploaded_by_id == user.id)
+            is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
             is_origin_admin = bool(
                 doc.origin_uo_id
                 and UserUOMembership.objects.filter(
@@ -716,13 +846,25 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
             )
             if not (is_origin_admin or is_personal_owner):
                 raise PermissionDenied(
-                    _("Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento.")
+                    _(
+                        "Solo un Administrador de la UO emisora, el autor del asiento personal o un superadministrador puede clausurar el documento."
+                    )
                 )
 
         justification = request.POST.get("justification", "").strip()
         if not justification:
-            messages.error(request, _("Debe proporcionar un motivo justificado para la destrucción anticipada."))
-            return render(request, self.template_name, {"active_nav": "documents", "doc": doc}, status=400)
+            messages.error(
+                request,
+                _(
+                    "Debe proporcionar un motivo justificado para la destrucción anticipada."
+                ),
+            )
+            return render(
+                request,
+                self.template_name,
+                {"active_nav": "documents", "doc": doc},
+                status=400,
+            )
 
         client_ip = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
@@ -756,12 +898,19 @@ class DashboardAuditLogView(LoginRequiredMixin, ListView):
     def get_queryset(self) -> models.QuerySet[DocumentAccessLog]:
         user = self.request.user
         if user.is_superuser:
-            qs = DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo").order_by("-created_at")
+            qs = (
+                DocumentAccessLog.objects.all()
+                .select_related("document", "origin_uo", "target_uo")
+                .order_by("-created_at")
+            )
         else:
             docs_qs = get_scoped_documents_queryset(user)
-            qs = DocumentAccessLog.objects.filter(
-                models.Q(document__in=docs_qs)
-            ).select_related("document", "origin_uo", "target_uo").order_by("-created_at").distinct()
+            qs = (
+                DocumentAccessLog.objects.filter(models.Q(document__in=docs_qs))
+                .select_related("document", "origin_uo", "target_uo")
+                .order_by("-created_at")
+                .distinct()
+            )
 
         query = self.request.GET.get("q", "").strip()
         if query:
@@ -830,7 +979,9 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest) -> HttpResponse:
         if not (request.user.is_superuser or request.user.is_staff):
-            raise PermissionDenied(_("Se requieren privilegios administrativos para gestionar API Tokens."))
+            raise PermissionDenied(
+                _("Se requieren privilegios administrativos para gestionar API Tokens.")
+            )
 
         tokens = APIToken.objects.all().order_by("-created_at")
         new_token = request.session.pop("new_raw_token", None)
@@ -844,11 +995,16 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest) -> HttpResponse:
         if not (request.user.is_superuser or request.user.is_staff):
-            raise PermissionDenied(_("Se requieren privilegios administrativos para gestionar API Tokens."))
+            raise PermissionDenied(
+                _("Se requieren privilegios administrativos para gestionar API Tokens.")
+            )
 
         name = request.POST.get("name", "").strip()
         if not name:
-            messages.error(request, _("Debe proporcionar un nombre o identificador para el servicio."))
+            messages.error(
+                request,
+                _("Debe proporcionar un nombre o identificador para el servicio."),
+            )
             return redirect("dashboard:api_tokens")
 
         scopes = request.POST.getlist("scopes")
@@ -882,7 +1038,9 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         )
 
         request.session["new_raw_token"] = raw_secret
-        messages.success(request, _(f"API Token '{token_obj.name}' generado correctamente."))
+        messages.success(
+            request, _(f"API Token '{token_obj.name}' generado correctamente.")
+        )
         return redirect("dashboard:api_tokens")
 
 
@@ -895,7 +1053,9 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest, token_id: int) -> HttpResponse:
         if not (request.user.is_superuser or request.user.is_staff):
-            raise PermissionDenied(_("Se requieren privilegios administrativos para revocar API Tokens."))
+            raise PermissionDenied(
+                _("Se requieren privilegios administrativos para revocar API Tokens.")
+            )
 
         token = get_object_or_404(APIToken, id=token_id)
         token.is_active = False
@@ -907,7 +1067,9 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
             f"[ARCAMITTE AUDIT] API Token revocado: '{token.name}' (prefijo: {token.prefix}...) por {request.user.username} (IP: {client_ip})"
         )
 
-        messages.warning(request, _(f"El API Token '{token.name}' ha sido revocado inmediatamente."))
+        messages.warning(
+            request, _(f"El API Token '{token.name}' ha sido revocado inmediatamente.")
+        )
         return redirect("dashboard:api_tokens")
 
 
@@ -923,7 +1085,9 @@ class DashboardUOMembersAjaxView(LoginRequiredMixin, View):
         try:
             uo = OrganizationalUnit.objects.get(pk=uo_id, is_active=True)
         except OrganizationalUnit.DoesNotExist:
-            return JsonResponse({"error": _("Unidad Organizativa no encontrada.")}, status=404)
+            return JsonResponse(
+                {"error": _("Unidad Organizativa no encontrada.")}, status=404
+            )
 
         memberships = (
             UserUOMembership.objects.filter(uo=uo, is_active=True, user__is_active=True)
@@ -988,7 +1152,8 @@ class DashboardUOCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
             uo = form.save()
             messages.success(
                 request,
-                _("Unidad Organizativa %(alias)s creada exitosamente.") % {"alias": uo.alias},
+                _("Unidad Organizativa %(alias)s creada exitosamente.")
+                % {"alias": uo.alias},
             )
             return redirect("dashboard:uo_list")
         return render(
@@ -1010,12 +1175,16 @@ class DashboardUOEditView(LoginRequiredMixin, View):
     def get_uo(self, request: HttpRequest, uo_id: int) -> OrganizationalUnit:
         uo = get_object_or_404(OrganizationalUnit, pk=uo_id)
         if not is_uo_admin(request.user, uo):
-            raise PermissionDenied(_("No tiene privilegios para administrar esta Unidad Organizativa."))
+            raise PermissionDenied(
+                _("No tiene privilegios para administrar esta Unidad Organizativa.")
+            )
         return uo
 
     def get(self, request: HttpRequest, uo_id: int) -> HttpResponse:
         uo = self.get_uo(request, uo_id)
-        form = OrganizationalUnitForm(instance=uo, is_superuser=request.user.is_superuser)
+        form = OrganizationalUnitForm(
+            instance=uo, is_superuser=request.user.is_superuser
+        )
         return render(
             request,
             self.template_name,
@@ -1033,7 +1202,8 @@ class DashboardUOEditView(LoginRequiredMixin, View):
             form.save()
             messages.success(
                 request,
-                _("Unidad Organizativa %(alias)s actualizada exitosamente.") % {"alias": uo.alias},
+                _("Unidad Organizativa %(alias)s actualizada exitosamente.")
+                % {"alias": uo.alias},
             )
             return redirect("dashboard:uo_list")
         return render(
@@ -1055,7 +1225,11 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
     def get_uo(self, request: HttpRequest, uo_id: int) -> OrganizationalUnit:
         uo = get_object_or_404(OrganizationalUnit, pk=uo_id)
         if not is_uo_admin(request.user, uo):
-            raise PermissionDenied(_("No tiene privilegios para administrar miembros en esta Unidad Organizativa."))
+            raise PermissionDenied(
+                _(
+                    "No tiene privilegios para administrar miembros en esta Unidad Organizativa."
+                )
+            )
         return uo
 
     def get(self, request: HttpRequest, uo_id: int) -> HttpResponse:
@@ -1089,8 +1263,16 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 "full_name": u.get_full_name() or "",
                 "email": u.email or "",
                 "is_occupied": u.id in other_active_memberships,
-                "assigned_uo_alias": other_active_memberships[u.id].alias if u.id in other_active_memberships else "",
-                "assigned_uo_name": other_active_memberships[u.id].name if u.id in other_active_memberships else "",
+                "assigned_uo_alias": (
+                    other_active_memberships[u.id].alias
+                    if u.id in other_active_memberships
+                    else ""
+                ),
+                "assigned_uo_name": (
+                    other_active_memberships[u.id].name
+                    if u.id in other_active_memberships
+                    else ""
+                ),
             }
             for u in available_users
         ]
@@ -1131,7 +1313,10 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                         "El usuario %(username)s ya se encuentra asignado a la Unidad Organizativa %(alias)s. "
                         "Debe ser desvinculado previamente por su UO correspondiente o por un superusuario para quedar libre."
                     )
-                    % {"username": target_user.username, "alias": existing_other.uo.alias},
+                    % {
+                        "username": target_user.username,
+                        "alias": existing_other.uo.alias,
+                    },
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1146,7 +1331,8 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 membership.save(update_fields=["role", "is_active"])
             messages.success(
                 request,
-                _("Usuario %(username)s asignado a %(alias)s.") % {"username": target_user.username, "alias": uo.alias},
+                _("Usuario %(username)s asignado a %(alias)s.")
+                % {"username": target_user.username, "alias": uo.alias},
             )
 
         elif action == "update_role":
@@ -1158,7 +1344,9 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             if membership.user.is_superuser and not request.user.is_superuser:
                 messages.error(
                     request,
-                    _("No tiene privilegios suficientes para modificar el rol de un superusuario del sistema."),
+                    _(
+                        "No tiene privilegios suficientes para modificar el rol de un superusuario del sistema."
+                    ),
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1182,7 +1370,8 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 membership.save(update_fields=["role"])
                 messages.success(
                     request,
-                    _("Rol de %(username)s actualizado a %(role)s.") % {
+                    _("Rol de %(username)s actualizado a %(role)s.")
+                    % {
                         "username": membership.user.username,
                         "role": membership.get_role_display(),
                     },
@@ -1196,7 +1385,9 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             if membership.user.is_superuser and not request.user.is_superuser:
                 messages.error(
                     request,
-                    _("No tiene privilegios suficientes para modificar el estado de un superusuario del sistema."),
+                    _(
+                        "No tiene privilegios suficientes para modificar el estado de un superusuario del sistema."
+                    ),
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1204,7 +1395,9 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             if membership.user == request.user and not request.user.is_superuser:
                 messages.error(
                     request,
-                    _("Por motivos de seguridad operativa, no puede desactivar su propia membresía en esta Unidad Organizativa."),
+                    _(
+                        "Por motivos de seguridad operativa, no puede desactivar su propia membresía en esta Unidad Organizativa."
+                    ),
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1213,7 +1406,8 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             state_str = _("activada") if membership.is_active else _("desactivada")
             messages.info(
                 request,
-                _("Membresía de %(username)s %(state)s.") % {
+                _("Membresía de %(username)s %(state)s.")
+                % {
                     "username": membership.user.username,
                     "state": state_str,
                 },
@@ -1227,7 +1421,9 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             if membership.user.is_superuser and not request.user.is_superuser:
                 messages.error(
                     request,
-                    _("No tiene privilegios suficientes para desvincular a un superusuario del sistema."),
+                    _(
+                        "No tiene privilegios suficientes para desvincular a un superusuario del sistema."
+                    ),
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1235,7 +1431,9 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             if membership.user == request.user and not request.user.is_superuser:
                 messages.error(
                     request,
-                    _("Por motivos de seguridad operativa, no puede auto-expulsarse de esta Unidad Organizativa. Solicite la retirada a otro administrador o a un superusuario."),
+                    _(
+                        "Por motivos de seguridad operativa, no puede auto-expulsarse de esta Unidad Organizativa. Solicite la retirada a otro administrador o a un superusuario."
+                    ),
                 )
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
@@ -1243,7 +1441,8 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             membership.delete()
             messages.warning(
                 request,
-                _("Usuario %(username)s retirado de %(alias)s.") % {"username": username, "alias": uo.alias},
+                _("Usuario %(username)s retirado de %(alias)s.")
+                % {"username": username, "alias": uo.alias},
             )
 
         return redirect("dashboard:uo_members", uo_id=uo.id)
@@ -1261,15 +1460,25 @@ class DashboardUserListView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest) -> HttpResponse:
         if request.user.is_superuser:
-            users = User.objects.all().prefetch_related("uo_memberships__uo").order_by("username")
+            users = (
+                User.objects.all()
+                .select_related("arcamitte_profile")
+                .prefetch_related("uo_memberships__uo")
+                .order_by("username")
+            )
             can_create_user = True
         else:
             admin_uos = get_user_administered_uos(request.user)
             if not admin_uos.exists():
-                raise PermissionDenied(_("No tiene permisos para administrar usuarios ni Unidades Organizativas."))
+                raise PermissionDenied(
+                    _(
+                        "No tiene permisos para administrar usuarios ni Unidades Organizativas."
+                    )
+                )
             users = (
                 User.objects.filter(uo_memberships__uo__in=admin_uos)
                 .distinct()
+                .select_related("arcamitte_profile")
                 .prefetch_related("uo_memberships__uo")
                 .order_by("username")
             )
@@ -1305,7 +1514,9 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
         if not request.user.is_superuser and not admin_uos.exists():
             raise PermissionDenied(_("No tiene permisos para crear usuarios."))
 
-        form = UserManagementForm(is_superuser=request.user.is_superuser, current_user=request.user)
+        form = UserManagementForm(
+            is_superuser=request.user.is_superuser, current_user=request.user
+        )
         return render(
             request,
             self.template_name,
@@ -1338,7 +1549,9 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
             user.save()
 
             uo_id = request.POST.get("initial_uo")
-            initial_role = request.POST.get("initial_role", UserUOMembership.Role.OPERATOR)
+            initial_role = request.POST.get(
+                "initial_role", UserUOMembership.Role.OPERATOR
+            )
             if uo_id:
                 try:
                     uo = admin_uos.get(pk=uo_id)
@@ -1355,13 +1568,17 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
                 reset_user_password_and_notify(user, requested_by=request.user)
                 messages.success(
                     request,
-                    _("Usuario %(username)s creado exitosamente. Se ha remitido una contraseña temporal a su correo.")
+                    _(
+                        "Usuario %(username)s creado exitosamente. Se ha remitido una contraseña temporal a su correo."
+                    )
                     % {"username": user.username},
                 )
             else:
                 messages.warning(
                     request,
-                    _("Usuario %(username)s creado sin correo electrónico. Deberá asignarle uno para remitirle la contraseña.")
+                    _(
+                        "Usuario %(username)s creado sin correo electrónico. Deberá asignarle uno para remitirle la contraseña."
+                    )
                     % {"username": user.username},
                 )
 
@@ -1394,10 +1611,16 @@ class DashboardUserEditView(LoginRequiredMixin, View):
             return target
         # Restricción jerárquica estricta: un usuario que no es superusuario jamás puede editar a un superusuario
         if target.is_superuser:
-            raise PermissionDenied(_("No tiene privilegios suficientes para administrar a un superusuario del sistema."))
+            raise PermissionDenied(
+                _(
+                    "No tiene privilegios suficientes para administrar a un superusuario del sistema."
+                )
+            )
         admin_uos = get_user_administered_uos(request.user)
         if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
-            raise PermissionDenied(_("No tiene permisos para administrar a este usuario."))
+            raise PermissionDenied(
+                _("No tiene permisos para administrar a este usuario.")
+            )
         return target
 
     def get(self, request: HttpRequest, user_id: int) -> HttpResponse:
@@ -1430,7 +1653,8 @@ class DashboardUserEditView(LoginRequiredMixin, View):
             form.save()
             messages.success(
                 request,
-                _("Usuario %(username)s actualizado exitosamente.") % {"username": target.username},
+                _("Usuario %(username)s actualizado exitosamente.")
+                % {"username": target.username},
             )
             return redirect("dashboard:user_list")
         return render(
@@ -1458,10 +1682,18 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
         if not request.user.is_superuser:
             # Restricción jerárquica estricta: un usuario que no es superusuario no puede resetear a un superusuario
             if target.is_superuser:
-                raise PermissionDenied(_("No tiene privilegios suficientes para resetear la contraseña de un superusuario del sistema."))
+                raise PermissionDenied(
+                    _(
+                        "No tiene privilegios suficientes para resetear la contraseña de un superusuario del sistema."
+                    )
+                )
             admin_uos = get_user_administered_uos(request.user)
-            if not UserUOMembership.objects.filter(user=target, uo__in=admin_uos).exists():
-                raise PermissionDenied(_("No tiene permisos para resetear la contraseña de este usuario."))
+            if not UserUOMembership.objects.filter(
+                user=target, uo__in=admin_uos
+            ).exists():
+                raise PermissionDenied(
+                    _("No tiene permisos para resetear la contraseña de este usuario.")
+                )
 
         ok, msg = reset_user_password_and_notify(target, requested_by=request.user)
         if ok:
@@ -1470,7 +1702,9 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
             messages.error(request, msg)
 
         fallback_url = reverse("dashboard:user_list")
-        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        next_url = (
+            request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        )
         if not url_has_allowed_host_and_scheme(
             url=next_url,
             allowed_hosts={request.get_host()},
@@ -1502,7 +1736,9 @@ class DashboardPasswordResetRequestView(View):
         if req_count >= self.max_requests_per_window:
             messages.error(
                 request,
-                _("Ha superado el límite de solicitudes de recuperación. Por favor, espere unos minutos antes de reintentar."),
+                _(
+                    "Ha superado el límite de solicitudes de recuperación. Por favor, espere unos minutos antes de reintentar."
+                ),
             )
             form = PasswordResetRequestForm(request.POST)
             return render(request, self.template_name, {"form": form}, status=429)
@@ -1520,7 +1756,9 @@ class DashboardPasswordResetRequestView(View):
 
             messages.success(
                 request,
-                _("Si la cuenta indicada existe y dispone de un correo configurado, se ha enviado una clave temporal con instrucciones."),
+                _(
+                    "Si la cuenta indicada existe y dispone de un correo configurado, se ha enviado una clave temporal con instrucciones."
+                ),
             )
             return redirect("dashboard:login")
 
@@ -1556,9 +1794,9 @@ class DashboardPasswordChangeView(LoginRequiredMixin, View):
             request.user.set_password(new_password)
             request.user.save(update_fields=["password"])
 
-            profile = get_or_create_user_profile(request.user)
-            profile.must_change_password = False
-            profile.save(update_fields=["must_change_password", "updated_at"])
+            from arcamitte.services import record_password_change
+
+            record_password_change(request.user, new_password)
 
             update_session_auth_hash(request, request.user)
             messages.success(request, _("Su contraseña ha sido actualizada con éxito."))
@@ -1585,13 +1823,22 @@ def get_user_analytics_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
     if not user or not user.is_authenticated:
         return OrganizationalUnit.objects.none()
     if getattr(user, "is_superuser", False):
-        return OrganizationalUnit.objects.filter(is_active=True).order_by("numeric_code")
-    return OrganizationalUnit.objects.filter(
-        memberships__user=user,
-        memberships__role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
-        memberships__is_active=True,
-        is_active=True,
-    ).order_by("numeric_code").distinct()
+        return OrganizationalUnit.objects.filter(is_active=True).order_by(
+            "numeric_code"
+        )
+    return (
+        OrganizationalUnit.objects.filter(
+            memberships__user=user,
+            memberships__role__in=[
+                UserUOMembership.Role.ADMIN,
+                UserUOMembership.Role.AUDITOR,
+            ],
+            memberships__is_active=True,
+            is_active=True,
+        )
+        .order_by("numeric_code")
+        .distinct()
+    )
 
 
 class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
@@ -1608,7 +1855,11 @@ class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
             return redirect(self.login_url)
         analytics_uos = get_user_analytics_uos(request.user)
         if not request.user.is_superuser and not analytics_uos.exists():
-            raise PermissionDenied(_("No dispone de privilegios de analítica en ninguna Unidad Organizativa."))
+            raise PermissionDenied(
+                _(
+                    "No dispone de privilegios de analítica en ninguna Unidad Organizativa."
+                )
+            )
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
@@ -1647,29 +1898,67 @@ def filter_analytics_querysets(
     target_uo_obj: OrganizationalUnit | None = None
 
     if requested_uo:
-        target_uo_obj = OrganizationalUnit.objects.filter(alias__iexact=requested_uo, is_active=True).first()
+        target_uo_obj = OrganizationalUnit.objects.filter(
+            alias__iexact=requested_uo, is_active=True
+        ).first()
         if not target_uo_obj and requested_uo.isdigit():
-            target_uo_obj = OrganizationalUnit.objects.filter(numeric_code=int(requested_uo), is_active=True).first()
+            target_uo_obj = OrganizationalUnit.objects.filter(
+                numeric_code=int(requested_uo), is_active=True
+            ).first()
         if not target_uo_obj:
-            return None, None, None, {}, JsonResponse({"error": _("Unidad Organizativa no encontrada.")}, status=404)
+            return (
+                None,
+                None,
+                None,
+                {},
+                JsonResponse(
+                    {"error": _("Unidad Organizativa no encontrada.")}, status=404
+                ),
+            )
 
-        if not request.user.is_superuser and not analytics_uos.filter(pk=target_uo_obj.pk).exists():
-            return None, None, None, {}, JsonResponse({"error": _("No tiene permisos sobre la Unidad Organizativa solicitada.")}, status=403)
+        if (
+            not request.user.is_superuser
+            and not analytics_uos.filter(pk=target_uo_obj.pk).exists()
+        ):
+            return (
+                None,
+                None,
+                None,
+                {},
+                JsonResponse(
+                    {
+                        "error": _(
+                            "No tiene permisos sobre la Unidad Organizativa solicitada."
+                        )
+                    },
+                    status=403,
+                ),
+            )
 
     docs_qs = EncryptedDocument.objects.select_related("origin_uo", "target_uo").all()
-    logs_qs = DocumentAccessLog.objects.select_related("document", "origin_uo", "target_uo").all()
+    logs_qs = DocumentAccessLog.objects.select_related(
+        "document", "origin_uo", "target_uo"
+    ).all()
 
     # 1. Filtro Perimetral UO y Rol
     uo_role = request.GET.get("uo_role", "all").strip().lower()
     if target_uo_obj:
         if uo_role == "origin":
             docs_qs = docs_qs.filter(origin_uo=target_uo_obj)
-            logs_qs = logs_qs.filter(models.Q(origin_uo=target_uo_obj) | models.Q(document__origin_uo=target_uo_obj))
+            logs_qs = logs_qs.filter(
+                models.Q(origin_uo=target_uo_obj)
+                | models.Q(document__origin_uo=target_uo_obj)
+            )
         elif uo_role == "target":
             docs_qs = docs_qs.filter(target_uo=target_uo_obj)
-            logs_qs = logs_qs.filter(models.Q(target_uo=target_uo_obj) | models.Q(document__target_uo=target_uo_obj))
+            logs_qs = logs_qs.filter(
+                models.Q(target_uo=target_uo_obj)
+                | models.Q(document__target_uo=target_uo_obj)
+            )
         else:
-            docs_qs = docs_qs.filter(models.Q(origin_uo=target_uo_obj) | models.Q(target_uo=target_uo_obj))
+            docs_qs = docs_qs.filter(
+                models.Q(origin_uo=target_uo_obj) | models.Q(target_uo=target_uo_obj)
+            )
             logs_qs = logs_qs.filter(
                 models.Q(origin_uo=target_uo_obj)
                 | models.Q(target_uo=target_uo_obj)
@@ -1677,7 +1966,10 @@ def filter_analytics_querysets(
                 | models.Q(document__target_uo=target_uo_obj)
             )
     elif not request.user.is_superuser:
-        docs_qs = docs_qs.filter(models.Q(origin_uo__in=analytics_uos) | models.Q(target_uo__in=analytics_uos))
+        docs_qs = docs_qs.filter(
+            models.Q(origin_uo__in=analytics_uos)
+            | models.Q(target_uo__in=analytics_uos)
+        )
         logs_qs = logs_qs.filter(
             models.Q(origin_uo__in=analytics_uos)
             | models.Q(target_uo__in=analytics_uos)
@@ -1687,7 +1979,10 @@ def filter_analytics_querysets(
 
     # 2. Filtro Política BAR
     burn_policy = request.GET.get("burn_policy", "").strip().upper()
-    if burn_policy in [EncryptedDocument.BurnPolicy.FIRST_ACCESS, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS]:
+    if burn_policy in [
+        EncryptedDocument.BurnPolicy.FIRST_ACCESS,
+        EncryptedDocument.BurnPolicy.ALL_RECIPIENTS,
+    ]:
         docs_qs = docs_qs.filter(burn_policy=burn_policy)
         logs_qs = logs_qs.filter(document__burn_policy=burn_policy)
 
@@ -1734,8 +2029,16 @@ def filter_analytics_querysets(
         start_date = (now - datetime.timedelta(days=days - 1)).date()
         end_date = now.date()
 
-    start_dt = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min)) if start_date else None
-    end_dt = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max)) if end_date else None
+    start_dt = (
+        timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
+        if start_date
+        else None
+    )
+    end_dt = (
+        timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max))
+        if end_date
+        else None
+    )
 
     if start_dt:
         docs_qs = docs_qs.filter(created_at__gte=start_dt)
@@ -1773,14 +2076,20 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
         analytics_uos = get_user_analytics_uos(request.user)
         if not request.user.is_superuser and not analytics_uos.exists():
-            return JsonResponse({"error": _("Acceso no autorizado a métricas analíticas.")}, status=403)
+            return JsonResponse(
+                {"error": _("Acceso no autorizado a métricas analíticas.")}, status=403
+            )
 
-        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(request, analytics_uos)
+        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(
+            request, analytics_uos
+        )
         if err_resp:
             return err_resp
 
         if docs_qs is None or logs_qs is None:
-            return JsonResponse({"error": _("Error al delimitar registros.")}, status=500)
+            return JsonResponse(
+                {"error": _("Error al delimitar registros.")}, status=500
+            )
 
         now = timezone.now()
         total_docs = docs_qs.count()
@@ -1788,28 +2097,47 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
         active_docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).count()
         expired_docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).count()
 
-        burn_rate = round((consumed_docs / total_docs * 100), 1) if total_docs > 0 else 0.0
+        burn_rate = (
+            round((consumed_docs / total_docs * 100), 1) if total_docs > 0 else 0.0
+        )
 
         # Timeline adaptativo según rango de fechas
         from django.db.models.functions import TruncDate
-        start_date = datetime.date.fromisoformat(meta["start_date"]) if meta["start_date"] else None
-        end_date = datetime.date.fromisoformat(meta["end_date"]) if meta["end_date"] else now.date()
+
+        start_date = (
+            datetime.date.fromisoformat(meta["start_date"])
+            if meta["start_date"]
+            else None
+        )
+        end_date = (
+            datetime.date.fromisoformat(meta["end_date"])
+            if meta["end_date"]
+            else now.date()
+        )
 
         if start_date and end_date:
             num_days = (end_date - start_date).days + 1
             if num_days <= 90:
-                date_range = [start_date + datetime.timedelta(days=i) for i in range(num_days)]
+                date_range = [
+                    start_date + datetime.timedelta(days=i) for i in range(num_days)
+                ]
                 date_labels = [d.strftime("%d/%m") for d in date_range]
 
                 created_counts = dict(
-                    docs_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                    docs_qs.filter(
+                        created_at__date__gte=start_date, created_at__date__lte=end_date
+                    )
                     .annotate(day=TruncDate("created_at"))
                     .values("day")
                     .annotate(count=models.Count("id"))
                     .values_list("day", "count")
                 )
                 consumed_counts = dict(
-                    docs_qs.filter(is_consumed=True, consumed_at__date__gte=start_date, consumed_at__date__lte=end_date)
+                    docs_qs.filter(
+                        is_consumed=True,
+                        consumed_at__date__gte=start_date,
+                        consumed_at__date__lte=end_date,
+                    )
                     .annotate(day=TruncDate("consumed_at"))
                     .values("day")
                     .annotate(count=models.Count("id"))
@@ -1819,15 +2147,22 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                 timeline_consumed = [consumed_counts.get(d, 0) for d in date_range]
             else:
                 from django.db.models.functions import TruncMonth
+
                 created_items = list(
-                    docs_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                    docs_qs.filter(
+                        created_at__date__gte=start_date, created_at__date__lte=end_date
+                    )
                     .annotate(month=TruncMonth("created_at"))
                     .values("month")
                     .annotate(count=models.Count("id"))
                     .order_by("month")
                 )
                 consumed_items = list(
-                    docs_qs.filter(is_consumed=True, consumed_at__date__gte=start_date, consumed_at__date__lte=end_date)
+                    docs_qs.filter(
+                        is_consumed=True,
+                        consumed_at__date__gte=start_date,
+                        consumed_at__date__lte=end_date,
+                    )
                     .annotate(month=TruncMonth("consumed_at"))
                     .values("month")
                     .annotate(count=models.Count("id"))
@@ -1842,12 +2177,21 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                     else:
                         cur = datetime.date(cur.year, cur.month + 1, 1)
                 date_labels = [m.strftime("%b %y") for m in months]
-                c_map = {item["month"].date().replace(day=1): item["count"] for item in created_items if item["month"]}
-                d_map = {item["month"].date().replace(day=1): item["count"] for item in consumed_items if item["month"]}
+                c_map = {
+                    item["month"].date().replace(day=1): item["count"]
+                    for item in created_items
+                    if item["month"]
+                }
+                d_map = {
+                    item["month"].date().replace(day=1): item["count"]
+                    for item in consumed_items
+                    if item["month"]
+                }
                 timeline_created = [c_map.get(m, 0) for m in months]
                 timeline_consumed = [d_map.get(m, 0) for m in months]
         else:
             from django.db.models.functions import TruncMonth
+
             created_items = list(
                 docs_qs.annotate(month=TruncMonth("created_at"))
                 .values("month")
@@ -1861,20 +2205,38 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                 .annotate(count=models.Count("id"))
                 .order_by("month")
             )
-            all_months = sorted(list({item["month"].date().replace(day=1) for item in (created_items + consumed_items) if item.get("month")}))
+            all_months = sorted(
+                list(
+                    {
+                        item["month"].date().replace(day=1)
+                        for item in (created_items + consumed_items)
+                        if item.get("month")
+                    }
+                )
+            )
             if not all_months:
                 date_labels = [now.strftime("%b %y")]
                 timeline_created = [0]
                 timeline_consumed = [0]
             else:
                 date_labels = [m.strftime("%b %y") for m in all_months]
-                c_map = {item["month"].date().replace(day=1): item["count"] for item in created_items if item["month"]}
-                d_map = {item["month"].date().replace(day=1): item["count"] for item in consumed_items if item["month"]}
+                c_map = {
+                    item["month"].date().replace(day=1): item["count"]
+                    for item in created_items
+                    if item["month"]
+                }
+                d_map = {
+                    item["month"].date().replace(day=1): item["count"]
+                    for item in consumed_items
+                    if item["month"]
+                }
                 timeline_created = [c_map.get(m, 0) for m in all_months]
                 timeline_consumed = [d_map.get(m, 0) for m in all_months]
 
         # 3. Flujo entre UOs (Inter-UO Mesh)
-        all_uos_map = {uo.id: uo.alias for uo in OrganizationalUnit.objects.filter(is_active=True)}
+        all_uos_map = {
+            uo.id: uo.alias for uo in OrganizationalUnit.objects.filter(is_active=True)
+        }
         flow_raw = (
             docs_qs.values("origin_uo_id", "target_uo_id")
             .annotate(count=models.Count("id"))
@@ -1882,13 +2244,19 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
         )
         flows: list[dict[str, Any]] = []
         for item in flow_raw:
-            orig = all_uos_map.get(item["origin_uo_id"], str(_("Desconocida / Personal")))
-            targ = all_uos_map.get(item["target_uo_id"], str(_("Destinatarios Externos")))
-            flows.append({
-                "source": orig,
-                "target": targ,
-                "value": item["count"],
-            })
+            orig = all_uos_map.get(
+                item["origin_uo_id"], str(_("Desconocida / Personal"))
+            )
+            targ = all_uos_map.get(
+                item["target_uo_id"], str(_("Destinatarios Externos"))
+            )
+            flows.append(
+                {
+                    "source": orig,
+                    "target": targ,
+                    "value": item["count"],
+                }
+            )
 
         # Top UOs por volumen entrante y saliente
         uo_aliases = list(analytics_uos.values_list("alias", flat=True)[:8])
@@ -1905,11 +2273,21 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
             {"name": str(_("Caducado sin Acceso")), "value": expired_docs},
         ]
 
-        policy_first_access = docs_qs.filter(burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS).count()
-        policy_all_recipients = docs_qs.filter(burn_policy=EncryptedDocument.BurnPolicy.ALL_RECIPIENTS).count()
+        policy_first_access = docs_qs.filter(
+            burn_policy=EncryptedDocument.BurnPolicy.FIRST_ACCESS
+        ).count()
+        policy_all_recipients = docs_qs.filter(
+            burn_policy=EncryptedDocument.BurnPolicy.ALL_RECIPIENTS
+        ).count()
         policy_breakdown = [
-            {"name": str(_("Primer Acceso (FIRST_ACCESS)")), "value": policy_first_access},
-            {"name": str(_("Múltiples Destinatarios (ALL_RECIPIENTS)")), "value": policy_all_recipients},
+            {
+                "name": str(_("Primer Acceso (FIRST_ACCESS)")),
+                "value": policy_first_access,
+            },
+            {
+                "name": str(_("Múltiples Destinatarios (ALL_RECIPIENTS)")),
+                "value": policy_all_recipients,
+            },
         ]
 
         # 5. Incidentes y Bloqueos de Seguridad
@@ -1919,61 +2297,78 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
             .values_list("action", "count")
         )
         security_metrics = {
-            "otp_solicitados": log_counts.get(DocumentAccessLog.Action.SOLICITUD_OTP, 0),
+            "otp_solicitados": log_counts.get(
+                DocumentAccessLog.Action.SOLICITUD_OTP, 0
+            ),
             "otp_enviados": log_counts.get(DocumentAccessLog.Action.OTP_ENVIADO, 0),
             "descargas_exitosas": (
                 log_counts.get(DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN, 0)
-                + log_counts.get(DocumentAccessLog.Action.DESCIFRADO_PARCIAL_PRESERVADO, 0)
+                + log_counts.get(
+                    DocumentAccessLog.Action.DESCIFRADO_PARCIAL_PRESERVADO, 0
+                )
             ),
-            "intentos_post_consumo": log_counts.get(DocumentAccessLog.Action.INTENTO_POST_CONSUMO, 0),
-            "otp_bloqueados": log_counts.get(DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO, 0),
-            "finalizaciones_manuales": log_counts.get(DocumentAccessLog.Action.FINALIZACION_MANUAL, 0),
-            "auditorias_periciales": log_counts.get(DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA, 0),
+            "intentos_post_consumo": log_counts.get(
+                DocumentAccessLog.Action.INTENTO_POST_CONSUMO, 0
+            ),
+            "otp_bloqueados": log_counts.get(
+                DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO, 0
+            ),
+            "finalizaciones_manuales": log_counts.get(
+                DocumentAccessLog.Action.FINALIZACION_MANUAL, 0
+            ),
+            "auditorias_periciales": log_counts.get(
+                DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA, 0
+            ),
         }
-        total_security_alerts = security_metrics["intentos_post_consumo"] + security_metrics["otp_bloqueados"]
+        total_security_alerts = (
+            security_metrics["intentos_post_consumo"]
+            + security_metrics["otp_bloqueados"]
+        )
 
-        return JsonResponse({
-            "kpis": {
-                "total_documents": total_docs,
-                "active_documents": active_docs,
-                "consumed_documents": consumed_docs,
-                "expired_documents": expired_docs,
-                "burn_rate": burn_rate,
-                "total_events": logs_qs.count(),
-                "security_alerts": total_security_alerts,
-            },
-            "timeline": {
-                "labels": date_labels,
-                "created": timeline_created,
-                "consumed": timeline_consumed,
-            },
-            "uo_mesh": {
-                "categories": uo_aliases,
-                "outbound": outbound_series,
-                "inbound": inbound_series,
-                "flows": flows,
-            },
-            "custody": custody_breakdown,
-            "policies": policy_breakdown,
-            "security": security_metrics,
-            "meta": meta,
-            "scope_info": {
-                "is_global": request.user.is_superuser and not target_uo_obj,
-                "uo_alias": (
-                    target_uo_obj.alias
-                    if target_uo_obj
-                    else (
-                        str(_("Global (Toda la Organización)"))
-                        if request.user.is_superuser
+        return JsonResponse(
+            {
+                "kpis": {
+                    "total_documents": total_docs,
+                    "active_documents": active_docs,
+                    "consumed_documents": consumed_docs,
+                    "expired_documents": expired_docs,
+                    "burn_rate": burn_rate,
+                    "total_events": logs_qs.count(),
+                    "security_alerts": total_security_alerts,
+                },
+                "timeline": {
+                    "labels": date_labels,
+                    "created": timeline_created,
+                    "consumed": timeline_consumed,
+                },
+                "uo_mesh": {
+                    "categories": uo_aliases,
+                    "outbound": outbound_series,
+                    "inbound": inbound_series,
+                    "flows": flows,
+                },
+                "custody": custody_breakdown,
+                "policies": policy_breakdown,
+                "security": security_metrics,
+                "meta": meta,
+                "scope_info": {
+                    "is_global": request.user.is_superuser and not target_uo_obj,
+                    "uo_alias": (
+                        target_uo_obj.alias
+                        if target_uo_obj
                         else (
-                            analytics_uos.first().alias
-                            if analytics_uos.count() == 1
-                            else "Mis UOs"
+                            str(_("Global (Toda la Organización)"))
+                            if request.user.is_superuser
+                            else (
+                                analytics_uos.first().alias
+                                if analytics_uos.count() == 1
+                                else "Mis UOs"
+                            )
                         )
-                    )
-                ),
-            },
-        })
+                    ),
+                },
+            }
+        )
 
 
 class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
@@ -1989,12 +2384,16 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
         if not request.user.is_superuser and not analytics_uos.exists():
             return JsonResponse({"error": _("Acceso no autorizado.")}, status=403)
 
-        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(request, analytics_uos)
+        docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(
+            request, analytics_uos
+        )
         if err_resp:
             return err_resp
 
         if docs_qs is None or logs_qs is None:
-            return JsonResponse({"error": _("Error al delimitar registros.")}, status=500)
+            return JsonResponse(
+                {"error": _("Error al delimitar registros.")}, status=500
+            )
 
         # Filtro de búsqueda de texto en vivo
         q = request.GET.get("q", "").strip()
@@ -2020,88 +2419,144 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
 
         # 1. Asientos en Custodia Activa
         if drill_type in ["active", "en custodia activa"]:
-            docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).order_by("-created_at")[:100]
+            docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).order_by(
+                "-created_at"
+            )[:100]
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": str(_("Documentos en Custodia Activa")),
-                "subtitle": str(_("Archivos cifrados disponibles actualmente para canje seguro")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": str(_("Documentos en Custodia Activa")),
+                    "subtitle": str(
+                        _("Archivos cifrados disponibles actualmente para canje seguro")
+                    ),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 2. Asientos Consumidos / Incinerados
         elif drill_type in ["consumed", "destruido por canje (bar)", "destruido"]:
             docs = docs_qs.filter(is_consumed=True).order_by("-consumed_at")[:100]
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": str(_("Documentos Incinerados / Canjeados (BAR)")),
-                "subtitle": str(_("Archivos destruidos físicamente de disco tras su descarga conforme a política")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": str(_("Documentos Incinerados / Canjeados (BAR)")),
+                    "subtitle": str(
+                        _(
+                            "Archivos destruidos físicamente de disco tras su descarga conforme a política"
+                        )
+                    ),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 3. Asientos Caducados sin Acceso
         elif drill_type in ["expired", "caducado sin acceso", "caducado"]:
-            docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).order_by("-expires_at")[:100]
+            docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).order_by(
+                "-expires_at"
+            )[:100]
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": str(_("Documentos Caducados sin Acceso")),
-                "subtitle": str(_("Plazo de vigencia vencido sin haberse completado el canje")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": str(_("Documentos Caducados sin Acceso")),
+                    "subtitle": str(
+                        _("Plazo de vigencia vencido sin haberse completado el canje")
+                    ),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 4. Total de Asientos
         elif drill_type in ["total", "total_docs", "trámites totales"]:
             docs = docs_qs.order_by("-created_at")[:100]
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": str(_("Total de Trámites en Custodia")),
-                "subtitle": str(_("Todos los asientos bajo el perímetro y filtros seleccionados")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": str(_("Total de Trámites en Custodia")),
+                    "subtitle": str(
+                        _(
+                            "Todos los asientos bajo el perímetro y filtros seleccionados"
+                        )
+                    ),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 5. Incidentes y Bloqueos de Seguridad
-        elif drill_type in ["security_alerts", "bloqueos", "sondas", "incidentes", "alertas"]:
+        elif drill_type in [
+            "security_alerts",
+            "bloqueos",
+            "sondas",
+            "incidentes",
+            "alertas",
+        ]:
             alert_actions = [
                 DocumentAccessLog.Action.INTENTO_POST_CONSUMO,
                 DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO,
             ]
-            logs = logs_qs.filter(action__in=alert_actions).order_by("-created_at")[:100]
+            logs = logs_qs.filter(action__in=alert_actions).order_by("-created_at")[
+                :100
+            ]
             items = [self._format_log(l) for l in logs]
-            return JsonResponse({
-                "mode": "logs",
-                "title": str(_("Incidencias y Bloqueos de Seguridad")),
-                "subtitle": str(_("Intentos sobre archivos ya quemados (BAR) y bloqueos por claves erróneas")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "logs",
+                    "title": str(_("Incidencias y Bloqueos de Seguridad")),
+                    "subtitle": str(
+                        _(
+                            "Intentos sobre archivos ya quemados (BAR) y bloqueos por claves erróneas"
+                        )
+                    ),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 6. Métrica de Seguridad específica
         elif drill_type == "security_metric":
             val_lower = filter_val.lower()
-            if "post-consumo" in val_lower or "intento" in val_lower or "post" in val_lower:
+            if (
+                "post-consumo" in val_lower
+                or "intento" in val_lower
+                or "post" in val_lower
+            ):
                 action_filter = DocumentAccessLog.Action.INTENTO_POST_CONSUMO
                 title = str(_("Intentos de Acceso Post-Consumo"))
-                subtitle = str(_("Accesos a documentos que ya fueron incinerados conforme a la política BAR"))
-            elif "bloqueado" in val_lower or "fallido" in val_lower or "otp" in val_lower:
+                subtitle = str(
+                    _(
+                        "Accesos a documentos que ya fueron incinerados conforme a la política BAR"
+                    )
+                )
+            elif (
+                "bloqueado" in val_lower or "fallido" in val_lower or "otp" in val_lower
+            ):
                 action_filter = DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO
                 title = str(_("Bloqueos por Intentos OTP Fallidos"))
-                subtitle = str(_("Peticiones bloqueadas por reiteración de claves erróneas (protección anti-fuerza bruta)"))
+                subtitle = str(
+                    _(
+                        "Peticiones bloqueadas por reiteración de claves erróneas (protección anti-fuerza bruta)"
+                    )
+                )
             elif "auditoría" in val_lower or "pericial" in val_lower:
                 action_filter = DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA
                 title = str(_("Descargas Periciales de Auditoría Legal"))
-                subtitle = str(_("Acceso administrativo especial registrado por inspectores o auditores"))
+                subtitle = str(
+                    _(
+                        "Acceso administrativo especial registrado por inspectores o auditores"
+                    )
+                )
             elif "descarga" in val_lower or "ok" in val_lower:
                 action_filter = DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN
                 title = str(_("Descargas Exitosas y Canjes"))
@@ -2116,40 +2571,56 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
                 subtitle = str(_("Trazabilidad perimetral del sistema"))
 
             if action_filter:
-                logs = logs_qs.filter(action=action_filter).order_by("-created_at")[:100]
+                logs = logs_qs.filter(action=action_filter).order_by("-created_at")[
+                    :100
+                ]
             else:
                 logs = logs_qs.order_by("-created_at")[:100]
             items = [self._format_log(l) for l in logs]
-            return JsonResponse({
-                "mode": "logs",
-                "title": title,
-                "subtitle": subtitle,
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "logs",
+                    "title": title,
+                    "subtitle": subtitle,
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 7. Flujos entre UOs
         elif drill_type in ["uo_outbound", "uo_inbound"]:
             uo_alias = filter_val.upper()
             if drill_type == "uo_outbound":
-                docs = docs_qs.filter(origin_uo__alias=uo_alias).order_by("-created_at")[:100]
+                docs = docs_qs.filter(origin_uo__alias=uo_alias).order_by(
+                    "-created_at"
+                )[:100]
                 title = f"{_('Trámites Emitidos por UO')}: {uo_alias}"
-                subtitle = str(_("Documentos originados en este departamento hacia otras áreas o terceros"))
+                subtitle = str(
+                    _(
+                        "Documentos originados en este departamento hacia otras áreas o terceros"
+                    )
+                )
             else:
-                docs = docs_qs.filter(target_uo__alias=uo_alias).order_by("-created_at")[:100]
+                docs = docs_qs.filter(target_uo__alias=uo_alias).order_by(
+                    "-created_at"
+                )[:100]
                 title = f"{_('Trámites Recibidos por UO')}: {uo_alias}"
-                subtitle = str(_("Documentos dirigidos hacia esta dependencia organizativa"))
+                subtitle = str(
+                    _("Documentos dirigidos hacia esta dependencia organizativa")
+                )
 
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": title,
-                "subtitle": subtitle,
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": title,
+                    "subtitle": subtitle,
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # 8. Actividad en fecha específica (Timeline)
         elif drill_type == "timeline_date":
@@ -2159,7 +2630,9 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
                 parts = date_str.split("/")
                 current_year = now.year
                 try:
-                    target_date = datetime.date(current_year, int(parts[1]), int(parts[0]))
+                    target_date = datetime.date(
+                        current_year, int(parts[1]), int(parts[0])
+                    )
                 except (ValueError, IndexError):
                     target_date = None
             elif "-" in date_str:
@@ -2170,32 +2643,39 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
 
             if target_date:
                 docs = docs_qs.filter(
-                    models.Q(created_at__date=target_date) | models.Q(consumed_at__date=target_date)
+                    models.Q(created_at__date=target_date)
+                    | models.Q(consumed_at__date=target_date)
                 ).order_by("-created_at")[:100]
             else:
                 docs = docs_qs.order_by("-created_at")[:100]
 
             items = [self._format_doc(d) for d in docs]
-            return JsonResponse({
-                "mode": "documents",
-                "title": f"{_('Actividad Documental del')} {filter_val}",
-                "subtitle": str(_("Asientos creados o consumidos en esta fecha")),
-                "count": len(items),
-                "items": items,
-                "meta": meta,
-            })
+            return JsonResponse(
+                {
+                    "mode": "documents",
+                    "title": f"{_('Actividad Documental del')} {filter_val}",
+                    "subtitle": str(_("Asientos creados o consumidos en esta fecha")),
+                    "count": len(items),
+                    "items": items,
+                    "meta": meta,
+                }
+            )
 
         # Por defecto
         docs = docs_qs.order_by("-created_at")[:100]
         items = [self._format_doc(d) for d in docs]
-        return JsonResponse({
-            "mode": "documents",
-            "title": str(_("Listado Nominal de Documentos")),
-            "subtitle": str(_("Asientos registrados bajo el perímetro y filtros seleccionados")),
-            "count": len(items),
-            "items": items,
-            "meta": meta,
-        })
+        return JsonResponse(
+            {
+                "mode": "documents",
+                "title": str(_("Listado Nominal de Documentos")),
+                "subtitle": str(
+                    _("Asientos registrados bajo el perímetro y filtros seleccionados")
+                ),
+                "count": len(items),
+                "items": items,
+                "meta": meta,
+            }
+        )
 
     def _format_doc(self, doc: EncryptedDocument) -> dict[str, Any]:
         now = timezone.now()
@@ -2215,13 +2695,19 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
             "file_hash": doc.file_hash,
             "file_hash_short": f"{doc.file_hash[:10]}...{doc.file_hash[-6:]}",
             "origin_uo": doc.origin_uo.alias if doc.origin_uo else str(_("Sin UO")),
-            "target_uo": doc.target_uo.alias if doc.target_uo else str(_("Destinatario Externo")),
+            "target_uo": (
+                doc.target_uo.alias if doc.target_uo else str(_("Destinatario Externo"))
+            ),
             "status_text": status_text,
             "status_badge": status_badge,
             "burn_policy": doc.get_burn_policy_display(),
             "created_at": timezone.localtime(doc.created_at).strftime("%d/%m/%Y %H:%M"),
             "expires_at": timezone.localtime(doc.expires_at).strftime("%d/%m/%Y %H:%M"),
-            "consumed_at": timezone.localtime(doc.consumed_at).strftime("%d/%m/%Y %H:%M") if doc.consumed_at else "-",
+            "consumed_at": (
+                timezone.localtime(doc.consumed_at).strftime("%d/%m/%Y %H:%M")
+                if doc.consumed_at
+                else "-"
+            ),
             "detail_url": reverse("dashboard:document_detail", args=[doc.file_hash]),
         }
 
@@ -2233,16 +2719,360 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
         return {
             "id": log.pk,
             "action_display": str(log.get_action_display() or log.action),
-            "action_badge": "danger" if is_alert else ("warning" if "admin" in log.action else "info"),
+            "action_badge": (
+                "danger"
+                if is_alert
+                else ("warning" if "admin" in log.action else "info")
+            ),
             "is_alert": is_alert,
             "ip_address": log.ip_address or "-",
             "email": log.email or "-",
-            "document_filename": log.document.original_filename if log.document else str(_("Sin documento")),
-            "document_hash_short": f"{log.document.file_hash[:10]}..." if log.document else "-",
-            "document_url": reverse("dashboard:document_detail", args=[log.document.file_hash]) if log.document else None,
-            "created_at": timezone.localtime(log.created_at).strftime("%d/%m/%Y %H:%M:%S"),
+            "document_filename": (
+                log.document.original_filename
+                if log.document
+                else str(_("Sin documento"))
+            ),
+            "document_hash_short": (
+                f"{log.document.file_hash[:10]}..." if log.document else "-"
+            ),
+            "document_url": (
+                reverse("dashboard:document_detail", args=[log.document.file_hash])
+                if log.document
+                else None
+            ),
+            "created_at": timezone.localtime(log.created_at).strftime(
+                "%d/%m/%Y %H:%M:%S"
+            ),
             "details": log.details or "-",
             "origin_uo": log.origin_uo.alias if log.origin_uo else "-",
         }
 
 
+# ==============================================================================
+# VISTAS DE SEGURIDAD PERIMETRAL, DESBLOQUEOS Y NO REPUDIO DE AUDITORÍA
+# ==============================================================================
+
+
+class DashboardUserUnlockView(LoginRequiredMixin, View):
+    """
+    Acción administrativa para desbloquear manualmente a un usuario cuya cuenta
+    haya sido bloqueada temporalmente por fuerza bruta.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        target = get_object_or_404(User, pk=user_id)
+        if not request.user.is_superuser:
+            admin_uos = get_user_administered_uos(request.user)
+            if not UserUOMembership.objects.filter(
+                user=target, uo__in=admin_uos
+            ).exists():
+                raise PermissionDenied(
+                    _("No tiene permisos para desbloquear a este usuario.")
+                )
+
+        from arcamitte.services import unlock_user_account
+
+        unlock_user_account(target, operator=request.user)
+        messages.success(
+            request,
+            _(
+                f"La cuenta del usuario '{target.username}' ha sido desbloqueada con éxito."
+            ),
+        )
+
+        fallback_url = reverse("dashboard:user_list")
+        next_url = (
+            request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        )
+        if not url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = fallback_url
+        return redirect(next_url)
+
+
+class DashboardIPBanListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """
+    Panel de gobernanza de la lista negra perimetral de direcciones IP bloqueadas.
+    Exclusivo para superusuarios y administradores del sistema.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/ip_ban_list.html"
+    context_object_name = "banned_ips"
+    paginate_by = 25
+
+    def test_func(self) -> bool:
+        return self.request.user.is_superuser
+
+    def get_queryset(self) -> Any:
+        from arcamitte.models import BannedIP
+
+        qs = BannedIP.objects.all().select_related("created_by").order_by("-created_at")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            qs = qs.filter(
+                models.Q(ip_address__icontains=query)
+                | models.Q(reason__icontains=query)
+            )
+        status_filter = self.request.GET.get("status", "").strip()
+        if status_filter == "active":
+            qs = qs.filter(is_active=True)
+        elif status_filter == "inactive":
+            qs = qs.filter(is_active=False)
+        return qs
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["active_nav"] = "security_ips"
+        context["query"] = self.request.GET.get("q", "")
+        context["status_filter"] = self.request.GET.get("status", "")
+        return context
+
+
+class DashboardIPBanCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Incorporación manual de una IP a la lista negra con motivo y vigencia.
+    """
+
+    login_url = "dashboard:login"
+
+    def test_func(self) -> bool:
+        return self.request.user.is_superuser
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        ip_address = request.POST.get("ip_address", "").strip()
+        reason = (
+            request.POST.get("reason", "").strip() or "Bloqueo manual por administrador"
+        )
+        duration_hours_str = request.POST.get("duration_hours", "24").strip()
+
+        try:
+            duration_hours = int(duration_hours_str)
+        except ValueError:
+            duration_hours = 24
+
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(ip_address)
+        except ValueError:
+            messages.error(
+                request,
+                _(
+                    "La dirección IP especificada no es una dirección IPv4 o IPv6 válida."
+                ),
+            )
+            return redirect("dashboard:ip_ban_list")
+
+        from arcamitte.services import ban_ip
+
+        ban_ip(
+            ip_address=ip_address,
+            reason=reason,
+            duration_hours=duration_hours if duration_hours > 0 else None,
+            created_by=request.user,
+        )
+        messages.success(
+            request, _(f"La dirección IP {ip_address} ha sido bloqueada correctamente.")
+        )
+        return redirect("dashboard:ip_ban_list")
+
+
+class DashboardIPBanUnbanView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Revocación inmediata del baneo de una dirección IP (desbaneo).
+    """
+
+    login_url = "dashboard:login"
+
+    def test_func(self) -> bool:
+        return self.request.user.is_superuser
+
+    def post(self, request: HttpRequest, pk: int) -> HttpResponse:
+        from arcamitte.models import BannedIP
+
+        banned_obj = get_object_or_404(BannedIP, pk=pk)
+        from arcamitte.services import unban_ip
+
+        unban_ip(banned_obj.ip_address, operator=request.user)
+        messages.success(
+            request,
+            _(
+                f"El baneo sobre la dirección IP {banned_obj.ip_address} ha sido revocado."
+            ),
+        )
+        return redirect("dashboard:ip_ban_list")
+
+
+class DashboardAuditExportView(LoginRequiredMixin, View):
+    """
+    Genera y entrega una exportación forense certificada en CSV con recibo inmutable
+    AuditExportReceipt y cálculo estricto del hash SHA-256 para garantizar el no repudio.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        user = request.user
+        if user.is_superuser:
+            qs = (
+                DocumentAccessLog.objects.all()
+                .select_related("document", "origin_uo", "target_uo")
+                .order_by("-created_at")
+            )
+        else:
+            docs_qs = get_scoped_documents_queryset(user)
+            qs = (
+                DocumentAccessLog.objects.filter(models.Q(document__in=docs_qs))
+                .select_related("document", "origin_uo", "target_uo")
+                .order_by("-created_at")
+                .distinct()
+            )
+
+        query = request.POST.get("q", "").strip()
+        if query:
+            qs = qs.filter(
+                models.Q(ip_address__icontains=query)
+                | models.Q(details__icontains=query)
+                | models.Q(email__icontains=query)
+                | models.Q(document__file_hash__icontains=query)
+                | models.Q(document__original_filename__icontains=query)
+            )
+
+        action = request.POST.get("action", "").strip()
+        if action:
+            qs = qs.filter(action=action)
+
+        reason = (
+            request.POST.get("reason", "").strip()
+            or "Auditoría periódica de cumplimiento ENS"
+        )
+        client_ip = get_client_ip(request)
+
+        from arcamitte.services import create_certified_audit_export
+
+        csv_bytes, receipt = create_certified_audit_export(
+            user=request.user,
+            queryset=qs,
+            filters={"query": query, "action": action},
+            reason=reason,
+            client_ip=client_ip,
+        )
+
+        filename = f"arcamitte_auditoria_certificada_{receipt.receipt_id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response = HttpResponse(csv_bytes, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["X-Arcamitte-Receipt-ID"] = receipt.receipt_id
+        response["X-Arcamitte-Export-Hash"] = receipt.export_hash
+        apply_no_store_headers(response)
+        return response
+
+
+class DashboardAuditVerifyChainView(LoginRequiredMixin, View):
+    """
+    Verifica la integridad de la cadena criptográfica completa de logs (Hash Chaining).
+    Identifica cualquier corrupción o manipulación no autorizada en la base de datos.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/audit_verify_chain.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        from arcamitte.services import verify_audit_log_chain
+
+        result = verify_audit_log_chain()
+        return render(
+            request,
+            self.template_name,
+            {
+                "active_nav": "audit",
+                "result": result,
+            },
+        )
+
+
+class DashboardAuditReceiptListView(LoginRequiredMixin, ListView):
+    """
+    Directorio histórico de recibos oficiales de exportación de auditoría (AuditExportReceipt).
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/audit_receipt_list.html"
+    context_object_name = "receipts"
+    paginate_by = 25
+
+    def get_queryset(self) -> Any:
+        from arcamitte.models import AuditExportReceipt
+
+        qs = (
+            AuditExportReceipt.objects.all()
+            .select_related("exported_by")
+            .order_by("-created_at")
+        )
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            qs = qs.filter(
+                models.Q(receipt_id__icontains=q)
+                | models.Q(export_hash__icontains=q)
+                | models.Q(exported_by__username__icontains=q)
+                | models.Q(reason__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["active_nav"] = "audit"
+        context["query"] = self.request.GET.get("q", "")
+        return context
+
+
+class DashboardAuditVerifyReceiptView(LoginRequiredMixin, View):
+    """
+    Verificador de autenticidad y no repudio de exportaciones de auditoría.
+    Permite contrastar un código de recibo, hash o archivo CSV subido contra la base de datos.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/audit_verify_receipt.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        initial_term = request.GET.get("term", "").strip()
+        result = None
+        if initial_term:
+            from arcamitte.services import verify_export_receipt
+
+            result = verify_export_receipt(initial_term)
+        return render(
+            request,
+            self.template_name,
+            {
+                "active_nav": "audit",
+                "term": initial_term,
+                "result": result,
+            },
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        receipt_id_or_hash = request.POST.get("term", "").strip()
+        uploaded_file = request.FILES.get("csv_file")
+        file_bytes = None
+        if uploaded_file:
+            file_bytes = uploaded_file.read()
+
+        from arcamitte.services import verify_export_receipt
+
+        result = verify_export_receipt(receipt_id_or_hash, file_bytes=file_bytes)
+        return render(
+            request,
+            self.template_name,
+            {
+                "active_nav": "audit",
+                "term": receipt_id_or_hash,
+                "result": result,
+            },
+        )

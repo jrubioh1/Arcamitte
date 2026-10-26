@@ -4,11 +4,71 @@
 {% block title %}{% trans "Trazabilidad Forense" %}{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-	<h1 class="h3 fw-bold mb-1">{% trans "Trazabilidad Forense y Auditoría Legal" %}</h1>
-	<p class="text-muted small mb-0">
-		{% trans "Registro inmutable de accesos, operaciones criptográficas, canjes y vicisitudes del sistema." %}
-	</p>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Trazabilidad Forense y Auditoría Legal" %}</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Registro inmutable de accesos, operaciones criptográficas, canjes y vicisitudes con encadenamiento Hash Chaining." %}
+		</p>
+	</div>
+	<div class="d-flex flex-wrap gap-2">
+		<button type="button" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#exportAuditModal">
+			<i data-feather="download" style="width:15px;height:15px;"></i>
+			<span>{% trans "Exportar Certificado (No Repudio)" %}</span>
+		</button>
+		<a href="{% url 'dashboard:audit_verify_chain' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="shield-check" style="width:15px;height:15px;"></i>
+			<span>{% trans "Verificar Cadena" %}</span>
+		</a>
+		<a href="{% url 'dashboard:audit_receipt_list' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="file-text" style="width:15px;height:15px;"></i>
+			<span>{% trans "Recibos Oficiales" %}</span>
+		</a>
+		<a href="{% url 'dashboard:audit_verify_receipt' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="check-circle" style="width:15px;height:15px;"></i>
+			<span>{% trans "Verificar CSV" %}</span>
+		</a>
+	</div>
+</div>
+
+<!-- Modal para Exportación Certificada con Vicisitud Legal -->
+<div class="modal fade" id="exportAuditModal" tabindex="-1" aria-labelledby="exportAuditModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<form method="post" action="{% url 'dashboard:audit_export' %}">
+				{% csrf_token %}
+				<input type="hidden" name="q" value="{{ query|default:'' }}">
+				<input type="hidden" name="action" value="{{ action_filter|default:'' }}">
+				<div class="modal-header">
+					<h5 class="modal-title fw-bold" id="exportAuditModalLabel">
+						<i data-feather="award" class="me-1 text-primary" style="width:18px;height:18px;"></i>
+						{% trans "Exportación Certificada de Auditoría" %}
+					</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<p class="small text-muted mb-3">
+						{% trans "Esta acción generará un archivo CSV oficial firmado con hash SHA-256 inalterable y registrará una vicisitud permanente en la cadena de auditoría (eIDAS / ENS)." %}
+					</p>
+					<div class="mb-3">
+						<label for="export_reason" class="form-label small fw-bold">{% trans "Motivo Legal / Justificación de la Exportación" %}</label>
+						<textarea name="reason" id="export_reason" rows="3" class="form-control" required placeholder="{% trans 'Ej. Auditoría de seguridad trimestral, requerimiento judicial o inspección interna...' %}"></textarea>
+					</div>
+					<div class="alert alert-info py-2 small mb-0">
+						<i data-feather="info" style="width:14px;height:14px;" class="me-1"></i>
+						{% trans "El CSV incluirá sanitización anti-CSV Injection y el recibo oficial quedará archivado permanentemente." %}
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+					<button type="submit" class="btn btn-primary">
+						<i data-feather="download" style="width:15px;height:15px;" class="me-1"></i>
+						{% trans "Generar y Descargar Recibo Oficial" %}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
 </div>
 
 <div class="card mb-4">
@@ -53,6 +113,7 @@
 					<th>{% trans "Dirección IP" %}</th>
 					<th>{% trans "Solicitante / Actor" %}</th>
 					<th>{% trans "Detalles" %}</th>
+					<th>{% trans "Integridad (Hash)" %}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -85,10 +146,19 @@
 						<td class="small text-muted">
 							{{ log.details }}
 						</td>
+						<td class="font-mono small">
+							{% if log.log_hash %}
+								<span class="badge bg-light text-dark border font-mono" title="Prev: {{ log.previous_hash|slice:':16' }}... | Hash: {{ log.log_hash }}">
+									<i data-feather="link" style="width:11px;height:11px;" class="text-success me-1"></i>{{ log.log_hash|slice:":8" }}...
+								</span>
+							{% else %}
+								<span class="text-muted small">-</span>
+							{% endif %}
+						</td>
 					</tr>
 				{% empty %}
 					<tr>
-						<td colspan="6" class="text-center py-5 text-muted">
+						<td colspan="7" class="text-center py-5 text-muted">
 							<i data-feather="inbox" style="width: 36px; height: 36px;" class="mb-2"></i>
 							<h5>{% trans "No se encontraron registros de auditoría" %}</h5>
 						</td>

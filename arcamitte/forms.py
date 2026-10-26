@@ -37,7 +37,9 @@ class RequestAccessForm(forms.Form):
                 "spellcheck": "false",
             }
         ),
-        help_text=_("Identificador de 64 caracteres facilitado para la descarga del documento."),
+        help_text=_(
+            "Identificador de 64 caracteres facilitado para la descarga del documento."
+        ),
     )
     email = forms.EmailField(
         label=_("Correo Electrónico"),
@@ -49,14 +51,18 @@ class RequestAccessForm(forms.Form):
                 "autocomplete": "off",
             }
         ),
-        help_text=_("Dirección de correo autorizada donde recibirá el código de verificación."),
+        help_text=_(
+            "Dirección de correo autorizada donde recibirá el código de verificación."
+        ),
     )
 
     def clean_file_hash(self) -> str:
         raw_hash = (self.cleaned_data.get("file_hash") or "").strip().lower()
         if not HASH_REGEX.match(raw_hash):
             raise ValidationError(
-                _("El identificador SHA-256 debe componerse de 64 caracteres hexadecimales [0-9a-f].")
+                _(
+                    "El identificador SHA-256 debe componerse de 64 caracteres hexadecimales [0-9a-f]."
+                )
             )
         return raw_hash
 
@@ -95,7 +101,9 @@ class RedeemOtpForm(forms.Form):
                 "autofocus": "autofocus",
             }
         ),
-        help_text=_("Introduzca el código de 6 dígitos recibido en su correo electrónico."),
+        help_text=_(
+            "Introduzca el código de 6 dígitos recibido en su correo electrónico."
+        ),
     )
 
     def clean_file_hash(self) -> str:
@@ -111,7 +119,9 @@ class RedeemOtpForm(forms.Form):
     def clean_otp_code(self) -> str:
         code = (self.cleaned_data.get("otp_code") or "").strip()
         if not code.isdigit() or len(code) != 6:
-            raise ValidationError(_("El código de verificación debe contener 6 dígitos numéricos."))
+            raise ValidationError(
+                _("El código de verificación debe contener 6 dígitos numéricos.")
+            )
         return code
 
 
@@ -125,10 +135,24 @@ class OrganizationalUnitForm(forms.ModelForm):
         model = OrganizationalUnit
         fields = ["numeric_code", "alias", "name", "email", "description", "is_active"]
         widgets = {
-            "numeric_code": forms.NumberInput(attrs={"class": "form-control", "placeholder": "1001"}),
-            "alias": forms.TextInput(attrs={"class": "form-control text-uppercase font-mono", "placeholder": "LEGAL"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Asesoría Jurídica y Cumplimiento")}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "legal@empresa.com"}),
+            "numeric_code": forms.NumberInput(
+                attrs={"class": "form-control", "placeholder": "1001"}
+            ),
+            "alias": forms.TextInput(
+                attrs={
+                    "class": "form-control text-uppercase font-mono",
+                    "placeholder": "LEGAL",
+                }
+            ),
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Asesoría Jurídica y Cumplimiento"),
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={"class": "form-control", "placeholder": "legal@empresa.com"}
+            ),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -148,7 +172,9 @@ class OrganizationalUnitForm(forms.ModelForm):
     def clean_alias(self) -> str:
         alias = (self.cleaned_data.get("alias") or "").strip().upper()
         if not re.match(r"^[A-Z0-9_\-]+$", alias):
-            raise ValidationError(_("El alias solo puede contener letras mayúsculas, números y guiones."))
+            raise ValidationError(
+                _("El alias solo puede contener letras mayúsculas, números y guiones.")
+            )
         return alias
 
 
@@ -233,9 +259,16 @@ class UserManagementForm(forms.ModelForm):
         is_active = self.cleaned_data.get("is_active", True)
         if self.is_self and not is_active:
             raise ValidationError(
-                _("Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario.")
+                _(
+                    "Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario."
+                )
             )
-        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_active:
+        if (
+            self.instance
+            and self.instance.pk
+            and getattr(self.instance, "is_superuser", False)
+            and not is_active
+        ):
             other_superusers = (
                 User.objects.filter(is_superuser=True, is_active=True)
                 .exclude(pk=self.instance.pk)
@@ -243,7 +276,9 @@ class UserManagementForm(forms.ModelForm):
             )
             if other_superusers == 0:
                 raise ValidationError(
-                    _("No es posible desactivar al único superusuario activo del sistema.")
+                    _(
+                        "No es posible desactivar al único superusuario activo del sistema."
+                    )
                 )
         return is_active
 
@@ -251,17 +286,30 @@ class UserManagementForm(forms.ModelForm):
         is_staff = self.cleaned_data.get("is_staff", False)
         if self.is_self and getattr(self.instance, "is_staff", False) and not is_staff:
             raise ValidationError(
-                _("Por motivos de seguridad, no puede revocar su propio acceso administrativo.")
+                _(
+                    "Por motivos de seguridad, no puede revocar su propio acceso administrativo."
+                )
             )
         return is_staff
 
     def clean_is_superuser(self) -> bool:
         is_superuser = self.cleaned_data.get("is_superuser", False)
-        if self.is_self and getattr(self.instance, "is_superuser", False) and not is_superuser:
+        if (
+            self.is_self
+            and getattr(self.instance, "is_superuser", False)
+            and not is_superuser
+        ):
             raise ValidationError(
-                _("Por motivos de seguridad, no puede revocar sus propios privilegios de superusuario global.")
+                _(
+                    "Por motivos de seguridad, no puede revocar sus propios privilegios de superusuario global."
+                )
             )
-        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_superuser:
+        if (
+            self.instance
+            and self.instance.pk
+            and getattr(self.instance, "is_superuser", False)
+            and not is_superuser
+        ):
             other_superusers = (
                 User.objects.filter(is_superuser=True, is_active=True)
                 .exclude(pk=self.instance.pk)
@@ -269,7 +317,9 @@ class UserManagementForm(forms.ModelForm):
             )
             if other_superusers == 0:
                 raise ValidationError(
-                    _("No es posible revocar los privilegios al único superusuario activo del sistema.")
+                    _(
+                        "No es posible revocar los privilegios al único superusuario activo del sistema."
+                    )
                 )
         return is_superuser
 
@@ -284,7 +334,9 @@ class UserManagementForm(forms.ModelForm):
                 or cleaned_data.get("is_staff")
             ):
                 raise ValidationError(
-                    _("Solo un superusuario global puede conceder privilegios administrativos o de superusuario.")
+                    _(
+                        "Solo un superusuario global puede conceder privilegios administrativos o de superusuario."
+                    )
                 )
         elif cleaned_data.get("is_superuser"):
             cleaned_data["is_staff"] = True
@@ -326,7 +378,9 @@ class PasswordResetRequestForm(forms.Form):
                 "autofocus": "autofocus",
             }
         ),
-        help_text=_("Introduzca su nombre de usuario o la dirección de correo corporativa vinculada a su cuenta."),
+        help_text=_(
+            "Introduzca su nombre de usuario o la dirección de correo corporativa vinculada a su cuenta."
+        ),
     )
 
     def clean_identity(self) -> str:
@@ -361,7 +415,7 @@ class PasswordChangeCustomForm(forms.Form):
             }
         ),
         help_text=_(
-            "Debe contener al menos 10 caracteres e incluir mayúsculas, minúsculas, números y símbolos especiales."
+            "Debe contener al menos 12 caracteres e incluir mayúsculas, minúsculas, números y símbolos especiales, sin reutilizar sus últimas 5 contraseñas."
         ),
     )
     confirm_password = forms.CharField(
@@ -394,13 +448,17 @@ class PasswordChangeCustomForm(forms.Form):
 
         if new_password and confirm_password:
             if new_password != confirm_password:
-                self.add_error("confirm_password", _("Las nuevas contraseñas no coinciden."))
+                self.add_error(
+                    "confirm_password", _("Las nuevas contraseñas no coinciden.")
+                )
             elif (current_password and new_password == current_password) or (
                 self.user and self.user.check_password(new_password)
             ):
                 self.add_error(
                     "new_password",
-                    _("La nueva contraseña no puede ser idéntica a la contraseña actual o temporal."),
+                    _(
+                        "La nueva contraseña no puede ser idéntica a la contraseña actual o temporal."
+                    ),
                 )
             else:
                 try:
@@ -409,4 +467,3 @@ class PasswordChangeCustomForm(forms.Form):
                     self.add_error("new_password", exc)
 
         return cleaned_data
-

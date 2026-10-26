@@ -37,8 +37,10 @@ ALLOWED_EXTENSIONS = {
 
 # Firmas de cabecera binaria (Magic Bytes)
 MAGIC_PDF = b"%PDF-"
-MAGIC_OLE2 = b"\xd0\xcf\x11\xe0"  # Microsoft Compound File Binary Format (.doc, .xls, .ppt)
-MAGIC_ZIP = b"PK\x03\x04"        # Base de contenedores ZIP (.docx, .xlsx, .pptx, .odt, .ods, .odp, .odg)
+MAGIC_OLE2 = (
+    b"\xd0\xcf\x11\xe0"  # Microsoft Compound File Binary Format (.doc, .xls, .ppt)
+)
+MAGIC_ZIP = b"PK\x03\x04"  # Base de contenedores ZIP (.docx, .xlsx, .pptx, .odt, .ods, .odp, .odg)
 
 # Límites de seguridad contra ataques Zip Bomb / Descompresión Maliciosa
 MAX_ZIP_ENTRIES = 500
@@ -54,11 +56,20 @@ def validate_safe_email(email: str) -> str:
         raise ValidationError("La dirección de correo debe ser una cadena de texto.")
 
     # Mitigación estricta de CRLF (retornos de carro y saltos de línea)
-    if "\r" in email or "\n" in email or "%0a" in email.lower() or "%0d" in email.lower():
-        raise ValidationError("Carácter de control CRLF no permitido en la dirección de correo.")
+    if (
+        "\r" in email
+        or "\n" in email
+        or "%0a" in email.lower()
+        or "%0d" in email.lower()
+    ):
+        raise ValidationError(
+            "Carácter de control CRLF no permitido en la dirección de correo."
+        )
 
     email_clean = email.strip()
-    validator = EmailValidator(message="El formato del correo electrónico no es válido.")
+    validator = EmailValidator(
+        message="El formato del correo electrónico no es válido."
+    )
     validator(email_clean)
 
     return email_clean.lower()
@@ -103,7 +114,9 @@ def normalize_and_validate_email_list(raw_input) -> list[str]:
                     extract_candidates(parsed)
                     return
             except (json.JSONDecodeError, ValueError, TypeError):
-                logger.debug("Cadena de entrada no es un array JSON válido, continuando análisis sintáctico.")
+                logger.debug(
+                    "Cadena de entrada no es un array JSON válido, continuando análisis sintáctico."
+                )
 
             try:
                 parsed = ast.literal_eval(item_str)
@@ -111,7 +124,9 @@ def normalize_and_validate_email_list(raw_input) -> list[str]:
                     extract_candidates(parsed)
                     return
             except (ValueError, SyntaxError, MemoryError, TypeError):
-                logger.debug("Cadena de entrada no es un literal Python evaluable de forma segura.")
+                logger.debug(
+                    "Cadena de entrada no es un literal Python evaluable de forma segura."
+                )
 
         # Descomposición por comas, puntos y comas o saltos de línea
         for part in item_str.replace(";", ",").replace("\n", ",").split(","):
@@ -139,7 +154,7 @@ def validate_document_file(file_obj):
     """
     Valida exhaustivamente un archivo subido combinando comprobación de extensión,
     inspección de cabeceras binarias (Magic Bytes) y verificación estructural profunda.
-    
+
     Mitiga OWASP A03 (Inyección/Carga Maliciosa) y OWASP A08 (Integridad de Software/Datos):
     - Impide el enmascaramiento de ejecutables (ej. renombrar 'malware.exe' a 'documento.pdf').
     - Previene ataques de descompresión maliciosa (Zip Bombs) en formatos Office y ODF.
@@ -212,11 +227,15 @@ def validate_document_file(file_obj):
                 # Comprobación de límites (Anti-Zip Bomb)
                 entries = zf.infolist()
                 if len(entries) > MAX_ZIP_ENTRIES:
-                    raise ValidationError("El archivo excede el número máximo permitido de entradas internas.")
+                    raise ValidationError(
+                        "El archivo excede el número máximo permitido de entradas internas."
+                    )
 
                 total_uncompressed = sum(entry.file_size for entry in entries)
                 if total_uncompressed > MAX_UNCOMPRESSED_ZIP_SIZE:
-                    raise ValidationError("El tamaño descomprimido del documento excede los límites de seguridad.")
+                    raise ValidationError(
+                        "El tamaño descomprimido del documento excede los límites de seguridad."
+                    )
 
                 filenames = [entry.filename for entry in entries]
 
@@ -224,19 +243,31 @@ def validate_document_file(file_obj):
                 if ext in {".odt", ".ods", ".odp", ".odg"}:
                     # LibreOffice / ODF requiere un archivo 'mimetype' en la raíz del contenedor
                     if "mimetype" not in filenames:
-                        raise ValidationError("Estructura ODF inválida: falta el descriptor 'mimetype'.")
-                    
-                    mimetype_content = zf.read("mimetype").decode("ascii", errors="ignore").strip()
-                    if not mimetype_content.startswith("application/vnd.oasis.opendocument"):
-                        raise ValidationError("El contenido del descriptor ODF no corresponde a LibreOffice/ODF.")
+                        raise ValidationError(
+                            "Estructura ODF inválida: falta el descriptor 'mimetype'."
+                        )
+
+                    mimetype_content = (
+                        zf.read("mimetype").decode("ascii", errors="ignore").strip()
+                    )
+                    if not mimetype_content.startswith(
+                        "application/vnd.oasis.opendocument"
+                    ):
+                        raise ValidationError(
+                            "El contenido del descriptor ODF no corresponde a LibreOffice/ODF."
+                        )
 
                 elif ext in {".docx", ".xlsx", ".pptx"}:
                     # MS Office OpenXML requiere '[Content_Types].xml'
                     if "[Content_Types].xml" not in filenames:
-                        raise ValidationError("Estructura OpenXML inválida: falta '[Content_Types].xml'.")
+                        raise ValidationError(
+                            "Estructura OpenXML inválida: falta '[Content_Types].xml'."
+                        )
 
         except zipfile.BadZipFile:
-            raise ValidationError("El archivo ZIP del documento se encuentra corrupto o dañado.")
+            raise ValidationError(
+                "El archivo ZIP del documento se encuentra corrupto o dañado."
+            )
 
     # Restaurar puntero de lectura original
     if hasattr(file_obj, "seek"):
@@ -249,10 +280,11 @@ class CorporatePasswordComplexityValidator:
     """
     Validador de complejidad corporativa para contraseñas de usuarios en Arcamitte
     (NIST SP 800-63B / ENS op.acc.5 / OWASP A07:2021).
-    Exige longitud mínima, mayúsculas, minúsculas, dígitos y caracteres especiales.
+    Exige longitud mínima (por defecto 12 caracteres), mayúsculas, minúsculas,
+    dígitos y caracteres especiales.
     """
 
-    def __init__(self, min_length: int = 10) -> None:
+    def __init__(self, min_length: int = 12) -> None:
         self.min_length = min_length
 
     def validate(self, password: str, user: Any = None) -> None:
@@ -260,7 +292,9 @@ class CorporatePasswordComplexityValidator:
         if len(password) < self.min_length:
             errors.append(
                 ValidationError(
-                    _("La contraseña debe contener al menos %(min_length)d caracteres."),
+                    _(
+                        "La contraseña debe contener al menos %(min_length)d caracteres."
+                    ),
                     code="password_too_short",
                     params={"min_length": self.min_length},
                 )
@@ -289,7 +323,9 @@ class CorporatePasswordComplexityValidator:
         if not re.search(r"[^A-Za-z0-9\s]", password):
             errors.append(
                 ValidationError(
-                    _("Debe incluir al menos un carácter especial o símbolo (ej. !@#$%&*+-_=)."),
+                    _(
+                        "Debe incluir al menos un carácter especial o símbolo (ej. !@#$%&*+-_=)."
+                    ),
                     code="password_no_symbol",
                 )
             )
@@ -305,3 +341,64 @@ class CorporatePasswordComplexityValidator:
             )
             % {"min_length": self.min_length}
         )
+
+
+class PasswordHistoryValidator:
+    """
+    Validador corporativo que impide la reutilización de las últimas N contraseñas previas
+    (NIST SP 800-63B / ENS op.acc.5).
+    """
+
+    def __init__(self, history_limit: int = 5) -> None:
+        self.history_limit = history_limit
+
+    def validate(self, password: str, user: Any = None) -> None:
+        if not user or not getattr(user, "pk", None):
+            return
+
+        from django.contrib.auth.hashers import check_password
+        from arcamitte.models import PasswordHistory
+
+        # Comprobar contra la contraseña actual del usuario
+        if user.password and check_password(password, user.password):
+            raise ValidationError(
+                _("La nueva contraseña no puede ser idéntica a su contraseña actual."),
+                code="password_reuse_current",
+            )
+
+        # Comprobar contra el historial de contraseñas previas
+        recent_entries = PasswordHistory.objects.filter(user=user).order_by(
+            "-created_at"
+        )[: self.history_limit]
+        for entry in recent_entries:
+            if check_password(password, entry.hashed_password):
+                raise ValidationError(
+                    _(
+                        "No puede reutilizar ninguna de sus últimas %(history_limit)d contraseñas previas."
+                    ),
+                    code="password_history_reuse",
+                    params={"history_limit": self.history_limit},
+                )
+
+    def get_help_text(self) -> str:
+        return str(
+            _(
+                "No puede reutilizar ninguna de sus últimas %(history_limit)d contraseñas previas."
+            )
+            % {"history_limit": self.history_limit}
+        )
+
+
+def sanitize_csv_cell(value: Any) -> str:
+    """
+    Sanitiza un valor antes de volcarlo a una celda de archivo CSV / Excel.
+    Mitiga ataques de Inyección de Fórmulas CSV (CWE-1236 / OWASP CSV Injection).
+    Si el valor de texto comienza con '=', '+', '-', '@', '\\t' o '\\r',
+    se antepone un apóstrofo simple (') para neutralizar la ejecución de macros/fórmulas.
+    """
+    if value is None:
+        return ""
+    str_val = str(value)
+    if str_val and str_val[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{str_val}"
+    return str_val

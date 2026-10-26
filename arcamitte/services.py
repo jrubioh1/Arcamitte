@@ -38,7 +38,9 @@ from arcamitte.validators import (
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE: int = 64 * 1024  # 64 KB para lectura segura por bloques anti-DoS (OWASP A04)
+CHUNK_SIZE: int = (
+    64 * 1024
+)  # 64 KB para lectura segura por bloques anti-DoS (OWASP A04)
 HASH_REGEX = re.compile(r"^[0-9a-fA-F]{64}$")
 GENERIC_ACCESS_MESSAGE: str = _(
     "Si los datos indicados corresponden a un documento disponible y una dirección de correo "
@@ -79,7 +81,9 @@ def _send_mail_worker(
             fail_silently=fail_silently,
         )
     except Exception as exc:
-        logger.error(f"[ARCAMITTE ERROR] Fallo al enviar correo asíncrono a {recipient_list}: {exc}")
+        logger.error(
+            f"[ARCAMITTE ERROR] Fallo al enviar correo asíncrono a {recipient_list}: {exc}"
+        )
 
 
 def dispatch_email(
@@ -96,7 +100,9 @@ def dispatch_email(
     los hilos de los web workers (gunicorn/uvicorn/asgi).
     En entorno de tests o si ARCAMITTE_ASYNC_EMAIL está desactivado, se ejecuta síncronamente.
     """
-    sender = from_email or getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local")
+    sender = from_email or getattr(
+        settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"
+    )
     recipients = recipient_list or []
 
     if sync is None:
@@ -105,7 +111,9 @@ def dispatch_email(
             getattr(settings, "TESTING", False)
             or ("test" in sys.argv)
             or ("pytest" in sys.modules)
-            or str(getattr(settings, "EMAIL_BACKEND", "")).endswith("locmem.EmailBackend")
+            or str(getattr(settings, "EMAIL_BACKEND", "")).endswith(
+                "locmem.EmailBackend"
+            )
         )
         sync = (not async_enabled) or is_testing
 
@@ -135,7 +143,9 @@ def dispatch_email(
         )
 
 
-def get_uo_recipient_emails(uo: OrganizationalUnit | None, include_members: bool = True) -> list[str]:
+def get_uo_recipient_emails(
+    uo: OrganizationalUnit | None, include_members: bool = True
+) -> list[str]:
     """
     Obtiene la lista de correos destinatarios disponibles para una Unidad Organizativa:
     su buzón general oficial y opcionalmente los correos de sus miembros activos.
@@ -149,10 +159,9 @@ def get_uo_recipient_emails(uo: OrganizationalUnit | None, include_members: bool
             emails.append(clean_uo_email)
 
     if include_members:
-        member_emails = (
-            uo.memberships.filter(is_active=True, user__is_active=True)
-            .values_list("user__email", flat=True)
-        )
+        member_emails = uo.memberships.filter(
+            is_active=True, user__is_active=True
+        ).values_list("user__email", flat=True)
         for me in member_emails:
             if me and isinstance(me, str) and me.strip():
                 clean_email = me.strip().lower()
@@ -223,16 +232,22 @@ def shred_and_delete_file(file_field: Any) -> bool:
                     f.flush()
                     os.fsync(f.fileno())
             os.remove(path)
-            logger.info(f"[ARCAMITTE AUDIT] Shredding físico completado por bloques para: {path}")
+            logger.info(
+                f"[ARCAMITTE AUDIT] Shredding físico completado por bloques para: {path}"
+            )
 
         file_field.delete(save=False)
         return True
     except Exception as exc:
-        logger.error(f"[ARCAMITTE ERROR] Fallo durante trituración segura de archivo: {exc}")
+        logger.error(
+            f"[ARCAMITTE ERROR] Fallo durante trituración segura de archivo: {exc}"
+        )
         try:
             file_field.delete(save=False)
         except Exception as del_exc:
-            logger.warning(f"[ARCAMITTE WARNING] Fallo secundario al desvincular campo de archivo: {del_exc}")
+            logger.warning(
+                f"[ARCAMITTE WARNING] Fallo secundario al desvincular campo de archivo: {del_exc}"
+            )
         return False
 
 
@@ -269,7 +284,9 @@ def reactivate_document(
     new_hash = calculate_file_sha256(original_file)
     if new_hash != document.file_hash:
         raise ValidationError(
-            _("El archivo proporcionado no coincide con el hash SHA-256 del documento original.")
+            _(
+                "El archivo proporcionado no coincide con el hash SHA-256 del documento original."
+            )
         )
 
     dek: bytes = Fernet.generate_key()
@@ -287,13 +304,18 @@ def reactivate_document(
     if document.encrypted_file:
         shred_and_delete_file(document.encrypted_file)
 
-    filename = getattr(original_file, "name", document.original_filename) or document.original_filename
+    filename = (
+        getattr(original_file, "name", document.original_filename)
+        or document.original_filename
+    )
     clean_filename = os.path.basename(filename)
     enc_filename = f"{clean_filename}.enc"
     document.encrypted_file.save(enc_filename, ContentFile(encrypted_bytes), save=False)
 
     normalized_emails = (
-        normalize_and_validate_email_list(new_emails) if new_emails is not None else document.allowed_emails
+        normalize_and_validate_email_list(new_emails)
+        if new_emails is not None
+        else document.allowed_emails
     )
     document.encrypted_dek = encrypted_dek_str
     document.allowed_emails = normalized_emails
@@ -320,7 +342,9 @@ def reactivate_document(
     document.save()
 
     # Invalidar tokens pendientes previos de este documento
-    AccessVerificationToken.objects.filter(document=document, is_used=False).update(is_used=True)
+    AccessVerificationToken.objects.filter(document=document, is_used=False).update(
+        is_used=True
+    )
 
     admin_identifier = (
         getattr(admin_user, "email", None)
@@ -357,7 +381,9 @@ def terminate_document_manually(
     3. Registra la constancia de vicisitud en DocumentAccessLog con acción FINALIZACION_MANUAL.
     """
     if document.is_consumed:
-        return False, _("El asiento ya se encuentra finalizado y el archivo ha sido retirado.")
+        return False, _(
+            "El asiento ya se encuentra finalizado y el archivo ha sido retirado."
+        )
 
     user_identifier = getattr(admin_user, "username", str(admin_user))
     user_email = getattr(admin_user, "email", user_identifier) or user_identifier
@@ -369,9 +395,13 @@ def terminate_document_manually(
         document.is_consumed = True
         document.consumed_at = timezone.now()
         document.consumed_by = f"Finalizado manualmente por {user_identifier}"
-        document.save(update_fields=["is_consumed", "consumed_at", "consumed_by", "updated_at"])
+        document.save(
+            update_fields=["is_consumed", "consumed_at", "consumed_by", "updated_at"]
+        )
 
-        detail_text = f"Asiento finalizado manualmente por {user_identifier} ({user_email})."
+        detail_text = (
+            f"Asiento finalizado manualmente por {user_identifier} ({user_email})."
+        )
         if reason:
             detail_text += f" Motivo: {reason.strip()}"
 
@@ -390,7 +420,9 @@ def terminate_document_manually(
             f"[ARCAMITTE AUDIT] Asiento {document.file_hash[:12]}... finalizado manualmente por {user_identifier}."
         )
 
-    return True, _("Asiento finalizado correctamente. El archivo ha sido destruido físicamente y la vicisitud ha quedado registrada en la auditoría legal.")
+    return True, _(
+        "Asiento finalizado correctamente. El archivo ha sido destruido físicamente y la vicisitud ha quedado registrada en la auditoría legal."
+    )
 
 
 def check_and_expire_document(
@@ -410,7 +442,9 @@ def check_and_expire_document(
         return False
 
     with transaction.atomic():
-        doc = EncryptedDocument.objects.select_for_update().filter(pk=document.pk).first()
+        doc = (
+            EncryptedDocument.objects.select_for_update().filter(pk=document.pk).first()
+        )
         if not doc or doc.is_consumed or not doc.is_expired():
             return False
 
@@ -420,9 +454,15 @@ def check_and_expire_document(
         doc.is_consumed = True
         doc.consumed_at = timezone.now()
         doc.consumed_by = "Sistema (Caducidad automática sin acceso en plazo)"
-        doc.save(update_fields=["is_consumed", "consumed_at", "consumed_by", "updated_at"])
+        doc.save(
+            update_fields=["is_consumed", "consumed_at", "consumed_by", "updated_at"]
+        )
 
-        expiry_str = doc.expires_at.strftime("%Y-%m-%d %H:%M") if doc.expires_at else "desconocida"
+        expiry_str = (
+            doc.expires_at.strftime("%Y-%m-%d %H:%M")
+            if doc.expires_at
+            else "desconocida"
+        )
         DocumentAccessLog.objects.create(
             document=doc,
             email="sistema@arcamitte.local",
@@ -459,7 +499,9 @@ def process_expired_documents() -> int:
     for doc in expired_docs:
         if check_and_expire_document(doc):
             count += 1
-    logger.info(f"[ARCAMITTE] Proceso de caducidad completado: {count} documentos cerrados.")
+    logger.info(
+        f"[ARCAMITTE] Proceso de caducidad completado: {count} documentos cerrados."
+    )
     return count
 
 
@@ -480,11 +522,11 @@ def upload_and_encrypt_document(
 ) -> EncryptedDocument:
     """
     Servicio de registro y cifrado desatendido de documentos confidenciales.
-    
+
     Si 'reopen_existing=True' y ya existe un documento con el mismo hash SHA-256,
     se reactiva automáticamente re-cifrando en disco y actualizando destinatarios
     sin duplicar el identificador en base de datos.
-    
+
     Retorna: EncryptedDocument (con atributo '_is_reactivated' indicando si fue reactivación)
     """
     validate_document_file(original_file)
@@ -503,21 +545,37 @@ def upload_and_encrypt_document(
             uploaded_by = admin_user
 
     # Comprobación de seguridad: El usuario debe pertenecer a la origin_uo si no es superusuario
-    if uploaded_by is not None and hasattr(uploaded_by, "is_superuser") and not uploaded_by.is_superuser:
+    if (
+        uploaded_by is not None
+        and hasattr(uploaded_by, "is_superuser")
+        and not uploaded_by.is_superuser
+    ):
         if origin_uo is not None:
-            if not UserUOMembership.objects.filter(user=uploaded_by, uo=origin_uo, is_active=True).exists():
-                raise ValidationError(_("El usuario no pertenece a la UO emisora seleccionada."))
+            if not UserUOMembership.objects.filter(
+                user=uploaded_by, uo=origin_uo, is_active=True
+            ).exists():
+                raise ValidationError(
+                    _("El usuario no pertenece a la UO emisora seleccionada.")
+                )
 
     normalized_emails = normalize_and_validate_email_list(allowed_emails)
-    file_hash = (precalculated_hash or "").strip().lower() or calculate_file_sha256(original_file)
+    file_hash = (precalculated_hash or "").strip().lower() or calculate_file_sha256(
+        original_file
+    )
 
     existing_doc = EncryptedDocument.objects.filter(file_hash=file_hash).first()
     if existing_doc:
         if reopen_existing:
             # Comprobación de seguridad: El usuario debe pertenecer a la origin_uo del documento existente si no es superusuario
-            if uploaded_by is not None and hasattr(uploaded_by, "is_superuser") and not uploaded_by.is_superuser:
+            if (
+                uploaded_by is not None
+                and hasattr(uploaded_by, "is_superuser")
+                and not uploaded_by.is_superuser
+            ):
                 if existing_doc.origin_uo is not None:
-                    if not UserUOMembership.objects.filter(user=uploaded_by, uo=existing_doc.origin_uo, is_active=True).exists():
+                    if not UserUOMembership.objects.filter(
+                        user=uploaded_by, uo=existing_doc.origin_uo, is_active=True
+                    ).exists():
                         raise ValidationError(
                             _(
                                 "Ya existe un documento registrado con este mismo hash pero pertenece a otra Unidad Organizativa (%(alias)s). No tiene autorización para reactivarlo."
@@ -547,7 +605,9 @@ def upload_and_encrypt_document(
             )
             reactivated._is_reactivated = True
             return reactivated
-        raise ValidationError(_("Ya existe un documento registrado con este mismo hash SHA-256."))
+        raise ValidationError(
+            _("Ya existe un documento registrado con este mismo hash SHA-256.")
+        )
 
     dek: bytes = Fernet.generate_key()
     fernet_dek = Fernet(dek)
@@ -581,7 +641,9 @@ def upload_and_encrypt_document(
         doc_kwargs["expires_at"] = expires_at
 
     document = EncryptedDocument(**doc_kwargs)
-    document.encrypted_file.save(encrypted_filename, ContentFile(ciphertext_bytes), save=False)
+    document.encrypted_file.save(
+        encrypted_filename, ContentFile(ciphertext_bytes), save=False
+    )
     document.save()
 
     logger.info(
@@ -607,24 +669,44 @@ def request_document_access(
     clean_email = (email or "").strip().lower()
 
     if not HASH_REGEX.match(clean_hash):
-        hashlib.pbkdf2_hmac("sha256", clean_email.encode("utf-8"), b"arcamitte_timing_salt", TIMING_ATTACK_PBKDF2_ITERATIONS)
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            clean_email.encode("utf-8"),
+            b"arcamitte_timing_salt",
+            TIMING_ATTACK_PBKDF2_ITERATIONS,
+        )
         return True, GENERIC_ACCESS_MESSAGE
 
     try:
         normalized_email = validate_safe_email(clean_email)
     except ValidationError:
-        hashlib.pbkdf2_hmac("sha256", b"invalid_email", b"arcamitte_timing_salt", TIMING_ATTACK_PBKDF2_ITERATIONS)
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            b"invalid_email",
+            b"arcamitte_timing_salt",
+            TIMING_ATTACK_PBKDF2_ITERATIONS,
+        )
         return True, GENERIC_ACCESS_MESSAGE
 
     document = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
 
     if not document:
-        hashlib.pbkdf2_hmac("sha256", normalized_email.encode("utf-8"), b"arcamitte_timing_salt", TIMING_ATTACK_PBKDF2_ITERATIONS)
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            normalized_email.encode("utf-8"),
+            b"arcamitte_timing_salt",
+            TIMING_ATTACK_PBKDF2_ITERATIONS,
+        )
         return True, GENERIC_ACCESS_MESSAGE
 
     # Verificación de autorización previa (Mitigación de enumeración y fuga de metadatos)
     if not document.is_email_authorized(normalized_email):
-        hashlib.pbkdf2_hmac("sha256", normalized_email.encode("utf-8"), b"arcamitte_timing_salt", TIMING_ATTACK_PBKDF2_ITERATIONS)
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            normalized_email.encode("utf-8"),
+            b"arcamitte_timing_salt",
+            TIMING_ATTACK_PBKDF2_ITERATIONS,
+        )
         return True, GENERIC_ACCESS_MESSAGE
 
     # Verificación de caducidad del asiento (vencimiento de plazo)
@@ -640,8 +722,10 @@ def request_document_access(
         )
         consumed_by_str = document.consumed_by or _("un usuario autorizado")
         doc_name = document.original_filename or f"Documento_{document.file_hash[:8]}"
-        desc_part = f"• Descripción: {document.description}\n" if document.description else ""
-        
+        desc_part = (
+            f"• Descripción: {document.description}\n" if document.description else ""
+        )
+
         post_consume_message = (
             f"Estimado/a usuario/a,\n\n"
             f"Le informamos de que el documento solicitado ya fue retirado de la pasarela el {consumed_at_str} por {consumed_by_str} "
@@ -660,7 +744,9 @@ def request_document_access(
             subject=_("Información sobre su solicitud: Documento '%(filename)s'")
             % {"filename": doc_name},
             message=post_consume_message,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"),
+            from_email=getattr(
+                settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"
+            ),
             recipient_list=[normalized_email],
             fail_silently=True,
         )
@@ -691,9 +777,12 @@ def request_document_access(
             user_agent=user_agent,
         )
         doc_name = document.original_filename or f"Documento_{document.file_hash[:8]}"
-        desc_part = f"• Descripción: {document.description}\n" if document.description else ""
+        desc_part = (
+            f"• Descripción: {document.description}\n" if document.description else ""
+        )
         dispatch_email(
-            subject=_("Aviso: Copia ya descargada de '%(filename)s'") % {"filename": doc_name},
+            subject=_("Aviso: Copia ya descargada de '%(filename)s'")
+            % {"filename": doc_name},
             message=(
                 f"Estimado/a usuario/a,\n\n"
                 f"Le comunicamos que su dirección de correo ya ha descargado previamente este documento.\n\n"
@@ -706,7 +795,9 @@ def request_document_access(
                 f"Atentamente,\n"
                 f"Servicio de Entrega Segura - Arcamitte"
             ),
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"),
+            from_email=getattr(
+                settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"
+            ),
             recipient_list=[normalized_email],
             fail_silently=True,
         )
@@ -738,7 +829,11 @@ def request_document_access(
             redeem_path = "/arcamitte/canjear/"
 
         query_params = f"?hash={document.file_hash}&email={normalized_email}"
-        redeem_url = f"{base_url.rstrip('/')}{redeem_path}{query_params}" if base_url else f"{redeem_path}{query_params}"
+        redeem_url = (
+            f"{base_url.rstrip('/')}{redeem_path}{query_params}"
+            if base_url
+            else f"{redeem_path}{query_params}"
+        )
 
         policy_note = (
             "El documento permanecerá disponible hasta que todos los destinatarios autorizados hayan completado su descarga."
@@ -747,8 +842,12 @@ def request_document_access(
         )
 
         doc_name = document.original_filename or f"Documento_{document.file_hash[:8]}"
-        desc_part = f"• Descripción: {document.description}\n" if document.description else ""
-        email_subject = _("Código de verificación para '%(filename)s' - Arcamitte") % {"filename": doc_name}
+        desc_part = (
+            f"• Descripción: {document.description}\n" if document.description else ""
+        )
+        email_subject = _("Código de verificación para '%(filename)s' - Arcamitte") % {
+            "filename": doc_name
+        }
         email_body = (
             f"Estimado/a usuario/a,\n\n"
             f"Ha solicitado el acceso al siguiente documento:\n"
@@ -770,7 +869,9 @@ def request_document_access(
         dispatch_email(
             subject=email_subject,
             message=email_body,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"),
+            from_email=getattr(
+                settings, "DEFAULT_FROM_EMAIL", "no-reply@arcamitte.local"
+            ),
             recipient_list=[normalized_email],
             fail_silently=False,
         )
@@ -787,23 +888,34 @@ def request_document_access(
         return True, GENERIC_ACCESS_MESSAGE
 
     # Correo no autorizado: PBKDF2 simulado y respuesta neutra
-    hashlib.pbkdf2_hmac("sha256", normalized_email.encode("utf-8"), b"arcamitte_timing_salt", TIMING_ATTACK_PBKDF2_ITERATIONS)
+    hashlib.pbkdf2_hmac(
+        "sha256",
+        normalized_email.encode("utf-8"),
+        b"arcamitte_timing_salt",
+        TIMING_ATTACK_PBKDF2_ITERATIONS,
+    )
     return True, GENERIC_ACCESS_MESSAGE
 
 
-def generate_corporate_email_text(document: EncryptedDocument, base_url: str | None = None) -> str:
+def generate_corporate_email_text(
+    document: EncryptedDocument, base_url: str | None = None
+) -> str:
     """
     Genera el texto formal para notificar al destinatario,
     incluyendo nombre del archivo, descripción, identificador SHA-256 e instrucciones de acceso.
     """
-    url_root = (base_url or getattr(settings, "ARCAMITTE_BASE_URL", "http://127.0.0.1:8000")).rstrip("/")
+    url_root = (
+        base_url or getattr(settings, "ARCAMITTE_BASE_URL", "http://127.0.0.1:8000")
+    ).rstrip("/")
     solicitar_url = f"{url_root}/arcamitte/solicitar/?hash={document.file_hash}"
     policy_desc = (
         "El documento permanecerá disponible en la plataforma hasta que todos los destinatarios autorizados hayan completado su descarga."
         if document.burn_policy == EncryptedDocument.BurnPolicy.ALL_RECIPIENTS
         else "Por motivos de seguridad y confidencialidad, el documento dejará de estar disponible una vez completada la primera descarga."
     )
-    desc_part = f"\n• Descripción: {document.description}" if document.description else ""
+    desc_part = (
+        f"\n• Descripción: {document.description}" if document.description else ""
+    )
 
     return (
         f"Estimado/a destinatario/a,\n\n"
@@ -852,7 +964,12 @@ def consume_document_with_otp(
     )
 
     if not token or not token.is_valid():
-        return False, b"", "", _("El código de verificación no es válido o ha expirado.")
+        return (
+            False,
+            b"",
+            "",
+            _("El código de verificación no es válido o ha expirado."),
+        )
 
     document = token.document
 
@@ -861,12 +978,24 @@ def consume_document_with_otp(
         check_and_expire_document(document, client_ip=client_ip, user_agent=user_agent)
         token.is_used = True
         token.save(update_fields=["is_used"])
-        return False, b"", "", _("El plazo de disponibilidad de este documento ha expirado y el archivo ha sido retirado de la plataforma.")
+        return (
+            False,
+            b"",
+            "",
+            _(
+                "El plazo de disponibilidad de este documento ha expirado y el archivo ha sido retirado de la plataforma."
+            ),
+        )
 
     if document.is_consumed:
         token.is_used = True
         token.save(update_fields=["is_used"])
-        return False, b"", "", _("El documento ya no se encuentra disponible para su descarga.")
+        return (
+            False,
+            b"",
+            "",
+            _("El documento ya no se encuentra disponible para su descarga."),
+        )
 
     if (
         document.burn_policy == EncryptedDocument.BurnPolicy.ALL_RECIPIENTS
@@ -878,10 +1007,14 @@ def consume_document_with_otp(
             False,
             b"",
             "",
-            _("Usted ya ha descargado este documento con anterioridad. Cada destinatario dispone de un único acceso."),
+            _(
+                "Usted ya ha descargado este documento con anterioridad. Cada destinatario dispone de un único acceso."
+            ),
         )
 
-    is_match = secrets.compare_digest(token.otp_code.encode("utf-8"), clean_otp.encode("utf-8"))
+    is_match = secrets.compare_digest(
+        token.otp_code.encode("utf-8"), clean_otp.encode("utf-8")
+    )
 
     if not is_match:
         token.register_failed_attempt()
@@ -899,7 +1032,9 @@ def consume_document_with_otp(
                 False,
                 b"",
                 "",
-                _("Ha superado el número máximo de intentos permitidos. El acceso ha sido bloqueado por seguridad."),
+                _(
+                    "Ha superado el número máximo de intentos permitidos. El acceso ha sido bloqueado por seguridad."
+                ),
             )
         else:
             remaining = 3 - token.failed_attempts
@@ -907,7 +1042,9 @@ def consume_document_with_otp(
                 False,
                 b"",
                 "",
-                _("Código de verificación incorrecto. Intentos restantes: %(remaining)d.")
+                _(
+                    "Código de verificación incorrecto. Intentos restantes: %(remaining)d."
+                )
                 % {"remaining": remaining},
             )
 
@@ -921,7 +1058,12 @@ def consume_document_with_otp(
             dek_bytes = server_fernet.decrypt(document.encrypted_dek.encode("utf-8"))
 
             if not document.encrypted_file:
-                return False, b"", "", _("El archivo cifrado no está disponible en el servidor.")
+                return (
+                    False,
+                    b"",
+                    "",
+                    _("El archivo cifrado no está disponible en el servidor."),
+                )
 
             document.encrypted_file.seek(0)
             encrypted_file_bytes = document.encrypted_file.read()
@@ -930,7 +1072,9 @@ def consume_document_with_otp(
             decrypted_bytes = dek_fernet.decrypt(encrypted_file_bytes)
 
             consumed_list = list(document.consumed_recipients or [])
-            if token.email not in [e.strip().lower() for e in consumed_list if isinstance(e, str)]:
+            if token.email not in [
+                e.strip().lower() for e in consumed_list if isinstance(e, str)
+            ]:
                 consumed_list.append(token.email)
             document.consumed_recipients = consumed_list
 
@@ -941,7 +1085,9 @@ def consume_document_with_otp(
                     document.consumed_by = f"todos los destinatarios autorizados ({len(consumed_list)}/{len(document.allowed_emails)})"
                 else:
                     should_burn = False
-                    document.consumed_by = f"Parcial: {len(consumed_list)}/{len(document.allowed_emails)}"
+                    document.consumed_by = (
+                        f"Parcial: {len(consumed_list)}/{len(document.allowed_emails)}"
+                    )
             else:
                 should_burn = True
                 document.consumed_by = token.email
@@ -950,7 +1096,14 @@ def consume_document_with_otp(
                 shred_and_delete_file(document.encrypted_file)
                 document.is_consumed = True
                 document.consumed_at = timezone.now()
-                document.save(update_fields=["is_consumed", "consumed_by", "consumed_at", "consumed_recipients"])
+                document.save(
+                    update_fields=[
+                        "is_consumed",
+                        "consumed_by",
+                        "consumed_at",
+                        "consumed_recipients",
+                    ]
+                )
                 log_action = DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN
                 logger.info(
                     f"[ARCAMITTE AUDIT] Destrucción física final completada para documento {document.file_hash[:12]}... por {token.email}."
@@ -972,11 +1125,23 @@ def consume_document_with_otp(
                 user_agent=user_agent,
             )
 
-        return True, decrypted_bytes, document.original_filename, _("Documento descifrado con éxito.")
+        return (
+            True,
+            decrypted_bytes,
+            document.original_filename,
+            _("Documento descifrado con éxito."),
+        )
 
     except Exception as exc:
-        logger.error(f"[ARCAMITTE ERROR] Fallo durante descifrado y canje del documento: {exc}")
-        return False, b"", "", _("Se produjo un error al procesar el descifrado del documento.")
+        logger.error(
+            f"[ARCAMITTE ERROR] Fallo durante descifrado y canje del documento: {exc}"
+        )
+        return (
+            False,
+            b"",
+            "",
+            _("Se produjo un error al procesar el descifrado del documento."),
+        )
 
 
 def check_and_auto_close_if_file_missing(
@@ -1044,15 +1209,28 @@ def admin_decrypt_document(
     """
     file_present = check_and_auto_close_if_file_missing(
         document=document,
-        user_identifier=getattr(admin_user, "email", None) or getattr(admin_user, "username", "admin"),
+        user_identifier=getattr(admin_user, "email", None)
+        or getattr(admin_user, "username", "admin"),
         client_ip=client_ip,
         user_agent=user_agent,
     )
     if not file_present:
-        return False, b"", "", _("El archivo físico no se encuentra disponible en almacenamiento seguro. El asiento ha sido clausurado con constancia de vicisitud.")
+        return (
+            False,
+            b"",
+            "",
+            _(
+                "El archivo físico no se encuentra disponible en almacenamiento seguro. El asiento ha sido clausurado con constancia de vicisitud."
+            ),
+        )
 
     if document.is_consumed:
-        return False, b"", "", _("El documento ya ha sido consumido y destruido del servidor.")
+        return (
+            False,
+            b"",
+            "",
+            _("El documento ya ha sido consumido y destruido del servidor."),
+        )
 
     if not document.encrypted_file:
         return False, b"", "", _("El archivo cifrado no está disponible.")
@@ -1070,13 +1248,19 @@ def admin_decrypt_document(
                 role__in=[UserUOMembership.Role.AUDITOR, UserUOMembership.Role.ADMIN],
             ).values_list("uo_id", flat=True)
         )
-        is_origin_auditor = bool(document.origin_uo_id and document.origin_uo_id in user_auditor_uos)
-        is_target_auditor = bool(document.target_uo_id and document.target_uo_id in user_auditor_uos)
+        is_origin_auditor = bool(
+            document.origin_uo_id and document.origin_uo_id in user_auditor_uos
+        )
+        is_target_auditor = bool(
+            document.target_uo_id and document.target_uo_id in user_auditor_uos
+        )
         is_uploader = bool(
             document.uploaded_by_id
             and document.uploaded_by_id == getattr(admin_user, "id", None)
         )
-        is_standalone_without_uo = (not document.origin_uo_id and not document.target_uo_id)
+        is_standalone_without_uo = (
+            not document.origin_uo_id and not document.target_uo_id
+        )
 
         is_authorized = (
             is_origin_auditor
@@ -1087,7 +1271,12 @@ def admin_decrypt_document(
         )
 
         if not is_authorized:
-            return False, b"", "", _("No tiene permisos de auditoría en la UO asociada a este documento.")
+            return (
+                False,
+                b"",
+                "",
+                _("No tiene permisos de auditoría en la UO asociada a este documento."),
+            )
 
     try:
         server_key = get_server_fernet_key()
@@ -1121,15 +1310,21 @@ def admin_decrypt_document(
             f"[ARCAMITTE AUDIT] Descarga administrativa preservada realizada por '{admin_identifier}' "
             f"para documento {document.file_hash[:12]}..."
         )
-        return True, decrypted_bytes, document.original_filename, _("Descarga de auditoría completada.")
+        return (
+            True,
+            decrypted_bytes,
+            document.original_filename,
+            _("Descarga de auditoría completada."),
+        )
 
     except Exception as exc:
-        logger.error(f"[ARCAMITTE ERROR] Error en descarga de auditoría administrativa: {exc}")
+        logger.error(
+            f"[ARCAMITTE ERROR] Error en descarga de auditoría administrativa: {exc}"
+        )
         return False, b"", "", _("Error al descifrar el documento para auditoría.")
 
 
 decrypt_document_for_audit = admin_decrypt_document
-
 
 
 ROLE_PERMISSIONS_MAP: dict[str, list[str]] = {
@@ -1247,13 +1442,17 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
     }
     """
     if not isinstance(data, dict):
-        raise ValidationError(_("El contenido JSON debe ser un objeto/diccionario raíz."))
+        raise ValidationError(
+            _("El contenido JSON debe ser un objeto/diccionario raíz.")
+        )
 
     uo_list = data.get("organizational_units", [])
     user_list = data.get("users", [])
 
     if not isinstance(uo_list, list) or not isinstance(user_list, list):
-        raise ValidationError(_("'organizational_units' y 'users' deben ser listas JSON."))
+        raise ValidationError(
+            _("'organizational_units' y 'users' deben ser listas JSON.")
+        )
 
     uos_processed = 0
     users_processed = 0
@@ -1265,7 +1464,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
         # 1. Procesar Unidades Organizativas
         for uo_data in uo_list:
             if not isinstance(uo_data, dict):
-                raise ValidationError(_("Cada entrada en 'organizational_units' debe ser un objeto JSON."))
+                raise ValidationError(
+                    _("Cada entrada en 'organizational_units' debe ser un objeto JSON.")
+                )
             code = uo_data.get("numeric_code")
             alias = (uo_data.get("alias") or "").strip().upper()
             name = (uo_data.get("name") or "").strip()
@@ -1274,14 +1475,18 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
 
             if not code or not alias or not name or not email:
                 raise ValidationError(
-                    _(f"Cada UO debe incluir obligatoriamente 'numeric_code', 'alias', 'name' y 'email'. Entrada inválida: {uo_data}")
+                    _(
+                        f"Cada UO debe incluir obligatoriamente 'numeric_code', 'alias', 'name' y 'email'. Entrada inválida: {uo_data}"
+                    )
                 )
 
             try:
                 code_int = int(code)
             except (ValueError, TypeError):
                 raise ValidationError(
-                    _(f"El campo 'numeric_code' en UO '{alias}' debe ser un número entero válido: {code}")
+                    _(
+                        f"El campo 'numeric_code' en UO '{alias}' debe ser un número entero válido: {code}"
+                    )
                 )
 
             clean_email = validate_safe_email(email)
@@ -1298,17 +1503,23 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             )
             uos_processed += 1
             action_desc = "creada" if created else "actualizada"
-            feedback_notes.append(f"UO [{uo.numeric_code}] {uo.alias} {action_desc} exitosamente.")
+            feedback_notes.append(
+                f"UO [{uo.numeric_code}] {uo.alias} {action_desc} exitosamente."
+            )
 
         # 2. Procesar Usuarios y Membresías
         for u_data in user_list:
             if not isinstance(u_data, dict):
-                raise ValidationError(_("Cada entrada en 'users' debe ser un objeto JSON."))
+                raise ValidationError(
+                    _("Cada entrada en 'users' debe ser un objeto JSON.")
+                )
             username = (u_data.get("username") or "").strip()
             email = (u_data.get("email") or "").strip().lower()
             first_name = (u_data.get("first_name") or "").strip()
             last_name = (u_data.get("last_name") or "").strip()
-            raw_role = (u_data.get("role") or UserUOMembership.Role.OPERATOR).strip().upper()
+            raw_role = (
+                (u_data.get("role") or UserUOMembership.Role.OPERATOR).strip().upper()
+            )
             uo_alias = (u_data.get("uo_alias") or "").strip().upper()
             uo_code = u_data.get("uo_numeric_code")
             is_staff = bool(u_data.get("is_staff", True))
@@ -1316,7 +1527,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
 
             if not username or not email:
                 raise ValidationError(
-                    _(f"Cada usuario debe incluir obligatoriamente 'username' y 'email'. Entrada inválida: {u_data}")
+                    _(
+                        f"Cada usuario debe incluir obligatoriamente 'username' y 'email'. Entrada inválida: {u_data}"
+                    )
                 )
 
             clean_email = validate_safe_email(email)
@@ -1327,16 +1540,24 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 target_uo = OrganizationalUnit.objects.filter(alias=uo_alias).first()
             if not target_uo and uo_code:
                 try:
-                    target_uo = OrganizationalUnit.objects.filter(numeric_code=int(uo_code)).first()
+                    target_uo = OrganizationalUnit.objects.filter(
+                        numeric_code=int(uo_code)
+                    ).first()
                 except (ValueError, TypeError):
                     target_uo = None
 
             if not target_uo:
                 raise ValidationError(
-                    _(f"No se encontró la UO '{uo_alias or uo_code}' asociada al usuario '{username}'. Debe definirse previamente.")
+                    _(
+                        f"No se encontró la UO '{uo_alias or uo_code}' asociada al usuario '{username}'. Debe definirse previamente."
+                    )
                 )
 
-            role = raw_role if raw_role in UserUOMembership.Role.values else UserUOMembership.Role.OPERATOR
+            role = (
+                raw_role
+                if raw_role in UserUOMembership.Role.values
+                else UserUOMembership.Role.OPERATOR
+            )
 
             user = User.objects.filter(username=username).first()
             user_created = False
@@ -1417,7 +1638,9 @@ def generate_secure_temporary_password(length: int = 14) -> str:
     return "".join(pwd_chars)
 
 
-def reset_user_password_and_notify(user: Any, requested_by: Any = None) -> tuple[bool, str]:
+def reset_user_password_and_notify(
+    user: Any, requested_by: Any = None
+) -> tuple[bool, str]:
     """
     Restablece la contraseña de un usuario a una clave temporal generada aleatoriamente,
     activa la exigencia de cambio en el primer acceso (must_change_password = True)
@@ -1464,11 +1687,19 @@ def reset_user_password_and_notify(user: Any, requested_by: Any = None) -> tuple
         fail_silently=False,
     )
 
-    req_info = getattr(requested_by, "username", "Autoservicio") if requested_by else "Autoservicio"
+    req_info = (
+        getattr(requested_by, "username", "Autoservicio")
+        if requested_by
+        else "Autoservicio"
+    )
     logger.info(
         f"[ARCAMITTE SECURITY] Reseteo de contraseña ejecutado para usuario '{user.username}' por '{req_info}'."
     )
-    return True, str(_("Se ha restablecido la contraseña y se ha remitido la clave temporal al correo del usuario."))
+    return True, str(
+        _(
+            "Se ha restablecido la contraseña y se ha remitido la clave temporal al correo del usuario."
+        )
+    )
 
 
 def is_uo_admin(user: Any, uo: OrganizationalUnit) -> bool:
@@ -1497,14 +1728,20 @@ def get_user_administered_uos(user: Any) -> Any:
         return OrganizationalUnit.objects.none()
     if user.is_superuser:
         return OrganizationalUnit.objects.all().order_by("numeric_code")
-    return OrganizationalUnit.objects.filter(
-        memberships__user=user,
-        memberships__role=UserUOMembership.Role.ADMIN,
-        memberships__is_active=True,
-    ).order_by("numeric_code").distinct()
+    return (
+        OrganizationalUnit.objects.filter(
+            memberships__user=user,
+            memberships__role=UserUOMembership.Role.ADMIN,
+            memberships__is_active=True,
+        )
+        .order_by("numeric_code")
+        .distinct()
+    )
 
 
-def get_scoped_documents_for_request(request: Any) -> models.QuerySet[EncryptedDocument]:
+def get_scoped_documents_for_request(
+    request: Any,
+) -> models.QuerySet[EncryptedDocument]:
     """
     Retorna el QuerySet de documentos confidenciales accesible para la petición dada,
     aplicando estrictamente el principio de Menor Privilegio (Least Privilege) y
@@ -1527,11 +1764,17 @@ def get_scoped_documents_for_request(request: Any) -> models.QuerySet[EncryptedD
     token = getattr(request, "auth", None)
     if token and isinstance(token, APIToken) and token.is_valid():
         if token.uo:
-            return EncryptedDocument.objects.filter(
-                models.Q(origin_uo=token.uo) | models.Q(target_uo=token.uo)
-            ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
+            return (
+                EncryptedDocument.objects.filter(
+                    models.Q(origin_uo=token.uo) | models.Q(target_uo=token.uo)
+                )
+                .select_related("origin_uo", "target_uo", "uploaded_by")
+                .distinct()
+            )
         if token.created_by and token.created_by.is_superuser:
-            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
+            return EncryptedDocument.objects.all().select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            )
         if token.created_by:
             return EncryptedDocument.objects.filter(
                 uploaded_by=token.created_by
@@ -1541,25 +1784,34 @@ def get_scoped_documents_for_request(request: Any) -> models.QuerySet[EncryptedD
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
         if getattr(user, "is_superuser", False):
-            return EncryptedDocument.objects.all().select_related("origin_uo", "target_uo", "uploaded_by")
+            return EncryptedDocument.objects.all().select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            )
 
         from arcamitte.models import UserUOMembership
+
         user_uos = OrganizationalUnit.objects.filter(
             memberships__user=user,
             memberships__is_active=True,
             is_active=True,
         ).distinct()
 
-        return EncryptedDocument.objects.filter(
-            models.Q(origin_uo__in=user_uos)
-            | models.Q(target_uo__in=user_uos)
-            | models.Q(uploaded_by=user)
-        ).select_related("origin_uo", "target_uo", "uploaded_by").distinct()
+        return (
+            EncryptedDocument.objects.filter(
+                models.Q(origin_uo__in=user_uos)
+                | models.Q(target_uo__in=user_uos)
+                | models.Q(uploaded_by=user)
+            )
+            .select_related("origin_uo", "target_uo", "uploaded_by")
+            .distinct()
+        )
 
     return EncryptedDocument.objects.none()
 
 
-def can_user_or_token_terminate_document(request: Any, document: EncryptedDocument) -> bool:
+def can_user_or_token_terminate_document(
+    request: Any, document: EncryptedDocument
+) -> bool:
     """
     Comprueba si la entidad peticionaria (usuario o token M2M) dispone de potestad
     para terminar/revocar deliberadamente un asiento documental:
@@ -1594,7 +1846,9 @@ def can_user_or_token_terminate_document(request: Any, document: EncryptedDocume
     return False
 
 
-def can_user_or_token_decrypt_for_audit(request: Any, document: EncryptedDocument) -> bool:
+def can_user_or_token_decrypt_for_audit(
+    request: Any, document: EncryptedDocument
+) -> bool:
     """
     Comprueba si la entidad peticionaria dispone de permiso de descifrado pericial
     para inspección legal / auditoría (sin activar la destrucción por lectura):
@@ -1610,13 +1864,23 @@ def can_user_or_token_decrypt_for_audit(request: Any, document: EncryptedDocumen
             return False
         if not token.uo and token.created_by and token.created_by.is_superuser:
             return True
-        return bool(token.uo and (document.origin_uo_id == token.uo_id or document.target_uo_id == token.uo_id))
+        return bool(
+            token.uo
+            and (
+                document.origin_uo_id == token.uo_id
+                or document.target_uo_id == token.uo_id
+            )
+        )
 
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
         if user.is_superuser:
             return True
-        uo_ids = [uid for uid in (document.origin_uo_id, document.target_uo_id) if uid is not None]
+        uo_ids = [
+            uid
+            for uid in (document.origin_uo_id, document.target_uo_id)
+            if uid is not None
+        ]
         if uo_ids:
             return UserUOMembership.objects.filter(
                 user=user,
@@ -1629,7 +1893,9 @@ def can_user_or_token_decrypt_for_audit(request: Any, document: EncryptedDocumen
     return False
 
 
-def get_scoped_audit_logs_for_request(request: Any) -> models.QuerySet[DocumentAccessLog]:
+def get_scoped_audit_logs_for_request(
+    request: Any,
+) -> models.QuerySet[DocumentAccessLog]:
     """
     Retorna el QuerySet de registros de auditoría accesibles para la petición:
     - Superusuario / Token Maestro sin UO con scope 'audit:read': todos los registros.
@@ -1643,33 +1909,591 @@ def get_scoped_audit_logs_for_request(request: Any) -> models.QuerySet[DocumentA
         if not token.has_scope("audit:read"):
             return DocumentAccessLog.objects.none()
         if not token.uo and token.created_by and token.created_by.is_superuser:
-            return DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo")
+            return DocumentAccessLog.objects.all().select_related(
+                "document", "origin_uo", "target_uo"
+            )
         if token.uo:
-            return DocumentAccessLog.objects.filter(
-                models.Q(origin_uo=token.uo)
-                | models.Q(target_uo=token.uo)
-                | models.Q(document__origin_uo=token.uo)
-                | models.Q(document__target_uo=token.uo)
-            ).select_related("document", "origin_uo", "target_uo").distinct()
+            return (
+                DocumentAccessLog.objects.filter(
+                    models.Q(origin_uo=token.uo)
+                    | models.Q(target_uo=token.uo)
+                    | models.Q(document__origin_uo=token.uo)
+                    | models.Q(document__target_uo=token.uo)
+                )
+                .select_related("document", "origin_uo", "target_uo")
+                .distinct()
+            )
 
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
         if user.is_superuser:
-            return DocumentAccessLog.objects.all().select_related("document", "origin_uo", "target_uo")
+            return DocumentAccessLog.objects.all().select_related(
+                "document", "origin_uo", "target_uo"
+            )
 
         administered_or_audited_uos = OrganizationalUnit.objects.filter(
             memberships__user=user,
-            memberships__role__in=[UserUOMembership.Role.ADMIN, UserUOMembership.Role.AUDITOR],
+            memberships__role__in=[
+                UserUOMembership.Role.ADMIN,
+                UserUOMembership.Role.AUDITOR,
+            ],
             memberships__is_active=True,
             is_active=True,
         ).distinct()
 
-        return DocumentAccessLog.objects.filter(
-            models.Q(origin_uo__in=administered_or_audited_uos)
-            | models.Q(target_uo__in=administered_or_audited_uos)
-            | models.Q(document__origin_uo__in=administered_or_audited_uos)
-            | models.Q(document__target_uo__in=administered_or_audited_uos)
-        ).select_related("document", "origin_uo", "target_uo").distinct()
+        return (
+            DocumentAccessLog.objects.filter(
+                models.Q(origin_uo__in=administered_or_audited_uos)
+                | models.Q(target_uo__in=administered_or_audited_uos)
+                | models.Q(document__origin_uo__in=administered_or_audited_uos)
+                | models.Q(document__target_uo__in=administered_or_audited_uos)
+            )
+            .select_related("document", "origin_uo", "target_uo")
+            .distinct()
+        )
 
     return DocumentAccessLog.objects.none()
 
+
+# ==============================================================================
+# SERVICIOS DE SEGURIDAD PERIMETRAL, ANTI-FUERZA BRUTA Y NO REPUDIO DE LOGS
+# ==============================================================================
+
+
+def record_failed_login(username: str, client_ip: str | None = None) -> dict[str, Any]:
+    """
+    Registra un intento fallido de autenticación administrativa en Arcamitte.
+    Evalúa umbrales de fuerza bruta defensiva por IP y por cuenta de usuario:
+    - IP: Si supera ARCAMITTE_IP_BAN_FAILED_ATTEMPTS_THRESHOLD en la ventana temporal,
+      la IP es baneada automáticamente en BannedIP y se envía alerta al SOC.
+    - Usuario: Si el usuario existe y acumula ARCAMITTE_USER_MAX_FAILED_LOGINS,
+      su cuenta queda bloqueada temporalmente y se remiten notificaciones de seguridad.
+    """
+    from arcamitte.models import DocumentAccessLog, get_or_create_user_profile
+    from django.contrib.auth import get_user_model
+    from django.core.cache import cache
+
+    result: dict[str, Any] = {
+        "ip_banned": False,
+        "user_locked": False,
+        "attempts": 0,
+        "user_exists": False,
+    }
+
+    # 1. Control por IP
+    if client_ip:
+        ip_cache_key = f"arcamitte_ip_fails_{client_ip}"
+        window_secs = getattr(settings, "ARCAMITTE_IP_BAN_WINDOW_MINUTES", 10) * 60
+        ip_fails = cache.get(ip_cache_key, 0) + 1
+        cache.set(ip_cache_key, ip_fails, timeout=window_secs)
+
+        ip_threshold = getattr(
+            settings, "ARCAMITTE_IP_BAN_FAILED_ATTEMPTS_THRESHOLD", 10
+        )
+        if ip_fails >= ip_threshold:
+            duration_hours = getattr(
+                settings, "ARCAMITTE_IP_BAN_DEFAULT_DURATION_HOURS", 24
+            )
+            ban_ip(
+                ip_address=client_ip,
+                reason=f"Exceso de intentos fallidos de autenticación ({ip_fails} fallos en ventana)",
+                duration_hours=duration_hours,
+            )
+            result["ip_banned"] = True
+            logger.warning(
+                f"[ARCAMITTE SECURITY] IP {client_ip} baneada automáticamente tras {ip_fails} fallos."
+            )
+
+    # 2. Control por Usuario
+    clean_username = (username or "").strip()
+    if clean_username:
+        User = get_user_model()
+        user = User.objects.filter(
+            models.Q(username__iexact=clean_username)
+            | models.Q(email__iexact=clean_username)
+        ).first()
+
+        if user:
+            result["user_exists"] = True
+            profile = get_or_create_user_profile(user)
+            failed_count = profile.register_failed_login()
+            result["attempts"] = failed_count
+
+            user_threshold = getattr(settings, "ARCAMITTE_USER_MAX_FAILED_LOGINS", 5)
+            if failed_count >= user_threshold and not profile.is_locked:
+                lockout_min = getattr(
+                    settings, "ARCAMITTE_USER_LOCKOUT_DURATION_MINUTES", 30
+                )
+                profile.lock_account(minutes=lockout_min)
+                result["user_locked"] = True
+
+                # Registrar vicisitud en auditoría
+                DocumentAccessLog.objects.create(
+                    document=None,
+                    email=user.email or user.username,
+                    action=DocumentAccessLog.Action.BLOQUEO_USUARIO,
+                    details=(
+                        f"Cuenta del usuario '{user.username}' bloqueada temporalmente ({lockout_min} min) "
+                        f"tras {failed_count} intentos fallidos consecutivos desde IP {client_ip or 'desconocida'}."
+                    ),
+                    ip_address=client_ip,
+                )
+
+                # Notificar al usuario afectado y al administrador
+                send_security_alert_user_locked(
+                    user=user, client_ip=client_ip, lockout_minutes=lockout_min
+                )
+                send_security_alert_admin(
+                    subject=f"[Arcamitte Seguridad] Cuenta de usuario '{user.username}' bloqueada por fuerza bruta",
+                    message=(
+                        f"Se ha activado el bloqueo de seguridad para la cuenta de usuario '{user.username}'.\n"
+                        f"Intentos fallidos: {failed_count}\n"
+                        f"IP origen: {client_ip or 'No disponible'}\n"
+                        f"Fecha/Hora: {timezone.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+                        f"Duración: {lockout_min} minutos."
+                    ),
+                    event_type="USER_LOCKOUT",
+                    details={
+                        "username": user.username,
+                        "ip": client_ip,
+                        "attempts": failed_count,
+                    },
+                )
+                logger.warning(
+                    f"[ARCAMITTE SECURITY] Usuario {user.username} bloqueado por superar {failed_count} fallos."
+                )
+
+    return result
+
+
+def record_successful_login(user: Any, client_ip: str | None = None) -> None:
+    """Restablece los contadores de intentos fallidos tras un inicio de sesión exitoso."""
+    if not user or not user.is_authenticated:
+        return
+    from arcamitte.models import get_or_create_user_profile
+    from django.core.cache import cache
+
+    profile = get_or_create_user_profile(user)
+    profile.reset_failed_logins()
+
+    if client_ip:
+        cache.delete(f"arcamitte_ip_fails_{client_ip}")
+
+
+def ban_ip(
+    ip_address: str,
+    reason: str = "Bloqueo por actividad sospechosa",
+    duration_hours: int | None = 24,
+    created_by: Any = None,
+) -> Any:
+    """
+    Incorpora o renueva una dirección IP en la lista negra perimetral BannedIP
+    y actualiza la caché para intercepción inmediata con 0 latencia.
+    """
+    from arcamitte.models import BannedIP, DocumentAccessLog
+    from django.core.cache import cache
+
+    clean_ip = ip_address.strip()
+    banned_until = (
+        timezone.now() + timezone.timedelta(hours=duration_hours)
+        if duration_hours and duration_hours > 0
+        else None
+    )
+
+    banned_obj, _ = BannedIP.objects.update_or_create(
+        ip_address=clean_ip,
+        defaults={
+            "reason": reason,
+            "is_active": True,
+            "banned_until": banned_until,
+            "created_by": created_by,
+        },
+    )
+
+    ttl = 300
+    if banned_until:
+        rem = int((banned_until - timezone.now()).total_seconds())
+        ttl = max(10, min(ttl, rem))
+    cache.set(f"arcamitte_banned_ip_{clean_ip}", "BANNED", timeout=ttl)
+
+    admin_str = getattr(created_by, "username", "Sistema")
+    DocumentAccessLog.objects.create(
+        document=None,
+        email=admin_str,
+        action=DocumentAccessLog.Action.BANEO_IP,
+        details=f"Dirección IP {clean_ip} incorporada a la lista negra. Motivo: {reason}. Vigencia: {banned_until or 'Permanente'}",
+        ip_address=clean_ip,
+    )
+
+    send_security_alert_admin(
+        subject=f"[Arcamitte Seguridad] Dirección IP {clean_ip} incorporada a lista negra",
+        message=(
+            f"La dirección IP {clean_ip} ha sido bloqueada perimetralmente.\n"
+            f"Motivo: {reason}\n"
+            f"Vigencia: {banned_until or 'Indefinida'}\n"
+            f"Operador: {admin_str}"
+        ),
+        event_type="IP_BAN",
+        details={
+            "ip_address": clean_ip,
+            "reason": reason,
+            "banned_until": str(banned_until),
+            "operator": admin_str,
+        },
+    )
+    return banned_obj
+
+
+def unban_ip(ip_address: str, operator: Any = None) -> bool:
+    """Retira una IP de la lista negra y desbloquea su acceso perimetral."""
+    from arcamitte.models import BannedIP, DocumentAccessLog
+    from django.core.cache import cache
+
+    clean_ip = ip_address.strip()
+    banned_entry = BannedIP.objects.filter(ip_address=clean_ip, is_active=True).first()
+    if not banned_entry:
+        cache.delete(f"arcamitte_banned_ip_{clean_ip}")
+        return False
+
+    banned_entry.is_active = False
+    banned_entry.save(update_fields=["is_active"])
+    cache.set(f"arcamitte_banned_ip_{clean_ip}", "ALLOWED", timeout=60)
+
+    admin_str = getattr(operator, "username", "Sistema")
+    DocumentAccessLog.objects.create(
+        document=None,
+        email=admin_str,
+        action=DocumentAccessLog.Action.BANEO_IP,
+        details=f"Dirección IP {clean_ip} retirada de la lista negra de seguridad por {admin_str}.",
+        ip_address=clean_ip,
+    )
+    return True
+
+
+def unlock_user_account(user: Any, operator: Any = None) -> None:
+    """Desbloquea inmediatamente la cuenta de un usuario y registra la vicisitud."""
+    from arcamitte.models import DocumentAccessLog, get_or_create_user_profile
+
+    profile = get_or_create_user_profile(user)
+    profile.unlock_account()
+
+    admin_str = getattr(operator, "username", "Sistema")
+    DocumentAccessLog.objects.create(
+        document=None,
+        email=admin_str,
+        action=DocumentAccessLog.Action.BLOQUEO_USUARIO,
+        details=f"Cuenta del usuario '{user.username}' reactivada/desbloqueada manualmente por {admin_str}.",
+    )
+
+
+def record_password_change(user: Any, raw_password: str) -> None:
+    """
+    Registra el cambio de contraseña:
+    - Almacena el hash en PasswordHistory.
+    - Poda entradas antiguas conservando sólo las últimas N según ARCAMITTE_PASSWORD_HISTORY_LIMIT.
+    - Actualiza password_changed_at en UserProfile y restablece must_change_password.
+    """
+    from arcamitte.models import PasswordHistory, get_or_create_user_profile
+    from django.contrib.auth.hashers import make_password
+
+    profile = get_or_create_user_profile(user)
+    profile.password_changed_at = timezone.now()
+    profile.must_change_password = False
+    profile.save(
+        update_fields=["password_changed_at", "must_change_password", "updated_at"]
+    )
+
+    PasswordHistory.objects.create(
+        user=user,
+        hashed_password=make_password(raw_password),
+    )
+
+    limit = getattr(settings, "ARCAMITTE_PASSWORD_HISTORY_LIMIT", 5)
+    old_ids = list(
+        PasswordHistory.objects.filter(user=user)
+        .order_by("-created_at")
+        .values_list("id", flat=True)[limit:]
+    )
+    if old_ids:
+        PasswordHistory.objects.filter(id__in=old_ids).delete()
+
+
+def verify_audit_log_chain() -> dict[str, Any]:
+    """
+    Audita la integridad criptográfica de la cadena completa de logs de acceso (Hash Chaining).
+    Verifica secuencialmente desde el génesis hasta el último registro que:
+    1. El 'previous_hash' coincide exactamente con el 'log_hash' del bloque anterior.
+    2. El 'log_hash' recalculado sobre el payload coincide exactamente con el guardado en BD.
+    Si se detecta cualquier manipulación, inserción o borrado en la base de datos,
+    identifica el ID del registro corrompido.
+    """
+    from arcamitte.models import DocumentAccessLog
+
+    logs = list(DocumentAccessLog.objects.order_by("id"))
+    total = len(logs)
+    if total == 0:
+        return {"is_valid": True, "total_verified": 0, "head_hash": "0" * 64}
+
+    expected_prev = "0" * 64
+    for idx, log in enumerate(logs):
+        if idx == 0:
+            expected_prev = log.previous_hash or ("0" * 64)
+
+        if log.previous_hash != expected_prev:
+            return {
+                "is_valid": False,
+                "total_verified": idx,
+                "corrupted_log_id": log.id,
+                "error": (
+                    f"Ruptura de cadena en registro #{log.id}: previous_hash '{log.previous_hash[:12]}...' "
+                    f"no coincide con el bloque anterior '{expected_prev[:12]}...'."
+                ),
+            }
+
+        recalculated = log.calculate_payload_hash(expected_prev)
+        if log.log_hash != recalculated:
+            return {
+                "is_valid": False,
+                "total_verified": idx,
+                "corrupted_log_id": log.id,
+                "error": (
+                    f"Manipulación de datos en registro #{log.id}: log_hash '{log.log_hash[:12]}...' "
+                    f"difiere del hash recalculado sobre el payload '{recalculated[:12]}...'."
+                ),
+            }
+
+        expected_prev = log.log_hash
+
+    return {
+        "is_valid": True,
+        "total_verified": total,
+        "head_hash": logs[-1].log_hash,
+    }
+
+
+def create_certified_audit_export(
+    user: Any,
+    queryset: Any,
+    filters: dict[str, Any] | None = None,
+    reason: str = "",
+    client_ip: str | None = None,
+) -> tuple[bytes, Any]:
+    """
+    Genera un archivo CSV de auditoría certificado con sanitización estricta anti-CSV Injection.
+    Calcula el hash SHA-256 exacto del volcado binario, genera el recibo oficial inmutable
+    AuditExportReceipt y registra el asiento correspondiente en DocumentAccessLog para
+    garantizar el pleno no repudio legal (ENS / eIDAS).
+    """
+    import csv
+    import hashlib
+    import io
+    import uuid
+    from arcamitte.models import AuditExportReceipt, DocumentAccessLog
+    from arcamitte.validators import sanitize_csv_cell
+
+    receipt_code = (
+        f"ARCA-EXP-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+    )
+    timestamp_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    operator_str = getattr(user, "username", str(user))
+    operator_email = getattr(user, "email", "") or operator_str
+
+    count = queryset.count()
+    applied_filters = filters or {}
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+
+    # Cabecera Institucional Oficial
+    buffer.write(
+        f"# ==============================================================================\n"
+    )
+    buffer.write(
+        f"# ARCAMITTE - INFORME OFICIAL CERTIFICADO DE AUDITORÍA Y NO REPUDIO\n"
+    )
+    buffer.write(
+        f"# ==============================================================================\n"
+    )
+    buffer.write(f"# Identificador de Recibo : {receipt_code}\n")
+    buffer.write(f"# Fecha de Generación     : {timestamp_str}\n")
+    buffer.write(f"# Operador Responsable    : {operator_str} ({operator_email})\n")
+    buffer.write(f"# Dirección IP Solicitud  : {client_ip or 'No registrada'}\n")
+    buffer.write(
+        f"# Justificación Legal     : {reason or 'Sin justificación declarada'}\n"
+    )
+    buffer.write(f"# Total de Registros      : {count}\n")
+    buffer.write(
+        f"# ==============================================================================\n"
+    )
+
+    # Columnas CSV
+    writer.writerow(
+        [
+            "ID",
+            "Fecha_Hora_UTC",
+            "Accion_Codigo",
+            "Accion_Descripcion",
+            "Documento_Original",
+            "Hash_SHA256_Documento",
+            "IP_Solicitante",
+            "Actor_Correo",
+            "Detalles_Foreses",
+            "Hash_Bloque_Anterior",
+            "Hash_Criptografico_Registro",
+        ]
+    )
+
+    for log in queryset.iterator():
+        doc_filename = log.document.original_filename if log.document else ""
+        doc_hash = log.document.file_hash if log.document else ""
+        writer.writerow(
+            [
+                sanitize_csv_cell(log.id),
+                sanitize_csv_cell(log.created_at.strftime("%Y-%m-%d %H:%M:%S")),
+                sanitize_csv_cell(log.action),
+                sanitize_csv_cell(log.get_action_display()),
+                sanitize_csv_cell(doc_filename),
+                sanitize_csv_cell(doc_hash),
+                sanitize_csv_cell(log.ip_address or ""),
+                sanitize_csv_cell(log.email or ""),
+                sanitize_csv_cell(log.details or ""),
+                sanitize_csv_cell(log.previous_hash or ""),
+                sanitize_csv_cell(log.log_hash or ""),
+            ]
+        )
+
+    csv_content = buffer.getvalue()
+    csv_bytes = ("\ufeff" + csv_content).encode("utf-8")
+    export_hash = hashlib.sha256(csv_bytes).hexdigest()
+
+    receipt = AuditExportReceipt.objects.create(
+        receipt_id=receipt_code,
+        export_hash=export_hash,
+        exported_by=user,
+        records_count=count,
+        filter_criteria=applied_filters,
+        client_ip=client_ip,
+        reason=reason,
+        created_at=timezone.now(),
+    )
+
+    DocumentAccessLog.objects.create(
+        document=None,
+        email=operator_email,
+        action=DocumentAccessLog.Action.EXPORTACION_AUDITORIA,
+        details=(
+            f"Exportación certificada de auditoría [{receipt_code}]. "
+            f"Total registros: {count}. Hash SHA-256: {export_hash}. "
+            f"Motivo legal: {reason or 'Exportación estándar'}"
+        ),
+        ip_address=client_ip,
+    )
+
+    return csv_bytes, receipt
+
+
+def verify_export_receipt(
+    receipt_id_or_hash: str, file_bytes: bytes | None = None
+) -> dict[str, Any]:
+    """
+    Verifica la autenticidad y el no repudio de una exportación de auditoría.
+    Comprueba si existe el recibo en la base de datos y, si se proporcionan los bytes
+    del archivo descargado, verifica matemáticamente que el hash coincide al 100%.
+    """
+    import hashlib
+    from arcamitte.models import AuditExportReceipt
+
+    clean_term = (receipt_id_or_hash or "").strip()
+    receipt = AuditExportReceipt.objects.filter(
+        models.Q(receipt_id__iexact=clean_term)
+        | models.Q(export_hash__iexact=clean_term)
+    ).first()
+
+    if not receipt:
+        return {
+            "found": False,
+            "is_valid": False,
+            "error": "No se encontró ningún recibo oficial con el identificador o hash indicado.",
+        }
+
+    computed_hash = None
+    hash_match = None
+    if file_bytes is not None:
+        computed_hash = hashlib.sha256(file_bytes).hexdigest()
+        hash_match = computed_hash.lower() == receipt.export_hash.lower()
+
+    return {
+        "found": True,
+        "is_valid": True if hash_match is None else hash_match,
+        "receipt": receipt,
+        "hash_match": hash_match,
+        "computed_hash": computed_hash,
+        "expected_hash": receipt.export_hash,
+        "receipt_id": receipt.receipt_id,
+        "exported_by": receipt.exported_by.username,
+        "created_at": receipt.created_at,
+        "records_count": receipt.records_count,
+        "reason": receipt.reason,
+    }
+
+
+def send_security_alert_user_locked(
+    user: Any, client_ip: str | None = None, lockout_minutes: int = 30
+) -> None:
+    """Envía un aviso de seguridad por correo electrónico al usuario cuando su cuenta es bloqueada."""
+    if not user or not user.email:
+        return
+    unlock_time = (
+        timezone.now() + timezone.timedelta(minutes=lockout_minutes)
+    ).strftime("%H:%M:%S UTC")
+    subject = "[Arcamitte Seguridad] Aviso de bloqueo temporal de cuenta por intentos fallidos"
+    message = (
+        f"Estimado/a {user.get_full_name() or user.username}:\n\n"
+        f"Le informamos que su cuenta de acceso en la pasarela confidencial Arcamitte ha sido temporalmente bloqueada "
+        f"tras detectarse múltiples intentos fallidos de inicio de sesión consecutivos.\n\n"
+        f"Detalles del incidente:\n"
+        f"• Dirección IP de origen: {client_ip or 'No disponible'}\n"
+        f"• Fecha y hora: {timezone.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+        f"• Duración del bloqueo: {lockout_minutes} minutos (desbloqueo automático a las {unlock_time})\n\n"
+        f"Si usted NO ha intentado iniciar sesión, es posible que un tercero esté intentando acceder a su cuenta. "
+        f"Por favor, póngase en contacto inmediato con el Administrador de Seguridad de su Unidad Organizativa "
+        f"o restablezca su contraseña al finalizar el periodo de bloqueo.\n\n"
+        f"---\nArcamitte Cryptographic Custody Gateway"
+    )
+    dispatch_email(
+        subject=subject,
+        message=message,
+        recipient_list=[user.email],
+        fail_silently=True,
+    )
+
+
+def send_security_alert_admin(
+    subject: str,
+    message: str,
+    event_type: str = "SECURITY_ALERT",
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Envía una alerta de seguridad al buzón de administración/SOC o a los superusuarios."""
+    from django.contrib.auth import get_user_model
+
+    admin_email = getattr(settings, "ARCAMITTE_SECURITY_ALERTS_EMAIL", "").strip()
+    if not admin_email:
+        User = get_user_model()
+        recipients = list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email="")
+            .values_list("email", flat=True)
+        )
+    else:
+        recipients = [admin_email]
+
+    if not recipients:
+        return
+
+    dispatch_email(
+        subject=subject,
+        message=message,
+        recipient_list=recipients,
+        fail_silently=True,
+    )

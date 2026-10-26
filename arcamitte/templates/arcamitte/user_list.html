@@ -77,7 +77,11 @@
 							{% endif %}
 						</td>
 						<td>
-							{% if u.is_active %}
+							{% if u.arcamitte_profile.is_locked %}
+								<span class="badge bg-danger text-white shadow-sm" title="{% trans 'Bloqueado por intentos fallidos hasta:' %} {{ u.arcamitte_profile.locked_until|date:'H:i d/m/Y' }}">
+									<i data-feather="shield-off" style="width:11px;height:11px;" class="me-1"></i>{% trans "Bloqueado" %}
+								</span>
+							{% elif u.is_active %}
 								<span class="badge bg-success">{% trans "Activo" %}</span>
 							{% else %}
 								<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
@@ -90,6 +94,17 @@
 								</span>
 							{% else %}
 								<div class="btn-group btn-group-sm" role="group">
+									{% if u.arcamitte_profile.is_locked %}
+										<form method="post" action="{% url 'dashboard:user_unlock' u.id %}" class="d-inline me-1" onsubmit="return confirm('{% trans '¿Desea desbloquear inmediatamente la cuenta de este usuario?' %}');">
+											{% csrf_token %}
+											<input type="hidden" name="next" value="{{ request.get_full_path }}">
+											<button type="submit" class="btn btn-warning text-dark" title="{% trans 'Desbloquear cuenta de usuario' %}">
+												<i data-feather="unlock" style="width:14px;height:14px;"></i>
+												<span class="d-none d-md-inline ms-1">{% trans "Desbloquear" %}</span>
+											</button>
+										</form>
+									{% endif %}
+
 									<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar cuenta' %}">
 										<i data-feather="edit-2" style="width:14px;height:14px;"></i>
 										<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>

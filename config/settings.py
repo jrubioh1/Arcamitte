@@ -39,7 +39,9 @@ ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_str.split(",") if h.strip()]
 # Orígenes confiables para protección CSRF (OWASP A05 & Django 4+)
 csrf_trusted_origins_str = config.get("django", "csrf_trusted_origins", fallback="")
 if csrf_trusted_origins_str:
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_trusted_origins_str.split(",") if o.strip()]
+    CSRF_TRUSTED_ORIGINS = [
+        o.strip() for o in csrf_trusted_origins_str.split(",") if o.strip()
+    ]
 else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8000",
@@ -72,11 +74,46 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
 # Control explícito de confianza en cabecera X-Forwarded-For (Anti-IP Spoofing CWE-348)
-ARCAMITTE_TRUST_X_FORWARDED_FOR = config.getboolean("security", "trust_x_forwarded_for", fallback=False)
+ARCAMITTE_TRUST_X_FORWARDED_FOR = config.getboolean(
+    "security", "trust_x_forwarded_for", fallback=False
+)
+
+# Control de Bloqueos, Baneo de IPs y Ciclo de Vida de Credenciales (ENS / NIST SP 800-63B / AC-7)
+ARCAMITTE_USER_MAX_FAILED_LOGINS = config.getint(
+    "security", "user_max_failed_logins", fallback=5
+)
+ARCAMITTE_USER_LOCKOUT_DURATION_MINUTES = config.getint(
+    "security", "user_lockout_duration_minutes", fallback=30
+)
+ARCAMITTE_IP_BAN_FAILED_ATTEMPTS_THRESHOLD = config.getint(
+    "security", "ip_ban_failed_attempts_threshold", fallback=10
+)
+ARCAMITTE_IP_BAN_WINDOW_MINUTES = config.getint(
+    "security", "ip_ban_window_minutes", fallback=10
+)
+ARCAMITTE_IP_BAN_DEFAULT_DURATION_HOURS = config.getint(
+    "security", "ip_ban_default_duration_hours", fallback=24
+)
+ARCAMITTE_PASSWORD_MIN_LENGTH = config.getint(
+    "security", "password_min_length", fallback=12
+)
+ARCAMITTE_PASSWORD_HISTORY_LIMIT = config.getint(
+    "security", "password_history_limit", fallback=5
+)
+ARCAMITTE_PASSWORD_EXPIRATION_DAYS = config.getint(
+    "security", "password_expiration_days", fallback=90
+)
+ARCAMITTE_SECURITY_ALERTS_EMAIL = config.get(
+    "security", "security_alerts_email", fallback=""
+).strip()
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = config.getboolean("django", "secure_ssl_redirect", fallback=True)
-    SECURE_HSTS_SECONDS = config.getint("django", "secure_hsts_seconds", fallback=31536000)
+    SECURE_SSL_REDIRECT = config.getboolean(
+        "django", "secure_ssl_redirect", fallback=True
+    )
+    SECURE_HSTS_SECONDS = config.getint(
+        "django", "secure_hsts_seconds", fallback=31536000
+    )
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
@@ -97,6 +134,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "arcamitte.middleware.IPBanMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -165,7 +203,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": ARCAMITTE_PASSWORD_MIN_LENGTH},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -175,7 +213,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "arcamitte.validators.CorporatePasswordComplexityValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": ARCAMITTE_PASSWORD_MIN_LENGTH},
+    },
+    {
+        "NAME": "arcamitte.validators.PasswordHistoryValidator",
+        "OPTIONS": {"history_limit": ARCAMITTE_PASSWORD_HISTORY_LIMIT},
     },
 ]
 
@@ -229,8 +271,12 @@ except Exception as exc:
         ) from exc
 
 # Tamaño máximo de archivo permitido (50 MB)
-ARCAMITTE_MAX_FILE_SIZE = config.getint("security", "max_file_size", fallback=50 * 1024 * 1024)
-ARCAMITTE_TIMING_PBKDF2_ITERATIONS = config.getint("security", "timing_pbkdf2_iterations", fallback=20000)
+ARCAMITTE_MAX_FILE_SIZE = config.getint(
+    "security", "max_file_size", fallback=50 * 1024 * 1024
+)
+ARCAMITTE_TIMING_PBKDF2_ITERATIONS = config.getint(
+    "security", "timing_pbkdf2_iterations", fallback=20000
+)
 
 # ==============================================================================
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO (SMTP CORPORATIVO POR DEFECTO)
@@ -246,11 +292,15 @@ EMAIL_USE_TLS = config.getboolean("email", "use_tls", fallback=False)
 EMAIL_USE_SSL = config.getboolean("email", "use_ssl", fallback=False)
 EMAIL_HOST_USER = config.get("email", "host_user", fallback="")
 EMAIL_HOST_PASSWORD = config.get("email", "host_password", fallback="")
-DEFAULT_FROM_EMAIL = config.get("email", "default_from_email", fallback="no-reply@arcamitte.local")
+DEFAULT_FROM_EMAIL = config.get(
+    "email", "default_from_email", fallback="no-reply@arcamitte.local"
+)
 EMAIL_TIMEOUT = config.getint("email", "timeout", fallback=5)
 ARCAMITTE_ASYNC_EMAIL = config.getboolean("email", "async_email", fallback=True)
 ARCAMITTE_EMAIL_MAX_WORKERS = config.getint("email", "email_max_workers", fallback=8)
-ARCAMITTE_WEB_REQUEST_LIMIT_PER_MINUTE = config.getint("throttling", "web_request_limit_per_minute", fallback=15)
+ARCAMITTE_WEB_REQUEST_LIMIT_PER_MINUTE = config.getint(
+    "throttling", "web_request_limit_per_minute", fallback=15
+)
 
 # Caché en memoria para limitación de peticiones y control anti-flood
 CACHES = {
@@ -274,8 +324,12 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/minute",
-        "access_request": config.get("throttling", "api_access_request_rate", fallback="15/minute"),
-        "access_consume": config.get("throttling", "api_access_consume_rate", fallback="30/minute"),
+        "access_request": config.get(
+            "throttling", "api_access_request_rate", fallback="15/minute"
+        ),
+        "access_consume": config.get(
+            "throttling", "api_access_consume_rate", fallback="30/minute"
+        ),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
