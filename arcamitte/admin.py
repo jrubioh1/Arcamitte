@@ -36,7 +36,11 @@ from arcamitte.services import (
     upload_and_encrypt_document,
 )
 from arcamitte.validators import normalize_and_validate_email_list, validate_document_file
-from arcamitte.utils import get_client_ip
+from arcamitte.utils import (
+    apply_no_store_headers,
+    get_client_ip,
+    sanitize_content_disposition_filename,
+)
 
 
 class EmailListAdminWidget(forms.Widget):
@@ -1200,12 +1204,13 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
             messages.error(request, message)
             return HttpResponseRedirect(reverse("admin:arcamitte_encrypteddocument_change", args=[object_id]))
 
+        safe_name = sanitize_content_disposition_filename(original_filename)
         response = FileResponse(
             io.BytesIO(decrypted_bytes),
             as_attachment=True,
-            filename=f"AUDIT_{original_filename}",
+            filename=f"AUDIT_{safe_name}",
         )
-        return response
+        return apply_no_store_headers(response)
 
     def terminate_document_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
         """

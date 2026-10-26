@@ -12,6 +12,7 @@ from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -19,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import ListView, TemplateView
@@ -50,7 +52,11 @@ from arcamitte.services import (
 
 User = get_user_model()
 
-from arcamitte.utils import get_client_ip
+from arcamitte.utils import (
+    apply_no_store_headers,
+    get_client_ip,
+    sanitize_content_disposition_filename,
+)
 from arcamitte.validators import (
     normalize_and_validate_email_list,
     validate_document_file,
@@ -92,11 +98,45 @@ def get_scoped_documents_queryset(user: Any) -> models.QuerySet[EncryptedDocumen
 class DashboardLoginView(auth_views.LoginView):
     """
     Vista de autenticación administrativa para Arcamitte.
-    Protegida con cabeceras estrictas, sesión HttpOnly y CSRF token.
+    Protegida con cabeceras estrictas, sesión HttpOnly, CSRF token y bloqueo
+    temporal anti-fuerza bruta por IP/usuario (NIST SP 800-53 AC-7 / ENS op.acc.6).
     """
 
     template_name = "arcamitte/login.html"
     redirect_authenticated_user = True
+    max_failed_attempts = 5
+    lockout_seconds = 300
+
+    def _get_bf_cache_key(self, request: HttpRequest) -> str:
+        client_ip = get_client_ip(request) or "unknown"
+        username = (request.POST.get("username") or "").strip().lower()
+        return f"arcamitte_login_bf_{client_ip}_{username}"
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        bf_key = self._get_bf_cache_key(request)
+        attempts = cache.get(bf_key, 0)
+        if attempts >= self.max_failed_attempts:
+            form = self.get_form()
+            form.add_error(
+                None,
+                _(
+                    "Se ha superado el número máximo de intentos de inicio de sesión permitidos. "
+                    "Por seguridad, espere 5 minutos antes de volver a intentarlo."
+                ),
+            )
+            return self.render_to_response(self.get_context_data(form=form), status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_invalid(self, form: Any) -> HttpResponse:
+        bf_key = self._get_bf_cache_key(self.request)
+        attempts = cache.get(bf_key, 0) + 1
+        cache.set(bf_key, attempts, timeout=self.lockout_seconds)
+        return super().form_invalid(form)
+
+    def form_valid(self, form: Any) -> HttpResponse:
+        bf_key = self._get_bf_cache_key(self.request)
+        cache.delete(bf_key)
+        return super().form_valid(form)
 
     def get_success_url(self) -> str:
         if self.request.user.is_superuser:
@@ -120,7 +160,14 @@ class DashboardModeSelectionView(LoginRequiredMixin, UserPassesTestMixin, View):
         set_mode = request.GET.get("set")
         if set_mode in ["governance", "operational"]:
             request.session["dashboard_mode"] = set_mode
-            next_url = request.GET.get("next") or reverse("dashboard:home")
+            fallback_url = reverse("dashboard:home")
+            next_url = request.GET.get("next") or fallback_url
+            if not url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                next_url = fallback_url
             return redirect(next_url)
 
         current_mode = request.session.get("dashboard_mode", "governance")
@@ -602,7 +649,8 @@ class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
             return redirect("dashboard:document_detail", file_hash=doc.file_hash)
 
         import mimetypes
-        safe_filename = original_filename or getattr(doc, "original_filename", "documento_auditado")
+        raw_filename = original_filename or getattr(doc, "original_filename", "documento_auditado")
+        safe_filename = sanitize_content_disposition_filename(raw_filename, default="documento_auditado")
         mtype = getattr(doc, "mime_type", None) or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream"
         response = HttpResponse(
             decrypted_bytes,
@@ -610,7 +658,7 @@ class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
         )
         response["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
         response["Content-Length"] = len(decrypted_bytes)
-        return response
+        return apply_no_store_headers(response)
 
 
 class DashboardDocumentTerminateView(LoginRequiredMixin, View):
@@ -824,6 +872,7 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
             scopes=scopes,
             rate_limit=rate_limit,
             expires_at=expires_at,
+            created_by=request.user,
         )
 
         # Registrar en logs de auditoría del sistema
@@ -1420,7 +1469,14 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
         else:
             messages.error(request, msg)
 
-        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("dashboard:user_list")
+        fallback_url = reverse("dashboard:user_list")
+        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        if not url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = fallback_url
         return redirect(next_url)
 
 
@@ -1428,15 +1484,31 @@ class DashboardPasswordResetRequestView(View):
     """
     Autoservicio público «¿Olvidó su contraseña?».
     Genera clave temporal y la envía al buzón registrado, forzando cambio en primer acceso.
+    Incluye control anti-flood por IP para evitar email bombing y DoS de cuentas.
     """
 
     template_name = "arcamitte/password_reset_request.html"
+    max_requests_per_window = 5
+    window_seconds = 300
 
     def get(self, request: HttpRequest) -> HttpResponse:
         form = PasswordResetRequestForm()
         return render(request, self.template_name, {"form": form})
 
     def post(self, request: HttpRequest) -> HttpResponse:
+        client_ip = get_client_ip(request) or "unknown"
+        flood_key = f"arcamitte_pwd_reset_flood_{client_ip}"
+        req_count = cache.get(flood_key, 0)
+        if req_count >= self.max_requests_per_window:
+            messages.error(
+                request,
+                _("Ha superado el límite de solicitudes de recuperación. Por favor, espere unos minutos antes de reintentar."),
+            )
+            form = PasswordResetRequestForm(request.POST)
+            return render(request, self.template_name, {"form": form}, status=429)
+
+        cache.set(flood_key, req_count + 1, timeout=self.window_seconds)
+
         form = PasswordResetRequestForm(request.POST)
         if form.is_valid():
             identity = form.cleaned_data["identity"]
@@ -1481,7 +1553,6 @@ class DashboardPasswordChangeView(LoginRequiredMixin, View):
         form = PasswordChangeCustomForm(request.user, request.POST)
         if form.is_valid():
             new_password = form.cleaned_data["new_password"]
-            validate_password(new_password, user=request.user)
             request.user.set_password(new_password)
             request.user.save(update_fields=["password"])
 

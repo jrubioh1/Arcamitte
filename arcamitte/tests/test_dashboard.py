@@ -1532,6 +1532,131 @@ class DashboardTestCase(TestCase):
         resp_download = self.client.get(audit_download_url)
         self.assertEqual(resp_download.status_code, 302)
 
+    def test_password_policy_enforcement_and_no_reuse(self) -> None:
+        """
+        Verifica el cumplimiento estricto de la política de contraseñas (NIST SP 800-63B / ENS):
+        - Mínimo 10 caracteres
+        - Mayúscula, minúscula, dígito y símbolo
+        - No similitud con usuario/email
+        - Prohibición de reutilizar la contraseña actual/temporal
+        """
+        pwd_user = User.objects.create_user(
+            username="carlos_seguridad",
+            email="carlos.seguridad@arcamitte.local",
+            password="InitialTemp#2026",
+        )
+        profile = get_or_create_user_profile(pwd_user)
+        profile.must_change_password = True
+        profile.save()
+
+        self.client.force_login(pwd_user)
+        change_url = reverse("dashboard:password_change")
+
+        invalid_passwords = [
+            "Short1!a",              # Menos de 10 caracteres
+            "minusculas1234!#",      # Sin mayúsculas
+            "MAYUSCULAS1234!#",      # Sin minúsculas
+            "SinNumerosAqui!#",      # Sin dígitos
+            "SinSimbolos12345",      # Sin caracteres especiales
+            "Carlos_seguridad1!",    # Similar al username
+            "InitialTemp#2026",      # Reutilización de la contraseña actual/temporal
+        ]
+
+        for bad_pwd in invalid_passwords:
+            resp = self.client.post(
+                change_url,
+                {
+                    "current_password": "InitialTemp#2026",
+                    "new_password": bad_pwd,
+                    "confirm_password": bad_pwd,
+                },
+            )
+            self.assertEqual(resp.status_code, 200, f"Debería haber rechazado la contraseña débil: {bad_pwd}")
+            profile.refresh_from_db()
+            self.assertTrue(profile.must_change_password, f"No debería haber permitido el cambio con: {bad_pwd}")
+
+        # Contraseña robusta que cumple toda la política
+        valid_pwd = "Str0ngC0rp!Key#2026"
+        resp_ok = self.client.post(
+            change_url,
+            {
+                "current_password": "InitialTemp#2026",
+                "new_password": valid_pwd,
+                "confirm_password": valid_pwd,
+            },
+            follow=True,
+        )
+        self.assertEqual(resp_ok.status_code, 200)
+        profile.refresh_from_db()
+        pwd_user.refresh_from_db()
+        self.assertFalse(profile.must_change_password)
+        self.assertTrue(pwd_user.check_password(valid_pwd))
+
+    def test_open_redirect_mitigation(self) -> None:
+        """Verifica que las vistas con parámetro 'next' bloqueen redirecciones abiertas (CWE-601)."""
+        # 1. set_language_view
+        resp_lang = self.client.get(
+            reverse("arcamitte:set-language") + "?lang=en&next=https://evil-attacker.example.com/phish"
+        )
+        self.assertEqual(resp_lang.status_code, 302)
+        self.assertNotIn("evil-attacker.example.com", resp_lang["Location"])
+
+        # 2. DashboardModeSelectionView
+        self.client.force_login(self.admin_user)
+        resp_mode = self.client.get(
+            reverse("dashboard:mode_selection") + "?set=operational&next=//evil-attacker.example.com"
+        )
+        self.assertEqual(resp_mode.status_code, 302)
+        self.assertEqual(resp_mode["Location"], reverse("dashboard:home"))
+
+    def test_login_brute_force_protection(self) -> None:
+        """Verifica que tras 5 intentos fallidos de login se bloquee temporalmente con HTTP 429."""
+        from django.core.cache import cache
+        cache.clear()
+        self.client.logout()
+        login_url = reverse("dashboard:login")
+
+        for _ in range(5):
+            resp = self.client.post(login_url, {"username": "operador1", "password": "WrongPassword!"})
+            self.assertEqual(resp.status_code, 200)
+
+        # El 6º intento debe ser rechazado con 429 Too Many Requests
+        resp_locked = self.client.post(login_url, {"username": "operador1", "password": "WrongPassword!"})
+        self.assertEqual(resp_locked.status_code, 429)
+        cache.clear()
+
+    def test_client_ip_anti_spoofing_and_no_store_headers(self) -> None:
+        """Verifica la protección contra falsificación de X-Forwarded-For y cabeceras anti-caché."""
+        from django.test import RequestFactory
+        from arcamitte.utils import get_client_ip
+
+        rf = RequestFactory()
+        req = rf.get("/", REMOTE_ADDR="10.0.0.15", HTTP_X_FORWARDED_FOR="203.0.113.99")
+        # Por defecto ARCAMITTE_TRUST_X_FORWARDED_FOR=False -> ignora XFF
+        self.assertEqual(get_client_ip(req), "10.0.0.15")
+
+        with override_settings(ARCAMITTE_TRUST_X_FORWARDED_FOR=True):
+            self.assertEqual(get_client_ip(req), "203.0.113.99")
+            # Si XFF contiene payload malicioso que no es IP válida, cae a REMOTE_ADDR
+            req_spoof = rf.get("/", REMOTE_ADDR="10.0.0.15", HTTP_X_FORWARDED_FOR="malicious_sql_injection")
+            self.assertEqual(get_client_ip(req_spoof), "10.0.0.15")
+
+        # Verificar created_by en token generado desde Dashboard y cabeceras no-store en descarga de auditoría
+        self.client.force_login(self.admin_user)
+        self.client.post(
+            reverse("dashboard:api_tokens"),
+            {"name": "Token Con Autor", "scopes": ["documents:read"], "rate_limit": 60, "validity_days": 30},
+        )
+        tok = APIToken.objects.get(name="Token Con Autor")
+        self.assertEqual(tok.created_by, self.admin_user)
+
+        audit_resp = self.client.get(
+            reverse("dashboard:document_audit_download", kwargs={"file_hash": self.doc_sec.file_hash})
+        )
+        self.assertEqual(audit_resp.status_code, 200)
+        self.assertIn("no-store", audit_resp["Cache-Control"])
+
+
 
 
 

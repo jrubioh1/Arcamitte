@@ -184,9 +184,10 @@ El microservicio incluye un comando idempotente de arranque que crea la base de 
 poetry run python manage.py setup_staging --clean
 ```
 > **Credenciales de Staging creadas:**
-> - **Superadmin:** `admin` / `AdminPass123!`
-> - **Operador UO:** `operador_seguridad` / `StagingPass123!`
-> - **Auditor UO:** `auditor_seguridad` / `StagingPass123!`
+> - **Superadmin:** `admin` / `AdminMaster#2026`
+> - **Admin Dirección:** `admin_dir` / `PasswordDir#2026`
+> - **Operador RRHH:** `gestor_rrhh` / `PasswordRRHH#2026`
+> - **Auditor RRHH:** `auditor_rrhh` / `PasswordAuditor#2026`
 
 ### Paso 5: Ejecutar el Servidor de Desarrollo
 ```bash

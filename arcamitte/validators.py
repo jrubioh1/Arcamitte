@@ -3,11 +3,14 @@ import io
 import json
 import logging
 import os
+import re
 import zipfile
+from typing import Any
 
 logger = logging.getLogger(__name__)
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
+from django.utils.translation import gettext_lazy as _
 
 # ==============================================================================
 # WHITELIST DE FORMATOS PERMITIDOS: PDF, LIBREOFFICE Y MICROSOFT OFFICE
@@ -240,3 +243,65 @@ def validate_document_file(file_obj):
         file_obj.seek(original_pos)
 
     return file_obj
+
+
+class CorporatePasswordComplexityValidator:
+    """
+    Validador de complejidad corporativa para contraseñas de usuarios en Arcamitte
+    (NIST SP 800-63B / ENS op.acc.5 / OWASP A07:2021).
+    Exige longitud mínima, mayúsculas, minúsculas, dígitos y caracteres especiales.
+    """
+
+    def __init__(self, min_length: int = 10) -> None:
+        self.min_length = min_length
+
+    def validate(self, password: str, user: Any = None) -> None:
+        errors = []
+        if len(password) < self.min_length:
+            errors.append(
+                ValidationError(
+                    _("La contraseña debe contener al menos %(min_length)d caracteres."),
+                    code="password_too_short",
+                    params={"min_length": self.min_length},
+                )
+            )
+        if not re.search(r"[A-Z]", password):
+            errors.append(
+                ValidationError(
+                    _("Debe incluir al menos una letra mayúscula (A-Z)."),
+                    code="password_no_upper",
+                )
+            )
+        if not re.search(r"[a-z]", password):
+            errors.append(
+                ValidationError(
+                    _("Debe incluir al menos una letra minúscula (a-z)."),
+                    code="password_no_lower",
+                )
+            )
+        if not re.search(r"[0-9]", password):
+            errors.append(
+                ValidationError(
+                    _("Debe incluir al menos un dígito numérico (0-9)."),
+                    code="password_no_digit",
+                )
+            )
+        if not re.search(r"[^A-Za-z0-9\s]", password):
+            errors.append(
+                ValidationError(
+                    _("Debe incluir al menos un carácter especial o símbolo (ej. !@#$%&*+-_=)."),
+                    code="password_no_symbol",
+                )
+            )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def get_help_text(self) -> str:
+        return str(
+            _(
+                "Su contraseña debe contener al menos %(min_length)d caracteres e incluir "
+                "mayúsculas, minúsculas, números y símbolos especiales."
+            )
+            % {"min_length": self.min_length}
+        )

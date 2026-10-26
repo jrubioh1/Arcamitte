@@ -336,7 +336,7 @@ class PasswordResetRequestForm(forms.Form):
 class PasswordChangeCustomForm(forms.Form):
     """
     Formulario para actualización obligatoria o voluntaria de contraseña.
-    Aplica directivas estrictas de complejidad y confirmación.
+    Aplica directivas estrictas de complejidad, no reutilización y confirmación (NIST SP 800-63B / ENS).
     """
 
     current_password = forms.CharField(
@@ -344,6 +344,7 @@ class PasswordChangeCustomForm(forms.Form):
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
+                "id": "id_current_password",
                 "autocomplete": "current-password",
                 "placeholder": "••••••••••••",
             }
@@ -354,17 +355,21 @@ class PasswordChangeCustomForm(forms.Form):
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
+                "id": "id_new_password",
                 "autocomplete": "new-password",
                 "placeholder": "••••••••••••",
             }
         ),
-        help_text=_("Debe contener al menos 8 caracteres y cumplir las directivas de seguridad corporativas."),
+        help_text=_(
+            "Debe contener al menos 10 caracteres e incluir mayúsculas, minúsculas, números y símbolos especiales."
+        ),
     )
     confirm_password = forms.CharField(
         label=_("Confirmar Nueva Contraseña"),
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
+                "id": "id_confirm_password",
                 "autocomplete": "new-password",
                 "placeholder": "••••••••••••",
             }
@@ -383,12 +388,20 @@ class PasswordChangeCustomForm(forms.Form):
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
+        current_password = cleaned_data.get("current_password")
         new_password = cleaned_data.get("new_password")
         confirm_password = cleaned_data.get("confirm_password")
 
         if new_password and confirm_password:
             if new_password != confirm_password:
                 self.add_error("confirm_password", _("Las nuevas contraseñas no coinciden."))
+            elif (current_password and new_password == current_password) or (
+                self.user and self.user.check_password(new_password)
+            ):
+                self.add_error(
+                    "new_password",
+                    _("La nueva contraseña no puede ser idéntica a la contraseña actual o temporal."),
+                )
             else:
                 try:
                     validate_password(new_password, user=self.user)

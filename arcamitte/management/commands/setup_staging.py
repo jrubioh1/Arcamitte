@@ -1,4 +1,5 @@
 import configparser
+import logging
 import shutil
 from pathlib import Path
 from typing import Any
@@ -6,10 +7,13 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 from arcamitte.models import DocumentAccessLog, EncryptedDocument, OrganizationalUnit, UserUOMembership
 from arcamitte.services import (
@@ -125,7 +129,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING("=== 3. Configurando Administrador Maestro (Superusuario) ==="))
         admin_username = "admin"
         admin_email = "admin@arcamitte.local"
-        admin_pass = "admin123"
+        admin_pass = "AdminMaster#2026"
 
         admin_user, created = User.objects.get_or_create(
             username=admin_username,
@@ -310,7 +314,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE("\n👥 CUENTAS DE USUARIO Y ROLES DISPONIBLES:"))
         self.stdout.write(f"   {'USUARIO':<18} {'CONTRASEÑA':<22} {'ROL / UO':<30} {'CORREO'}")
         self.stdout.write("   " + "-" * 90)
-        self.stdout.write(f"   {'admin':<18} {'admin123':<22} {'Master Admin (Superuser)':<30} {'admin@arcamitte.local'}")
+        self.stdout.write(f"   {'admin':<18} {'AdminMaster#2026':<22} {'Master Admin (Superuser)':<30} {'admin@arcamitte.local'}")
         self.stdout.write(f"   {'admin_dir':<18} {'PasswordDir#2026':<22} {'ADMIN en DIRECCION (1001)':<30} {'admin_dir@arcamitte.local'}")
         self.stdout.write(f"   {'gestor_rrhh':<18} {'PasswordRRHH#2026':<22} {'OPERATOR en RRHH (1002)':<30} {'gestor_rrhh@arcamitte.local'}")
         self.stdout.write(f"   {'auditor_rrhh':<18} {'PasswordAuditor#2026':<22} {'AUDITOR en RRHH (1002)':<30} {'auditor_rrhh@arcamitte.local'}")

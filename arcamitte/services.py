@@ -461,7 +461,6 @@ def process_expired_documents() -> int:
             count += 1
     logger.info(f"[ARCAMITTE] Proceso de caducidad completado: {count} documentos cerrados.")
     return count
-    return count
 
 
 def upload_and_encrypt_document(
@@ -1350,17 +1349,11 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     is_staff=is_staff,
                 )
                 if raw_password:
-                    try:
-                        validate_password(raw_password, user=user)
-                    except ValidationError:
-                        pass
+                    validate_password(raw_password, user=user)
                     user.set_password(raw_password)
                 else:
-                    auto_pass = secrets.token_urlsafe(16)
-                    try:
-                        validate_password(auto_pass, user=user)
-                    except ValidationError:
-                        pass
+                    auto_pass = generate_secure_temporary_password(length=14)
+                    validate_password(auto_pass, user=user)
                     user.set_password(auto_pass)
                 user.save()
                 user_created = True
@@ -1372,10 +1365,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     user.last_name = last_name
                 user.is_staff = is_staff
                 if raw_password:
-                    try:
-                        validate_password(raw_password, user=user)
-                    except ValidationError:
-                        pass
+                    validate_password(raw_password, user=user)
                     user.set_password(raw_password)
                 user.save()
 

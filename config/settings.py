@@ -50,10 +50,12 @@ else:
 # Soporte para túneles y balanceadores / proxies inversos (Nginx, Traefik, Docker)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Hardening de cookies de sesión, CSRF e idioma (NIST SP 800-63B / OWASP A05)
+# Hardening de cookies de sesión, CSRF e idioma (NIST SP 800-63B / ENS op.acc.6 / OWASP A05)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_AGE = config.getint("security", "session_cookie_age", fallback=28800)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
@@ -66,6 +68,11 @@ LANGUAGE_COOKIE_SECURE = not DEBUG
 # Endurecimiento de cabeceras HTTP de seguridad (OWASP A05 / Django Deployment Checklist)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# Control explícito de confianza en cabecera X-Forwarded-For (Anti-IP Spoofing CWE-348)
+ARCAMITTE_TRUST_X_FORWARDED_FOR = config.getboolean("security", "trust_x_forwarded_for", fallback=False)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = config.getboolean("django", "secure_ssl_redirect", fallback=True)
@@ -149,7 +156,27 @@ else:
     }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 6}},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "OPTIONS": {
+            "user_attributes": ("username", "first_name", "last_name", "email"),
+            "max_similarity": 0.7,
+        },
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+    {
+        "NAME": "arcamitte.validators.CorporatePasswordComplexityValidator",
+        "OPTIONS": {"min_length": 10},
+    },
 ]
 
 LANGUAGE_CODE = "es"
@@ -238,7 +265,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "arcamitte.authentication.APITokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

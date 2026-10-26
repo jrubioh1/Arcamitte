@@ -14,6 +14,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import activate, check_for_language, gettext as _
 from django.views import View
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -52,7 +53,11 @@ from arcamitte.services import (
     request_document_access,
     upload_and_encrypt_document,
 )
-from arcamitte.utils import get_client_ip
+from arcamitte.utils import (
+    apply_no_store_headers,
+    get_client_ip,
+    sanitize_content_disposition_filename,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +72,11 @@ def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
         fallback_url = "/arcamitte/solicitar/"
 
     next_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or fallback_url
-    if "set-language" in next_url:
+    if "set-language" in next_url or not url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
         next_url = fallback_url
     response = HttpResponseRedirect(next_url)
 
@@ -310,6 +319,26 @@ class RedeemOtpView(ArcamitteI18nViewMixin, View):
         if not data.get("email") and email:
             data["email"] = email
 
+        client_ip_str = get_client_ip(request) or "unknown"
+        consume_cache_key = f"arcamitte_web_consume_flood_{client_ip_str}"
+        consume_limit = int(getattr(settings, "ARCAMITTE_WEB_REQUEST_LIMIT_PER_MINUTE", 15)) * 2
+        consume_count = cache.get(consume_cache_key, 0)
+        if consume_count >= consume_limit:
+            form = RedeemOtpForm(data)
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                    "error_message": _("Ha superado el límite de intentos por minuto. Por favor, espere antes de reintentar."),
+                    "file_hash": file_hash,
+                    "email": email,
+                    "LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "es"),
+                },
+                status=429,
+            )
+        cache.set(consume_cache_key, consume_count + 1, timeout=60)
+
         form = RedeemOtpForm(data)
         if not form.is_valid():
             return render(
@@ -358,12 +387,13 @@ class RedeemOtpView(ArcamitteI18nViewMixin, View):
         request.session.pop("arcamitte_email", None)
         request.session.pop("arcamitte_verified_email", None)
 
+        safe_name = sanitize_content_disposition_filename(original_filename)
         response = FileResponse(
             io.BytesIO(decrypted_bytes),
             as_attachment=True,
-            filename=original_filename,
+            filename=safe_name,
         )
-        return response
+        return apply_no_store_headers(response)
 
 
 # ==============================================================================
@@ -442,9 +472,10 @@ class PublicConsumeView(APIView):
         if not success:
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
 
+        safe_name = sanitize_content_disposition_filename(original_filename)
         response = HttpResponse(decrypted_bytes, content_type="application/octet-stream")
-        response["Content-Disposition"] = f'attachment; filename="{original_filename}"'
-        return response
+        response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+        return apply_no_store_headers(response)
 
 
 class APIDocumentRootView(APIView):
