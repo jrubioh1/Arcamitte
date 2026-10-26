@@ -46,6 +46,11 @@ urlpatterns = [
         name="document_audit_download",
     ),
     path(
+        "documentos/<str:file_hash>/descargar-y-cerrar/",
+        dashboard_views.DashboardDocumentDownloadAndBurnView.as_view(),
+        name="document_download_and_burn",
+    ),
+    path(
         "documentos/<str:file_hash>/terminar/",
         dashboard_views.DashboardDocumentTerminateView.as_view(),
         name="document_terminate",
@@ -115,6 +120,26 @@ urlpatterns = [
         name="user_unlock",
     ),
     path(
+        "usuarios/<int:user_id>/suspender/",
+        dashboard_views.DashboardUserManualLockView.as_view(),
+        name="user_suspend",
+    ),
+    path(
+        "usuarios/<int:user_id>/reset-2fa/",
+        dashboard_views.DashboardUserReset2FAView.as_view(),
+        name="user_reset_2fa",
+    ),
+    path(
+        "seguridad/usuarios-bloqueados/",
+        dashboard_views.DashboardLockedUsersView.as_view(),
+        name="locked_users",
+    ),
+    path(
+        "seguridad/2fa-config/",
+        dashboard_views.Dashboard2FAGovernanceView.as_view(),
+        name="2fa_governance",
+    ),
+    path(
         "seguridad/ips/",
         dashboard_views.DashboardIPBanListView.as_view(),
         name="ip_ban_list",
@@ -150,6 +175,11 @@ urlpatterns = [
         name="audit_verify_receipt",
     ),
     path(
+        "auditoria/recibos/<str:receipt_id>/tsr/",
+        dashboard_views.DashboardAuditReceiptTSRDownloadView.as_view(),
+        name="audit_receipt_tsr",
+    ),
+    path(
         "totp/verificar/",
         dashboard_views.DashboardTOTPVerifyView.as_view(),
         name="totp_verify",
@@ -165,6 +195,11 @@ urlpatterns = [
         name="totp_disable",
     ),
     path("tokens/", dashboard_views.DashboardApiTokenView.as_view(), name="api_tokens"),
+    path(
+        "tokens/<int:token_id>/",
+        dashboard_views.DashboardApiTokenDetailView.as_view(),
+        name="api_token_detail",
+    ),
     path(
         "tokens/<int:token_id>/revocar/",
         dashboard_views.DashboardApiTokenRevokeView.as_view(),

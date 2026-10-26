@@ -213,6 +213,9 @@ class UserManagementForm(forms.ModelForm):
             and getattr(self.current_user, "pk", None) == self.instance.pk
         )
 
+        if "email" in self.fields:
+            self.fields["email"].required = True
+
         if "is_active" in self.fields:
             self.fields["is_active"].label = _("Cuenta Activa / Operativa")
             self.fields["is_active"].help_text = _(
@@ -225,34 +228,39 @@ class UserManagementForm(forms.ModelForm):
                 )
 
         if is_superuser:
-            self.fields["is_staff"] = forms.BooleanField(
+            initial_mfa = False
+            initial_global = False
+            if self.instance and getattr(self.instance, "pk", None):
+                profile = getattr(self.instance, "arcamitte_profile", None)
+                if profile:
+                    initial_mfa = getattr(profile, "is_mfa_enforced", False)
+                    initial_global = getattr(profile, "is_global_admin", False)
+                if getattr(self.instance, "is_superuser", False):
+                    initial_global = True
+
+            self.fields["is_mfa_enforced"] = forms.BooleanField(
                 required=False,
-                label=_("Acceso Administrativo Departamental"),
+                label=_("Exigir Segundo Factor (2FA / TOTP) Obligatorio"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-                initial=getattr(self.instance, "is_staff", False),
+                initial=initial_mfa,
                 help_text=_(
-                    "Permite acceder al panel de control. Los usuarios con este rol pueden gestionar las Unidades Organizativas donde tengan cargo asignado, tramitar documentos y administrar su personal. No otorga acceso a organizaciones ajenas."
+                    "Aplica una directiva estricta de seguridad individual que obliga a este usuario a enrolar y validar un segundo factor TOTP para acceder al sistema."
                 ),
             )
-            self.fields["is_superuser"] = forms.BooleanField(
+            self.fields["is_global_admin"] = forms.BooleanField(
                 required=False,
-                label=_("Superusuario Global del Sistema"),
+                label=_("Administrador Global de Seguridad"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-                initial=getattr(self.instance, "is_superuser", False),
+                initial=initial_global,
                 help_text=_(
-                    "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global. Incluye automáticamente Acceso Administrativo."
+                    "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global."
                 ),
             )
             if self.is_self:
-                if getattr(self.instance, "is_staff", False):
-                    self.fields["is_staff"].disabled = True
-                    self.fields["is_staff"].help_text = _(
-                        "Protegido por seguridad: No puede revocar su propio acceso administrativo."
-                    )
-                if getattr(self.instance, "is_superuser", False):
-                    self.fields["is_superuser"].disabled = True
-                    self.fields["is_superuser"].help_text = _(
-                        "Protegido por seguridad: No puede revocar sus propios privilegios de superusuario global."
+                if initial_global:
+                    self.fields["is_global_admin"].disabled = True
+                    self.fields["is_global_admin"].help_text = _(
+                        "Protegido por seguridad: No puede revocar sus propios privilegios de administrador global."
                     )
 
     def clean_is_active(self) -> bool:
@@ -282,34 +290,33 @@ class UserManagementForm(forms.ModelForm):
                 )
         return is_active
 
-    def clean_is_staff(self) -> bool:
-        is_staff = self.cleaned_data.get("is_staff", False)
-        if self.is_self and getattr(self.instance, "is_staff", False) and not is_staff:
-            raise ValidationError(
-                _(
-                    "Por motivos de seguridad, no puede revocar su propio acceso administrativo."
-                )
-            )
-        return is_staff
+    def clean_is_global_admin(self) -> bool:
+        is_global = self.cleaned_data.get("is_global_admin", False)
+        # Compatibilidad con envíos directos de 'is_superuser'
+        if not is_global and self.data.get("is_superuser") in (
+            True,
+            "True",
+            "true",
+            "1",
+            "on",
+        ):
+            is_global = True
 
-    def clean_is_superuser(self) -> bool:
-        is_superuser = self.cleaned_data.get("is_superuser", False)
-        if (
-            self.is_self
-            and getattr(self.instance, "is_superuser", False)
-            and not is_superuser
-        ):
+        was_global = False
+        if self.instance and self.instance.pk:
+            profile = getattr(self.instance, "arcamitte_profile", None)
+            was_global = getattr(self.instance, "is_superuser", False) or getattr(
+                profile, "is_global_admin", False
+            )
+
+        if self.is_self and was_global and not is_global:
             raise ValidationError(
                 _(
-                    "Por motivos de seguridad, no puede revocar sus propios privilegios de superusuario global."
+                    "Por motivos de seguridad, no puede revocar sus propios privilegios de administrador global."
                 )
             )
-        if (
-            self.instance
-            and self.instance.pk
-            and getattr(self.instance, "is_superuser", False)
-            and not is_superuser
-        ):
+
+        if self.instance and self.instance.pk and was_global and not is_global:
             other_superusers = (
                 User.objects.filter(is_superuser=True, is_active=True)
                 .exclude(pk=self.instance.pk)
@@ -321,15 +328,17 @@ class UserManagementForm(forms.ModelForm):
                         "No es posible revocar los privilegios al único superusuario activo del sistema."
                     )
                 )
-        return is_superuser
+        return is_global
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
-        # Restricción jerárquica estricta: Solo un superusuario puede otorgar is_superuser o is_staff
+        # Restricción jerárquica estricta: Solo un superusuario global puede conceder privilegios
         if not self.is_superuser:
             if (
-                self.data.get("is_superuser")
+                self.data.get("is_global_admin")
+                or self.data.get("is_superuser")
                 or self.data.get("is_staff")
+                or cleaned_data.get("is_global_admin")
                 or cleaned_data.get("is_superuser")
                 or cleaned_data.get("is_staff")
             ):
@@ -338,21 +347,75 @@ class UserManagementForm(forms.ModelForm):
                         "Solo un superusuario global puede conceder privilegios administrativos o de superusuario."
                     )
                 )
-        elif cleaned_data.get("is_superuser"):
-            cleaned_data["is_staff"] = True
+        else:
+            is_global = cleaned_data.get("is_global_admin", False)
+            if not is_global and self.data.get("is_superuser") in (
+                True,
+                "True",
+                "true",
+                "1",
+                "on",
+            ):
+                is_global = True
+            cleaned_data["is_global_admin"] = is_global
+            cleaned_data["is_superuser"] = is_global
+            cleaned_data["is_staff"] = is_global
         return cleaned_data
 
+    def clean_username(self) -> str:
+        username = (self.cleaned_data.get("username") or "").strip()
+        if len(username) < 3:
+            raise ValidationError(
+                _("El nombre de usuario debe tener al menos 3 caracteres.")
+            )
+
+        # Regla anti-colisión: el nombre de usuario no puede coincidir con el correo de otro usuario
+        qs_email_collision = User.objects.filter(email__iexact=username)
+        if self.instance and self.instance.pk:
+            qs_email_collision = qs_email_collision.exclude(pk=self.instance.pk)
+        if qs_email_collision.exists():
+            raise ValidationError(
+                _(
+                    "El nombre de usuario coincide con el correo electrónico registrado por otra cuenta."
+                )
+            )
+        return username
+
     def clean_email(self) -> str:
-        raw_email = self.cleaned_data.get("email", "")
-        return validate_safe_email(raw_email)
+        raw_email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not raw_email:
+            raise ValidationError(
+                _("El correo electrónico corporativo es estrictamente obligatorio.")
+            )
+        clean_email = validate_safe_email(raw_email)
+
+        # 1. Unicidad estricta e insensible a mayúsculas
+        qs_dup = User.objects.filter(email__iexact=clean_email)
+        if self.instance and self.instance.pk:
+            qs_dup = qs_dup.exclude(pk=self.instance.pk)
+        if qs_dup.exists():
+            raise ValidationError(
+                _("Ya existe otro usuario registrado con este correo electrónico.")
+            )
+
+        # 2. Regla anti-colisión: el correo no puede coincidir con el nombre de usuario de otra cuenta
+        qs_user_collision = User.objects.filter(username__iexact=clean_email)
+        if self.instance and self.instance.pk:
+            qs_user_collision = qs_user_collision.exclude(pk=self.instance.pk)
+        if qs_user_collision.exists():
+            raise ValidationError(
+                _(
+                    "El correo electrónico coincide con el nombre de usuario de otra cuenta registrada."
+                )
+            )
+        return clean_email
 
     def save(self, commit: bool = True) -> Any:
         user = super().save(commit=False)
         if self.is_superuser:
-            user.is_staff = self.cleaned_data.get("is_staff", False)
-            user.is_superuser = self.cleaned_data.get("is_superuser", False)
-            if user.is_superuser:
-                user.is_staff = True
+            is_global = self.cleaned_data.get("is_global_admin", False)
+            user.is_superuser = is_global
+            user.is_staff = is_global
         else:
             # Jerarquía: Si quien gestiona la cuenta no es superusuario, no puede elevar a staff ni superuser
             if not user.pk:
@@ -360,6 +423,17 @@ class UserManagementForm(forms.ModelForm):
                 user.is_superuser = False
         if commit:
             user.save()
+            from arcamitte.models import get_or_create_user_profile
+
+            profile = get_or_create_user_profile(user)
+            if self.is_superuser:
+                profile.is_global_admin = user.is_superuser
+                if "is_mfa_enforced" in self.cleaned_data:
+                    profile.is_mfa_enforced = self.cleaned_data.get(
+                        "is_mfa_enforced", False
+                    )
+                profile.save(update_fields=["is_global_admin", "is_mfa_enforced"])
+            user.arcamitte_profile = profile
         return user
 
 

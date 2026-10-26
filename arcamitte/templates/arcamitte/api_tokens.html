@@ -62,6 +62,9 @@
 									<div class="text-muted small">
 										{% trans "Expira:" %} {{ token.expires_at|date:"d/m/Y"|default:"Permanente" }}
 									</div>
+									<div class="text-muted small" style="font-size:0.75rem;">
+										{% trans "Por:" %} <span class="font-mono">{{ token.created_by.username|default:"Sistema" }}</span>
+									</div>
 								</td>
 								<td class="font-mono small text-muted">
 									{{ token.prefix }}...
@@ -93,16 +96,18 @@
 										<span class="badge bg-success">{% trans "Activo" %}</span>
 									{% endif %}
 								</td>
-								<td class="text-end">
+								<td class="text-end text-nowrap">
+									<a href="{% url 'dashboard:api_token_detail' token.id %}" class="btn btn-sm btn-outline-secondary me-1" title="{% trans 'Auditar Detalles y Trazabilidad' %}">
+										<i data-feather="eye" style="width:14px;height:14px;"></i> {% trans "Detalles" %}
+									</a>
 									{% if token.is_active and not token.is_expired %}
-										<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}" class="d-inline" onsubmit="return confirm('¿Está seguro de revocar inmediatamente este token? Los servicios asociados perderán el acceso de forma instantánea.');">
+										<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}" class="d-inline" onsubmit="var r = prompt('{% trans 'Indique el motivo legal u operativo de la revocación:' %}'); if(!r) return false; this.reason.value = r; return true;">
 											{% csrf_token %}
+											<input type="hidden" name="reason" value="">
 											<button type="submit" class="btn btn-sm btn-outline-danger" title="{% trans 'Revocar Token' %}">
 												<i data-feather="slash" style="width:14px;height:14px;"></i> {% trans "Revocar" %}
 											</button>
 										</form>
-									{% else %}
-										<span class="text-muted small">&mdash;</span>
 									{% endif %}
 								</td>
 							</tr>

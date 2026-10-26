@@ -59,6 +59,9 @@
 					<tr>
 						<td class="font-mono fw-bold text-dark text-nowrap">
 							<i data-feather="file-text" style="width:14px;height:14px;" class="text-primary me-1"></i>{{ r.receipt_id }}
+							{% if r.timestamp_token %}
+								<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Sello Cualificado RFC 3161 ({{ r.timestamp_authority }})"><i data-feather="clock" style="width:11px;height:11px;"></i> TSA</span>
+							{% endif %}
 						</td>
 						<td class="font-mono small text-muted text-nowrap">
 							{{ r.created_at|date:"d/m/Y H:i:s" }}
@@ -79,6 +82,12 @@
 							<div class="text-truncate" title="{{ r.reason }}">{{ r.reason|default:"-" }}</div>
 						</td>
 						<td class="text-end text-nowrap">
+							{% if r.timestamp_token %}
+								<a href="{% url 'dashboard:audit_receipt_tsr' r.receipt_id %}" class="btn btn-sm btn-outline-secondary me-1" title="{% trans 'Descargar evidencia criptográfica DER (.tsr)' %}">
+									<i data-feather="download" style="width:13px;height:13px;"></i>
+									<span class="d-none d-lg-inline ms-1">.TSR</span>
+								</a>
+							{% endif %}
 							<a href="{% url 'dashboard:audit_verify_receipt' %}?term={{ r.receipt_id }}" class="btn btn-sm btn-outline-primary" title="{% trans 'Comprobar autenticidad del recibo' %}">
 								<i data-feather="check-circle" style="width:14px;height:14px;"></i>
 								<span class="d-none d-md-inline ms-1">{% trans "Verificar" %}</span>

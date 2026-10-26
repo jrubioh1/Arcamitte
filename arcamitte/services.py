@@ -286,16 +286,19 @@ def record_audit_log(
     user_agent: str = "",
     details: str | dict[str, Any] = "",
     document: Any = None,
+    origin_uo: Any = None,
+    target_uo: Any = None,
 ) -> Any:
     """
     Crea y persiste un registro de auditoría en DocumentAccessLog con encadenamiento
     criptográfico íntegro (Hash Chaining) conforme a ENS ALTA / eIDAS.
     """
     import json
+    from django.core.serializers.json import DjangoJSONEncoder
     from arcamitte.models import DocumentAccessLog
 
     details_str = (
-        json.dumps(details, ensure_ascii=False)
+        json.dumps(details, ensure_ascii=False, cls=DjangoJSONEncoder)
         if isinstance(details, dict)
         else str(details or "")
     )
@@ -304,6 +307,8 @@ def record_audit_log(
         email=email,
         action=action,
         details=details_str,
+        origin_uo=origin_uo,
+        target_uo=target_uo,
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -596,6 +601,62 @@ def upload_and_encrypt_document(
             % {"max_size": max_size // (1024 * 1024)}
         )
 
+    # --------------------------------------------------------------------------
+    # FASE B: Inspección Antivirus en Memoria (ClamAV zINSTREAM)
+    # Zero Disk Footprint: Inspección del flujo antes del cifrado en reposo
+    # --------------------------------------------------------------------------
+    if getattr(settings, "ARCAMITTE_CLAMAV_ENABLED", False):
+        import socket
+        from arcamitte.antivirus import (
+            scan_file_stream,
+            AntivirusError,
+            AntivirusConnectionError,
+        )
+
+        try:
+            is_clean, threat_name = scan_file_stream(original_file)
+            if not is_clean:
+                record_audit_log(
+                    action=DocumentAccessLog.Action.MALWARE_DETECTADO,
+                    email=getattr(uploaded_by, "email", "desconocido"),
+                    ip=client_ip,
+                    user_agent=user_agent or "",
+                    details={
+                        "threat_name": threat_name,
+                        "filename": getattr(original_file, "name", "documento"),
+                        "file_size": file_size,
+                    },
+                    document=None,
+                    origin_uo=origin_uo,
+                    target_uo=target_uo,
+                )
+                dispatch_siem_event(
+                    event_type="malware_detected",
+                    details={
+                        "threat_name": threat_name,
+                        "filename": getattr(original_file, "name", "documento"),
+                        "origin_uo": origin_uo.alias if origin_uo else None,
+                        "uploaded_by": getattr(uploaded_by, "username", "anonymous"),
+                    },
+                    ip_address=client_ip,
+                )
+                raise ValidationError(
+                    _(
+                        "Amenaza de malware detectada por el motor antivirus: %(threat)s. "
+                        "La subida ha sido bloqueada y registrada para auditoría legal."
+                    )
+                    % {"threat": threat_name}
+                )
+        except (AntivirusError, socket.error) as av_exc:
+            fail_open = getattr(settings, "ARCAMITTE_CLAMAV_FAIL_OPEN", False)
+            if not fail_open:
+                raise ValidationError(
+                    _(
+                        "El motor antivirus ClamAV no está disponible para inspeccionar el archivo. "
+                        "Por política de seguridad estricta (Fail-Secure), la subida ha sido bloqueada."
+                    )
+                ) from av_exc
+
     # Resolución del usuario que sube el archivo
     if uploaded_by is None and admin_user is not None:
         if hasattr(admin_user, "is_authenticated") and admin_user.is_authenticated:
@@ -695,6 +756,41 @@ def upload_and_encrypt_document(
         doc_kwargs["description"] = description
     if expires_at is not None:
         doc_kwargs["expires_at"] = expires_at
+
+    # --------------------------------------------------------------------------
+    # FASE B: Sellado Criptográfico Cualificado de Tiempo (RFC 3161)
+    # --------------------------------------------------------------------------
+    if getattr(settings, "ARCAMITTE_RFC3161_ENABLED", False):
+        from arcamitte.timestamping import (
+            request_rfc3161_timestamp,
+            token_to_base64,
+            TimestampingError,
+        )
+
+        try:
+            raw_hash_bytes = bytes.fromhex(file_hash)
+            tsr_bytes = request_rfc3161_timestamp(raw_hash_bytes)
+            doc_kwargs["timestamp_token"] = token_to_base64(tsr_bytes)
+            doc_kwargs["timestamp_authority"] = getattr(
+                settings, "ARCAMITTE_RFC3161_TSA_URL", ""
+            )
+            record_audit_log(
+                action=DocumentAccessLog.Action.SELLO_TIEMPO_RFC3161_GENERADO,
+                email=getattr(uploaded_by, "email", "sistema"),
+                ip=client_ip,
+                user_agent=user_agent or "",
+                details={
+                    "doc_hash": file_hash,
+                    "tsa_url": doc_kwargs["timestamp_authority"],
+                },
+                document=None,
+                origin_uo=origin_uo,
+                target_uo=target_uo,
+            )
+        except TimestampingError as ts_exc:
+            logger.warning(
+                f"[RFC3161] No se pudo obtener sello de tiempo para el documento {file_hash[:12]}: {ts_exc}"
+            )
 
     document = EncryptedDocument(**doc_kwargs)
     document.encrypted_file.save(
@@ -1180,6 +1276,38 @@ def consume_document_with_otp(
                 user_agent=user_agent,
             )
 
+        # ----------------------------------------------------------------------
+        # FASE B: Marca de Agua Forense Dinámica (Dynamic Forensic PDF Watermarking)
+        # Inyecta destinatario, IP, timestamp UTC y huella criptográfica en cada página
+        # ----------------------------------------------------------------------
+        if getattr(settings, "ARCAMITTE_WATERMARK_ENABLED", True) and (
+            document.original_filename.lower().endswith(".pdf")
+            or decrypted_bytes.startswith(b"%PDF")
+        ):
+            from arcamitte.watermark import apply_pdf_watermark
+
+            try:
+                decrypted_bytes = apply_pdf_watermark(
+                    pdf_content=decrypted_bytes,
+                    recipient_email=token.email,
+                    client_ip=client_ip or "0.0.0.0",
+                    doc_hash=document.file_hash,
+                )
+                DocumentAccessLog.objects.create(
+                    document=document,
+                    email=token.email,
+                    action=DocumentAccessLog.Action.MARCA_AGUA_APLICADA,
+                    details="Marca de agua forense inyectada en descarga con OTP.",
+                    origin_uo=document.origin_uo,
+                    target_uo=document.target_uo,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
+            except Exception as wm_exc:
+                logger.warning(
+                    f"[WATERMARK] Fallo al aplicar marca forense a {document.file_hash[:12]}: {wm_exc}"
+                )
+
         return (
             True,
             decrypted_bytes,
@@ -1364,6 +1492,38 @@ def admin_decrypt_document(
             f"[ARCAMITTE AUDIT] Descarga administrativa preservada realizada por '{admin_identifier}' "
             f"para documento {document.file_hash[:12]}..."
         )
+
+        # ----------------------------------------------------------------------
+        # FASE B: Marca de Agua Forense Dinámica en Descarga de Auditoría
+        # ----------------------------------------------------------------------
+        if getattr(settings, "ARCAMITTE_WATERMARK_ENABLED", True) and (
+            document.original_filename.lower().endswith(".pdf")
+            or decrypted_bytes.startswith(b"%PDF")
+        ):
+            from arcamitte.watermark import apply_pdf_watermark
+
+            try:
+                decrypted_bytes = apply_pdf_watermark(
+                    pdf_content=decrypted_bytes,
+                    recipient_email=f"AUDITOR:{admin_identifier}",
+                    client_ip=client_ip or "0.0.0.0",
+                    doc_hash=document.file_hash,
+                )
+                DocumentAccessLog.objects.create(
+                    document=document,
+                    email=admin_identifier,
+                    action=DocumentAccessLog.Action.MARCA_AGUA_APLICADA,
+                    details=f"Marca de agua forense inyectada en descarga administrativa por '{admin_identifier}'.",
+                    origin_uo=document.origin_uo,
+                    target_uo=document.target_uo,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
+            except Exception as wm_exc:
+                logger.warning(
+                    f"[WATERMARK] Fallo al aplicar marca forense a {document.file_hash[:12]}: {wm_exc}"
+                )
+
         return (
             True,
             decrypted_bytes,
@@ -1379,6 +1539,156 @@ def admin_decrypt_document(
 
 
 decrypt_document_for_audit = admin_decrypt_document
+
+
+def admin_download_and_burn_document(
+    document: EncryptedDocument,
+    admin_user: Any = None,
+    reason: str = "",
+    client_ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[bool, bytes, str, str]:
+    """
+    Descarga de entrega y clausura definitiva del asiento documental (Consumo Destructivo):
+    Descifra el archivo aplicando la marca de agua forense, destruye físicamente el binario
+    del almacenamiento seguro en disco (shred_and_delete_file) y finaliza el asiento con
+    constancia legal de vicisitud y justificación legal (ENS ALTO / NIST SP 800-88).
+    """
+    if document.is_consumed:
+        return (
+            False,
+            b"",
+            "",
+            _("El documento ya ha sido consumido y destruido del servidor."),
+        )
+
+    if not document.encrypted_file:
+        return False, b"", "", _("El archivo cifrado no está disponible.")
+
+    # Control de autorización (Superusuario o personal de la UO)
+    if (
+        admin_user
+        and hasattr(admin_user, "is_authenticated")
+        and admin_user.is_authenticated
+        and not getattr(admin_user, "is_superuser", False)
+    ):
+        user_admin_uos = list(
+            UserUOMembership.objects.filter(
+                user=admin_user,
+                is_active=True,
+                role__in=[
+                    UserUOMembership.Role.ADMIN,
+                    UserUOMembership.Role.AUDITOR,
+                    UserUOMembership.Role.OPERATOR,
+                ],
+            ).values_list("uo_id", flat=True)
+        )
+        is_origin_member = bool(
+            document.origin_uo_id and document.origin_uo_id in user_admin_uos
+        )
+        is_uploader = bool(
+            document.uploaded_by_id
+            and document.uploaded_by_id == getattr(admin_user, "id", None)
+        )
+        if not (
+            is_origin_member
+            or is_uploader
+            or (not document.origin_uo_id and not document.target_uo_id)
+        ):
+            return (
+                False,
+                b"",
+                "",
+                _("No tiene autorización para clausurar este asiento documental."),
+            )
+
+    try:
+        engine = get_fernet_engine()
+        dek_bytes = engine.decrypt(document.encrypted_dek.encode("utf-8"))
+
+        document.encrypted_file.seek(0)
+        ciphertext = document.encrypted_file.read()
+
+        dek_fernet = Fernet(dek_bytes)
+        decrypted_bytes = dek_fernet.decrypt(ciphertext)
+
+        admin_identifier = (
+            getattr(admin_user, "email", None)
+            or getattr(admin_user, "username", None)
+            or str(admin_user or "admin_operador")
+        )
+
+        # Aplicar marca de agua forense si es PDF
+        if getattr(settings, "ARCAMITTE_WATERMARK_ENABLED", True) and (
+            document.original_filename.lower().endswith(".pdf")
+            or decrypted_bytes.startswith(b"%PDF")
+        ):
+            from arcamitte.watermark import apply_pdf_watermark
+
+            try:
+                decrypted_bytes = apply_pdf_watermark(
+                    pdf_content=decrypted_bytes,
+                    recipient_email=f"CIERRE:{admin_identifier}",
+                    client_ip=client_ip or "0.0.0.0",
+                    doc_hash=document.file_hash,
+                )
+            except Exception as wm_exc:
+                logger.warning(
+                    f"[WATERMARK] Fallo al aplicar marca forense en clausura a {document.file_hash[:12]}: {wm_exc}"
+                )
+
+        # Destrucción física inmediata del archivo en disco
+        shred_and_delete_file(document.encrypted_file)
+        document.encrypted_file = None
+        document.is_consumed = True
+        document.consumed_at = timezone.now()
+        document.consumed_by = admin_identifier
+        document.save(
+            update_fields=[
+                "encrypted_file",
+                "is_consumed",
+                "consumed_at",
+                "consumed_by",
+                "updated_at",
+            ]
+        )
+
+        details_text = (
+            f"Asiento documental clausurado y descargado por '{admin_identifier}'. "
+            f"Archivo físico destruido con borrado seguro NIST SP 800-88. Motivo legal: {reason or 'Clausura de asiento y entrega segura'}"
+        )
+
+        DocumentAccessLog.objects.create(
+            document=document,
+            email=admin_identifier,
+            action=DocumentAccessLog.Action.FINALIZACION_MANUAL,
+            details=details_text,
+            origin_uo=document.origin_uo,
+            target_uo=document.target_uo,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
+
+        logger.info(
+            f"[ARCAMITTE AUDIT] Descarga con clausura y destrucción física completada para {document.file_hash[:12]}... por {admin_identifier}."
+        )
+        return (
+            True,
+            decrypted_bytes,
+            document.original_filename,
+            _("Asiento documental clausurado y archivo descargado con éxito."),
+        )
+
+    except Exception as exc:
+        logger.error(
+            f"[ARCAMITTE ERROR] Error durante la clausura y descarga del documento: {exc}"
+        )
+        return (
+            False,
+            b"",
+            "",
+            _("Error al procesar la clausura y descarga del documento."),
+        )
 
 
 ROLE_PERMISSIONS_MAP: dict[str, list[str]] = {
@@ -1459,10 +1769,6 @@ def sync_user_role_permissions(user: Any, role: str | None = None) -> list[str]:
         )
     )
     user.user_permissions.add(*direct_permissions)
-
-    if not user.is_staff:
-        user.is_staff = True
-        user.save(update_fields=["is_staff"])
 
     return list(assigned_codenames)
 
@@ -1576,7 +1882,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             )
             uo_alias = (u_data.get("uo_alias") or "").strip().upper()
             uo_code = u_data.get("uo_numeric_code")
-            is_staff = bool(u_data.get("is_staff", True))
+            is_staff = bool(u_data.get("is_staff", False))
             raw_password = u_data.get("password")
 
             if not username or not email:
@@ -2453,6 +2759,29 @@ def create_certified_audit_export(
     csv_bytes = ("\ufeff" + csv_content).encode("utf-8")
     export_hash = hashlib.sha256(csv_bytes).hexdigest()
 
+    # --------------------------------------------------------------------------
+    # FASE B: Sellado Criptográfico Cualificado RFC 3161 para Recibo de Exportación
+    # --------------------------------------------------------------------------
+    timestamp_token_b64 = ""
+    tsa_authority = ""
+    if getattr(settings, "ARCAMITTE_RFC3161_ENABLED", False):
+        from arcamitte.timestamping import (
+            request_rfc3161_timestamp,
+            token_to_base64,
+            TimestampingError,
+        )
+
+        try:
+            tsr_bytes = request_rfc3161_timestamp(bytes.fromhex(export_hash))
+            timestamp_token_b64 = token_to_base64(tsr_bytes)
+            tsa_authority = getattr(
+                settings, "ARCAMITTE_RFC3161_TSA_URL", "http://timestamp.digicert.com"
+            )
+        except TimestampingError as ts_exc:
+            logger.warning(
+                f"[RFC3161] Fallo al solicitar sello de tiempo para el recibo {receipt_code}: {ts_exc}"
+            )
+
     receipt = AuditExportReceipt.objects.create(
         receipt_id=receipt_code,
         export_hash=export_hash,
@@ -2461,8 +2790,19 @@ def create_certified_audit_export(
         filter_criteria=applied_filters,
         client_ip=client_ip,
         reason=reason,
+        timestamp_token=timestamp_token_b64,
+        timestamp_authority=tsa_authority,
         created_at=timezone.now(),
     )
+
+    if timestamp_token_b64:
+        DocumentAccessLog.objects.create(
+            document=None,
+            email=operator_email,
+            action=DocumentAccessLog.Action.SELLO_TIEMPO_RFC3161_GENERADO,
+            details=f"Sello de tiempo RFC 3161 generado para exportación {receipt_code} con TSA '{tsa_authority}'.",
+            ip_address=client_ip,
+        )
 
     DocumentAccessLog.objects.create(
         document=None,
@@ -2521,6 +2861,29 @@ def verify_export_receipt(
         computed_hash = hashlib.sha256(file_bytes).hexdigest()
         hash_match = computed_hash.lower() == receipt.export_hash.lower()
 
+    # Verificación del sello de tiempo cualificado RFC 3161 si está anclado en el recibo
+    timestamp_verification: dict[str, Any] = {"has_timestamp": False}
+    if receipt.timestamp_token:
+        from arcamitte.timestamping import verify_rfc3161_timestamp, token_from_base64
+
+        try:
+            tsr_bytes = token_from_base64(receipt.timestamp_token)
+            orig_hash_bytes = bytes.fromhex(receipt.export_hash)
+            ts_valid, ts_msg = verify_rfc3161_timestamp(tsr_bytes, orig_hash_bytes)
+            timestamp_verification = {
+                "has_timestamp": True,
+                "is_valid": ts_valid,
+                "message": ts_msg,
+                "authority": receipt.timestamp_authority,
+            }
+        except Exception as ts_exc:
+            timestamp_verification = {
+                "has_timestamp": True,
+                "is_valid": False,
+                "message": f"Error verificando estructura del sello de tiempo: {ts_exc}",
+                "authority": receipt.timestamp_authority,
+            }
+
     return {
         "found": True,
         "is_valid": True if hash_match is None else hash_match,
@@ -2533,6 +2896,7 @@ def verify_export_receipt(
         "created_at": receipt.created_at,
         "records_count": receipt.records_count,
         "reason": receipt.reason,
+        "timestamp_verification": timestamp_verification,
     }
 
 
@@ -2753,19 +3117,92 @@ def rotate_master_keys(
 
 def is_totp_required_for_user(user: Any) -> bool:
     """
-    Determina si el usuario debe pasar por el segundo factor de autenticación (2FA / TOTP).
-    Retorna True si el usuario tiene 2FA activado en su perfil O si la directiva institucional
-    ARCAMITTE_MFA_REQUIRED_FOR_STAFF exige 2FA obligatorio a miembros de staff o superusuarios.
+    Determina si el usuario debe pasar obligatoriamente por el segundo factor (2FA / TOTP).
+    Criterios de seguridad estricta (Zero Trust / ENS ALTO):
+    1. Si el usuario ya tiene 2FA configurado y activo (is_totp_enabled).
+    2. Si es Superusuario Global (is_superuser).
+    3. Si es Personal Administrativo de plataforma (is_staff).
+    4. Si cuenta con rol de Administrador de Unidad Organizativa (UserUOMembership.Role.ADMIN).
+    5. Si tiene la directiva individual forzada por un superusuario (is_mfa_enforced).
     """
     if not user or not user.is_authenticated:
         return False
+
     profile = getattr(user, "arcamitte_profile", None)
     if profile and profile.is_totp_enabled:
         return True
-    if getattr(settings, "ARCAMITTE_MFA_REQUIRED_FOR_STAFF", False):
-        if user.is_staff or user.is_superuser:
+
+    from arcamitte.permissions import (
+        is_global_admin,
+        is_uo_admin,
+        is_uo_auditor,
+        is_uo_operator,
+    )
+
+    # 1. Superusuario Global / Administrador de Seguridad (siempre obligatorio por ENS ALTO)
+    if is_global_admin(user) or getattr(user, "is_staff", False):
+        return True
+
+    # 2. Administrador de Unidad Organizativa (siempre obligatorio)
+    if is_uo_admin(user):
+        return True
+
+    # 3. Usuario Estándar con directiva individual forzada por superusuario
+    if profile and getattr(profile, "is_mfa_enforced", False):
+        return True
+
+    # 4. Directivas dinámicas de rol configuradas por UI (PlatformSecurityPolicy)
+    try:
+        from arcamitte.models import PlatformSecurityPolicy
+
+        policy = PlatformSecurityPolicy.get_solo()
+        if policy.mfa_enforced_for_auditors and is_uo_auditor(user):
             return True
+        if policy.mfa_enforced_for_operators and is_uo_operator(user):
+            return True
+    except Exception:
+        pass
+
     return False
+
+
+def reset_user_totp(user: Any, operator: Any = None, reason: str = "") -> None:
+    """
+    Resetea administrativamente las credenciales de segundo factor (2FA / TOTP) de un usuario.
+    Permite restaurar el acceso a un operador que haya extraviado su dispositivo móvil o códigos,
+    obligándole a vincular un nuevo autenticador en su siguiente inicio de sesión.
+    """
+    profile = getattr(user, "arcamitte_profile", None)
+    if not profile:
+        from arcamitte.models import get_or_create_user_profile
+
+        profile = get_or_create_user_profile(user)
+
+    profile.is_totp_enabled = False
+    profile.totp_secret = ""
+    profile.totp_scratch_codes = []
+    profile.save(
+        update_fields=[
+            "is_totp_enabled",
+            "totp_secret",
+            "totp_scratch_codes",
+            "updated_at",
+        ]
+    )
+
+    operator_name = getattr(operator, "username", "sistema") if operator else "sistema"
+    record_audit_log(
+        action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+        email=user.email or user.username,
+        details={
+            "evento": "2fa_reseteado_administrativamente",
+            "operador": operator_name,
+            "motivo": reason or "Reseteo administrativo por pérdida de clave",
+        },
+    )
+    logger.info(
+        f"[ARCAMITTE AUDIT] 2FA reseteado administrativamente para usuario '{user.username}' por '{operator_name}'."
+    )
 
 
 def verify_user_totp_or_scratch(

@@ -123,6 +123,29 @@
 										</td>
 									</tr>
 								{% endif %}
+								{% if result.timestamp_verification.has_timestamp %}
+									<tr>
+										<td class="text-muted fw-bold">{% trans "Sello de Tiempo RFC 3161:" %}</td>
+										<td>
+											{% if result.timestamp_verification.is_valid %}
+												<span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">
+													<i data-feather="clock" style="width:12px;height:12px;"></i>
+													{% trans "Cualificado (TSA Verificada)" %}
+												</span>
+												<span class="small text-muted d-block mt-1 font-mono" style="font-size:0.75rem;">{{ result.timestamp_verification.authority }}</span>
+												<a href="{% url 'dashboard:audit_receipt_tsr' result.receipt_id %}" class="btn btn-sm btn-outline-secondary mt-2 d-inline-flex align-items-center gap-1" style="font-size:0.75rem; padding: 0.2rem 0.6rem;">
+													<i data-feather="download" style="width:12px;height:12px;"></i>
+													{% trans "Descargar Acuse Criptográfico (.tsr)" %}
+												</a>
+											{% else %}
+												<span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+													{% trans "Sello Inválido / Discrepancia" %}
+												</span>
+												<span class="small text-danger d-block mt-1">{{ result.timestamp_verification.message }}</span>
+											{% endif %}
+										</td>
+									</tr>
+								{% endif %}
 							</tbody>
 						</table>
 					{% else %}

@@ -205,6 +205,22 @@ class TOTPAuthenticationViewsTests(TestCase):
         profile.refresh_from_db()
         self.assertTrue(profile.is_totp_enabled)
 
+    def test_totp_setup_post_invalid_code_renders_error(self) -> None:
+        """Verifica que el envío de un código TOTP incorrecto en setup no produce UnboundLocalError."""
+        user_fresh = User.objects.create_user(
+            username="fresh_user", email="fresh@test.es", password="Corporate#Pass2026"
+        )
+        self.client.force_login(user_fresh)
+        setup_url = reverse("dashboard:totp_setup")
+        # GET inicial para generar _totp_pending_secret
+        resp_get = self.client.get(setup_url)
+        self.assertEqual(resp_get.status_code, 200)
+
+        # POST con código inválido
+        resp_post = self.client.post(setup_url, {"code": "000000"})
+        self.assertEqual(resp_post.status_code, 400)
+        self.assertContains(resp_post, "incorrecto", status_code=400)
+
 
 class SessionSecurityMiddlewareTests(TestCase):
     """Pruebas de Session Hijacking (IP Binding) y Sesión Concurrente Única (Single Session)."""

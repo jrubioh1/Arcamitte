@@ -1,0 +1,252 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Detalles de API Token" %} - {{ token.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center">
+	<div>
+		<div class="mb-1">
+			<a href="{% url 'dashboard:api_tokens' %}" class="text-decoration-none text-muted small d-inline-flex align-items-center gap-1">
+				<i data-feather="arrow-left" style="width:14px;height:14px;"></i>
+				{% trans "Volver a la lista de Tokens" %}
+			</a>
+		</div>
+		<h1 class="h3 fw-bold mb-0 d-flex align-items-center gap-2">
+			<i data-feather="key" class="text-primary"></i>
+			<span>{{ token.name }}</span>
+			{% if not token.is_active %}
+				<span class="badge bg-danger fs-6">{% trans "Revocado" %}</span>
+			{% elif token.is_expired %}
+				<span class="badge bg-warning text-dark fs-6">{% trans "Caducado" %}</span>
+			{% else %}
+				<span class="badge bg-success fs-6">{% trans "Activo" %}</span>
+			{% endif %}
+		</h1>
+	</div>
+	<div>
+		{% if token.is_active and not token.is_expired %}
+			<button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#revokeTokenModal">
+				<i data-feather="slash" style="width:16px;height:16px;"></i>
+				<span>{% trans "Revocar Token" %}</span>
+			</button>
+		{% endif %}
+	</div>
+</div>
+
+<div class="row g-4 mb-4">
+	<!-- Metadatos de Autenticación M2M -->
+	<div class="col-12 col-lg-6">
+		<div class="card h-100 shadow-sm border">
+			<div class="card-header bg-light d-flex align-items-center gap-2">
+				<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
+				<h5 class="card-title mb-0 fs-6 fw-bold">{% trans "Identidad y Parámetros M2M" %}</h5>
+			</div>
+			<div class="card-body">
+				<dl class="row mb-0">
+					<dt class="col-sm-4 text-muted">{% trans "Nombre / Servicio" %}:</dt>
+					<dd class="col-sm-8 fw-bold">{{ token.name }}</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Prefijo Público" %}:</dt>
+					<dd class="col-sm-8 font-mono"><span class="badge bg-light text-dark border">{{ token.prefix }}...</span></dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Creado por" %}:</dt>
+					<dd class="col-sm-8 font-mono">{{ token.created_by.username|default:"Sistema" }} ({{ token.created_by.email|default:"-" }})</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Fecha de Creación" %}:</dt>
+					<dd class="col-sm-8">{{ token.created_at|date:"d/m/Y H:i:s" }} UTC</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Vencimiento" %}:</dt>
+					<dd class="col-sm-8">
+						{% if token.expires_at %}
+							{{ token.expires_at|date:"d/m/Y H:i:s" }} UTC
+							{% if token.is_expired %}
+								<span class="badge bg-warning text-dark ms-1">{% trans "Vencido" %}</span>
+							{% endif %}
+						{% else %}
+							<em>{% trans "Sin caducidad (Permanente)" %}</em>
+						{% endif %}
+					</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Límite de Tasa" %}:</dt>
+					<dd class="col-sm-8 font-mono">{{ token.rate_limit }} {% trans "peticiones / minuto" %}</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Permisos (Scopes)" %}:</dt>
+					<dd class="col-sm-8">
+						{% for scope in token.scopes %}
+							<span class="badge bg-primary-subtle text-primary border border-primary-subtle font-mono me-1">{{ scope }}</span>
+						{% empty %}
+							<span class="badge bg-light text-muted border font-mono">documents:*</span>
+						{% endfor %}
+					</dd>
+				</dl>
+			</div>
+		</div>
+	</div>
+
+	<!-- Métricas de Uso y Estado de Revocación -->
+	<div class="col-12 col-lg-6">
+		<div class="card h-100 shadow-sm border">
+			<div class="card-header bg-light d-flex align-items-center gap-2">
+				<i data-feather="activity" style="width:16px;height:16px;" class="text-primary"></i>
+				<h5 class="card-title mb-0 fs-6 fw-bold">{% trans "Telemetría y Estado de Revocación" %}</h5>
+			</div>
+			<div class="card-body">
+				<dl class="row mb-0">
+					<dt class="col-sm-4 text-muted">{% trans "Último Uso" %}:</dt>
+					<dd class="col-sm-8">
+						{% if token.last_used_at %}
+							{{ token.last_used_at|date:"d/m/Y H:i:s" }} UTC
+						{% else %}
+							<span class="text-muted italic">{% trans "Nunca ha sido utilizado" %}</span>
+						{% endif %}
+					</dd>
+
+					<dt class="col-sm-4 text-muted">{% trans "Última IP Cliente" %}:</dt>
+					<dd class="col-sm-8 font-mono">
+						{{ token.last_used_ip|default:"-" }}
+					</dd>
+
+					{% if not token.is_active %}
+						<dt class="col-sm-4 text-danger">{% trans "Fecha de Revocación" %}:</dt>
+						<dd class="col-sm-8 text-danger fw-bold">
+							{{ token.revoked_at|date:"d/m/Y H:i:s"|default:"-" }} UTC
+						</dd>
+
+						<dt class="col-sm-4 text-danger">{% trans "Revocado por" %}:</dt>
+						<dd class="col-sm-8 font-mono text-danger">
+							{{ token.revoked_by.username|default:"Administrador" }}
+						</dd>
+
+						<dt class="col-sm-4 text-danger">{% trans "Motivo Legal" %}:</dt>
+						<dd class="col-sm-8 text-danger">
+							{{ token.revocation_reason|default:"Revocación manual por el operador" }}
+						</dd>
+					{% else %}
+						<dt class="col-sm-4 text-success">{% trans "Estado Operativo" %}:</dt>
+						<dd class="col-sm-8 text-success fw-bold">
+							✓ {% trans "Habilitado para consumo M2M" %}
+						</dd>
+					{% endif %}
+				</dl>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Trazabilidad Forense de Eventos del Token -->
+<div class="card shadow-sm border mb-4">
+	<div class="card-header bg-light d-flex justify-content-between align-items-center">
+		<h5 class="card-title mb-0 fs-6 fw-bold d-flex align-items-center gap-2">
+			<i data-feather="link-2" style="width:16px;height:16px;" class="text-primary"></i>
+			{% trans "Trazabilidad Criptográfica del Token (Cadena de Custodia)" %}
+		</h5>
+		<span class="badge bg-light text-dark border">{{ token_events|length }} {% trans "asientos registrados" %}</span>
+	</div>
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead>
+				<tr>
+					<th>{% trans "Fecha / Hora" %}</th>
+					<th>{% trans "Acción" %}</th>
+					<th>{% trans "Operador / Actor" %}</th>
+					<th>{% trans "IP Cliente" %}</th>
+					<th>{% trans "Detalles Criptográficos" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for evt in token_events %}
+					<tr>
+						<td class="small font-mono text-nowrap">
+							{{ evt.created_at|date:"d/m/Y H:i:s" }} UTC
+						</td>
+						<td>
+							{% if evt.action == "token_api_creado" %}
+								<span class="badge bg-success-subtle text-success border border-success-subtle">
+									<i data-feather="plus-circle" style="width:12px;height:12px;" class="me-1"></i>
+									{{ evt.get_action_display }}
+								</span>
+							{% elif evt.action == "token_api_revocado" %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+									<i data-feather="slash" style="width:12px;height:12px;" class="me-1"></i>
+									{{ evt.get_action_display }}
+								</span>
+							{% else %}
+								<span class="badge bg-light text-dark border">{{ evt.get_action_display }}</span>
+							{% endif %}
+						</td>
+						<td class="font-mono small">
+							{{ evt.email }}
+						</td>
+						<td class="font-mono small text-muted">
+							{{ evt.ip_address|default:"-" }}
+						</td>
+						<td class="small">
+							{% if evt.details %}
+								<span class="text-muted font-mono" style="font-size:0.75rem;">
+									{% if evt.details.reason %}
+										<strong>{% trans "Motivo:" %}</strong> {{ evt.details.reason }} &bull;
+									{% endif %}
+									{% if evt.details.scopes %}
+										<strong>{% trans "Scopes:" %}</strong> {{ evt.details.scopes|join:", " }}
+									{% endif %}
+								</span>
+							{% else %}
+								&mdash;
+							{% endif %}
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="5" class="text-center py-4 text-muted">
+							<i data-feather="file-text" style="width:28px;height:28px;" class="mb-1"></i>
+							<p class="small mb-0">{% trans "No hay eventos de auditoría previos para este identificador." %}</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+
+<!-- Modal de Revocación de Token -->
+{% if token.is_active and not token.is_expired %}
+<div class="modal fade" id="revokeTokenModal" tabindex="-1" aria-labelledby="revokeTokenModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content border-0 shadow">
+			<form method="post" action="{% url 'dashboard:api_token_revoke' token.id %}">
+				{% csrf_token %}
+				<div class="modal-header bg-danger text-white">
+					<h5 class="modal-title d-flex align-items-center gap-2" id="revokeTokenModalLabel">
+						<i data-feather="alert-octagon"></i>
+						{% trans "Revocar Token API de Forma Inmediata" %}
+					</h5>
+					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<p class="text-danger fw-bold mb-2">
+						{% trans "¡Atención! Esta acción es irreversible." %}
+					</p>
+					<p class="small text-muted mb-3">
+						{% trans "El token perderá de inmediato su validez y cualquier cliente o microservicio que lo utilice para autenticarse recibirá un error HTTP 401 Unauthorized." %}
+					</p>
+					<div class="mb-3">
+						<label for="revocationReasonInput" class="form-label fw-bold small">
+							{% trans "Motivo legal u operativo de la revocación" %} <span class="text-danger">*</span>
+						</label>
+						<textarea name="reason" id="revocationReasonInput" class="form-control" rows="3" required placeholder="{% trans 'Ej: Baja de servicio externo, rotación de credenciales, sospecha de compromiso...' %}"></textarea>
+					</div>
+				</div>
+				<div class="modal-footer bg-light">
+					<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+					<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
+						<i data-feather="slash" style="width:14px;height:14px;"></i>
+						<span>{% trans "Confirmar y Revocar" %}</span>
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+{% endif %}
+{% endblock %}

@@ -106,13 +106,30 @@ class DashboardTestCase(TestCase):
 
     def test_dashboard_login_successful(self) -> None:
         """Verifica el inicio de sesión exitoso: superusuario al selector de modo y usuario regular al dashboard."""
-        # 1. Login como Superusuario -> Debe redirigir al Selector de Modo
-        response = self.client.post(
+        # 1. Login como Superusuario -> Con 2FA obligatorio por diseño:
+        # En el primer paso con credenciales primarias, se redirige a verificación TOTP
+        resp_preauth = self.client.post(
             reverse("dashboard:login"),
             {
                 "username": "superadmin",
                 "password": "StrongPassword123!",
             },
+        )
+        self.assertEqual(resp_preauth.status_code, 302)
+        self.assertIn(reverse("dashboard:totp_verify"), resp_preauth.url)
+
+        # Configurar 2FA para superadmin y completar segundo factor
+        from arcamitte.models import get_or_create_user_profile
+        from arcamitte.totp import generate_totp_code
+
+        profile = get_or_create_user_profile(self.admin_user)
+        test_secret = "JBSWY3DPEHPK3PXP"
+        profile.enable_totp(secret=test_secret, scratch_hashes=[])
+
+        valid_totp = generate_totp_code(test_secret)
+        response = self.client.post(
+            reverse("dashboard:totp_verify"),
+            {"code": valid_totp},
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -160,15 +177,21 @@ class DashboardTestCase(TestCase):
         self.assertContains(response, "contrato_confidencial.pdf")
 
         # Búsqueda por texto (éxito)
-        response_found = self.client.get(reverse("dashboard:document_list") + "?q=contrato")
+        response_found = self.client.get(
+            reverse("dashboard:document_list") + "?q=contrato"
+        )
         self.assertContains(response_found, "contrato_confidencial.pdf")
 
         # Búsqueda por texto (sin resultados)
-        response_empty = self.client.get(reverse("dashboard:document_list") + "?q=inexistente")
+        response_empty = self.client.get(
+            reverse("dashboard:document_list") + "?q=inexistente"
+        )
         self.assertContains(response_empty, "No se encontraron asientos")
 
         # Filtro por estado activo
-        response_active = self.client.get(reverse("dashboard:document_list") + "?status=active")
+        response_active = self.client.get(
+            reverse("dashboard:document_list") + "?status=active"
+        )
         self.assertContains(response_active, "contrato_confidencial.pdf")
 
     def test_dashboard_document_upload_success(self) -> None:
@@ -191,17 +214,23 @@ class DashboardTestCase(TestCase):
             "expires_at": default_document_expiry().strftime("%Y-%m-%dT%H:%M"),
         }
 
-        response = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        response = self.client.post(
+            reverse("dashboard:document_upload"), post_data, follow=True
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Asiento cifrado con éxito")
 
         # Comprobar en base de datos
-        created_doc = EncryptedDocument.objects.filter(original_filename="auditoria_q3.pdf").first()
+        created_doc = EncryptedDocument.objects.filter(
+            original_filename="auditoria_q3.pdf"
+        ).first()
         self.assertIsNotNone(created_doc)
         self.assertEqual(created_doc.origin_uo, self.uo_security)
         self.assertEqual(created_doc.target_uo, self.uo_legal)
         self.assertEqual(len(created_doc.allowed_emails), 2)
-        self.assertEqual(created_doc.burn_policy, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS)
+        self.assertEqual(
+            created_doc.burn_policy, EncryptedDocument.BurnPolicy.ALL_RECIPIENTS
+        )
 
     def test_dashboard_document_upload_validation_error(self) -> None:
         """Verifica que se muestren errores si faltan datos o el formato es inválido."""
@@ -214,18 +243,28 @@ class DashboardTestCase(TestCase):
         }
         response = self.client.post(reverse("dashboard:document_upload"), bad_data)
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Debe seleccionar un archivo confidencial", status_code=400)
+        self.assertContains(
+            response, "Debe seleccionar un archivo confidencial", status_code=400
+        )
 
         # 2. Operador intenta emitir desde una UO donde no tiene membresía
-        new_pdf = SimpleUploadedFile("doc.pdf", b"%PDF-1.4\nTest\n%%EOF", content_type="application/pdf")
+        new_pdf = SimpleUploadedFile(
+            "doc.pdf", b"%PDF-1.4\nTest\n%%EOF", content_type="application/pdf"
+        )
         unauth_uo_data = {
             "original_file": new_pdf,
             "origin_uo": self.uo_legal.id,  # El operador solo pertenece a Seguridad
             "allowed_emails": "valido@empresa.com",
         }
-        resp_unauth = self.client.post(reverse("dashboard:document_upload"), unauth_uo_data)
+        resp_unauth = self.client.post(
+            reverse("dashboard:document_upload"), unauth_uo_data
+        )
         self.assertEqual(resp_unauth.status_code, 400)
-        self.assertContains(resp_unauth, "No tiene autorización operativa sobre la UO emisora seleccionada", status_code=400)
+        self.assertContains(
+            resp_unauth,
+            "No tiene autorización operativa sobre la UO emisora seleccionada",
+            status_code=400,
+        )
 
     def test_dashboard_auditor_can_upload_documents(self) -> None:
         """Verifica que un usuario con rol de Auditor en una UO pueda cifrar y emitir documentos de su UO."""
@@ -255,11 +294,15 @@ class DashboardTestCase(TestCase):
             "description": "Documento subido por el auditor de la UO",
             "burn_policy": EncryptedDocument.BurnPolicy.FIRST_ACCESS,
         }
-        resp = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        resp = self.client.post(
+            reverse("dashboard:document_upload"), post_data, follow=True
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Asiento cifrado con éxito")
 
-        doc = EncryptedDocument.objects.filter(original_filename="auditoria_fiscal.pdf").first()
+        doc = EncryptedDocument.objects.filter(
+            original_filename="auditoria_fiscal.pdf"
+        ).first()
         self.assertIsNotNone(doc)
         self.assertEqual(doc.origin_uo, self.uo_security)
         self.assertEqual(doc.uploaded_by, auditor_user)
@@ -268,17 +311,25 @@ class DashboardTestCase(TestCase):
         """Verifica que un documento sin UO emisora sea un asiento personal privado solo visible por su autor."""
         self.client.force_login(self.operator_user)
 
-        personal_pdf = SimpleUploadedFile("asiento_personal.pdf", b"%PDF-1.4\nPersonal\n%%EOF", content_type="application/pdf")
+        personal_pdf = SimpleUploadedFile(
+            "asiento_personal.pdf",
+            b"%PDF-1.4\nPersonal\n%%EOF",
+            content_type="application/pdf",
+        )
         post_data = {
             "original_file": personal_pdf,
             "origin_uo": "",  # Sin UO -> Asiento Personal Privado
             "allowed_emails": "destinatario@externo.com",
             "description": "Asiento personal privado",
         }
-        response = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        response = self.client.post(
+            reverse("dashboard:document_upload"), post_data, follow=True
+        )
         self.assertEqual(response.status_code, 200)
 
-        created_doc = EncryptedDocument.objects.filter(original_filename="asiento_personal.pdf").first()
+        created_doc = EncryptedDocument.objects.filter(
+            original_filename="asiento_personal.pdf"
+        ).first()
         self.assertIsNotNone(created_doc)
         self.assertIsNone(created_doc.origin_uo)
         self.assertEqual(created_doc.uploaded_by, self.operator_user)
@@ -286,37 +337,71 @@ class DashboardTestCase(TestCase):
         # El autor puede verlo en el listado y detalle
         resp_list = self.client.get(reverse("dashboard:document_list"))
         self.assertContains(resp_list, "asiento_personal.pdf")
-        resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        resp_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}
+            )
+        )
         self.assertEqual(resp_detail.status_code, 200)
 
         # Otro usuario regular NO puede verlo (incluso perteneciendo a la misma UO)
-        same_uo_user = User.objects.create_user(username="colega_seguridad", email="colega@arcamitte.local", password="Pass123!")
-        UserUOMembership.objects.create(user=same_uo_user, uo=self.uo_security, role=UserUOMembership.Role.OPERATOR, is_active=True)
+        same_uo_user = User.objects.create_user(
+            username="colega_seguridad",
+            email="colega@arcamitte.local",
+            password="Pass123!",
+        )
+        UserUOMembership.objects.create(
+            user=same_uo_user,
+            uo=self.uo_security,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
         self.client.force_login(same_uo_user)
 
         resp_same_list = self.client.get(reverse("dashboard:document_list"))
         self.assertNotContains(resp_same_list, "asiento_personal.pdf")
-        resp_same_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        resp_same_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}
+            )
+        )
         self.assertEqual(resp_same_detail.status_code, 403)
 
         # Otro usuario de otra UO tampoco
-        other_user = User.objects.create_user(username="otro_operador", email="otro@empresa.com", password="Pass123!")
-        UserUOMembership.objects.create(user=other_user, uo=self.uo_legal, role=UserUOMembership.Role.OPERATOR, is_active=True)
+        other_user = User.objects.create_user(
+            username="otro_operador", email="otro@empresa.com", password="Pass123!"
+        )
+        UserUOMembership.objects.create(
+            user=other_user,
+            uo=self.uo_legal,
+            role=UserUOMembership.Role.OPERATOR,
+            is_active=True,
+        )
         self.client.force_login(other_user)
 
         resp_other_list = self.client.get(reverse("dashboard:document_list"))
         self.assertNotContains(resp_other_list, "asiento_personal.pdf")
-        resp_other_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        resp_other_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}
+            )
+        )
         self.assertEqual(resp_other_detail.status_code, 403)
 
         # El superusuario SÍ puede verlo
         self.client.force_login(self.admin_user)
         resp_admin_list = self.client.get(reverse("dashboard:document_list"))
         self.assertContains(resp_admin_list, "asiento_personal.pdf")
-        resp_admin_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}))
+        resp_admin_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail", kwargs={"file_hash": created_doc.file_hash}
+            )
+        )
         self.assertEqual(resp_admin_detail.status_code, 200)
 
-    def test_dashboard_document_upload_duplicate_hash_reactivates_seat_and_preserves_logs(self) -> None:
+    def test_dashboard_document_upload_duplicate_hash_reactivates_seat_and_preserves_logs(
+        self,
+    ) -> None:
         """
         Verifica que al subir un archivo con un hash SHA-256 ya existente en el sistema:
         1. No se lance ValidationError ni error 500.
@@ -327,7 +412,11 @@ class DashboardTestCase(TestCase):
         self.client.force_login(self.operator_user)
 
         sample_pdf_bytes = b"%PDF-1.4\nContenido Unico Reutilizable 2026\n%%EOF"
-        first_pdf = SimpleUploadedFile("expediente_reapertura.pdf", sample_pdf_bytes, content_type="application/pdf")
+        first_pdf = SimpleUploadedFile(
+            "expediente_reapertura.pdf",
+            sample_pdf_bytes,
+            content_type="application/pdf",
+        )
 
         # 1. Primera subida
         post_data_1 = {
@@ -338,11 +427,15 @@ class DashboardTestCase(TestCase):
             "description": "Primera remesa del expediente",
             "burn_policy": EncryptedDocument.BurnPolicy.FIRST_ACCESS,
         }
-        resp1 = self.client.post(reverse("dashboard:document_upload"), post_data_1, follow=True)
+        resp1 = self.client.post(
+            reverse("dashboard:document_upload"), post_data_1, follow=True
+        )
         self.assertEqual(resp1.status_code, 200)
         self.assertContains(resp1, "Asiento cifrado con éxito")
 
-        doc = EncryptedDocument.objects.get(original_filename="expediente_reapertura.pdf")
+        doc = EncryptedDocument.objects.get(
+            original_filename="expediente_reapertura.pdf"
+        )
         initial_pk = doc.pk
         initial_hash = doc.file_hash
 
@@ -365,7 +458,11 @@ class DashboardTestCase(TestCase):
         self.assertGreaterEqual(prev_logs_count, 1)
 
         # 2. Segunda subida con el mismo archivo exacto (mismo hash SHA-256) y nuevos destinatarios
-        second_pdf = SimpleUploadedFile("expediente_reapertura.pdf", sample_pdf_bytes, content_type="application/pdf")
+        second_pdf = SimpleUploadedFile(
+            "expediente_reapertura.pdf",
+            sample_pdf_bytes,
+            content_type="application/pdf",
+        )
         post_data_2 = {
             "original_file": second_pdf,
             "origin_uo": self.uo_security.id,
@@ -374,7 +471,9 @@ class DashboardTestCase(TestCase):
             "description": "Segunda remesa reactivada del expediente",
             "burn_policy": EncryptedDocument.BurnPolicy.ALL_RECIPIENTS,
         }
-        resp2 = self.client.post(reverse("dashboard:document_upload"), post_data_2, follow=True)
+        resp2 = self.client.post(
+            reverse("dashboard:document_upload"), post_data_2, follow=True
+        )
         self.assertEqual(resp2.status_code, 200)
 
         # Verificar mensaje informativo de reactivación
@@ -391,14 +490,25 @@ class DashboardTestCase(TestCase):
         self.assertIsNone(doc.consumed_at)
 
         # Los destinatarios han sido actualizados
-        self.assertEqual(doc.allowed_emails, ["nuevo_destinatario_1@empresa.com", "nuevo_destinatario_2@empresa.com"])
+        self.assertEqual(
+            doc.allowed_emails,
+            ["nuevo_destinatario_1@empresa.com", "nuevo_destinatario_2@empresa.com"],
+        )
         self.assertEqual(doc.description, "Segunda remesa reactivada del expediente")
 
         # El historial anterior de auditoría sigue intacto + nueva vicisitud de reactivación
         current_logs = DocumentAccessLog.objects.filter(document=doc)
         self.assertGreater(current_logs.count(), prev_logs_count)
-        self.assertTrue(current_logs.filter(action=DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN).exists())
-        self.assertTrue(current_logs.filter(action=DocumentAccessLog.Action.REACTIVACION_DOCUMENTO).exists())
+        self.assertTrue(
+            current_logs.filter(
+                action=DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN
+            ).exists()
+        )
+        self.assertTrue(
+            current_logs.filter(
+                action=DocumentAccessLog.Action.REACTIVACION_DOCUMENTO
+            ).exists()
+        )
 
     def test_dashboard_document_upload_duplicate_hash_denied_for_other_uo(self) -> None:
         """
@@ -434,7 +544,9 @@ class DashboardTestCase(TestCase):
         }
         resp = self.client.post(reverse("dashboard:document_upload"), post_data)
         self.assertEqual(resp.status_code, 400)
-        self.assertContains(resp, "pertenece a otra Unidad Organizativa", status_code=400)
+        self.assertContains(
+            resp, "pertenece a otra Unidad Organizativa", status_code=400
+        )
 
     def test_dashboard_user_without_any_uo_operates_standalone(self) -> None:
         """Verifica que un usuario activo sin UO asignada pueda operar en modo personal autónomo."""
@@ -456,17 +568,25 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_upload_page, "personalSeatConfirmModal")
 
         # 3. Subir documento personal
-        pdf_file = SimpleUploadedFile("mi_asiento.pdf", b"%PDF-1.4\nStandalone\n%%EOF", content_type="application/pdf")
+        pdf_file = SimpleUploadedFile(
+            "mi_asiento.pdf",
+            b"%PDF-1.4\nStandalone\n%%EOF",
+            content_type="application/pdf",
+        )
         post_data = {
             "original_file": pdf_file,
             "origin_uo": "",
             "allowed_emails": "cliente@externo.com",
             "description": "Asiento personal creado por usuario sin UO",
         }
-        resp_post = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        resp_post = self.client.post(
+            reverse("dashboard:document_upload"), post_data, follow=True
+        )
         self.assertEqual(resp_post.status_code, 200)
 
-        doc = EncryptedDocument.objects.filter(original_filename="mi_asiento.pdf").first()
+        doc = EncryptedDocument.objects.filter(
+            original_filename="mi_asiento.pdf"
+        ).first()
         self.assertIsNotNone(doc)
         self.assertIsNone(doc.origin_uo)
         self.assertEqual(doc.uploaded_by, standalone_user)
@@ -475,35 +595,59 @@ class DashboardTestCase(TestCase):
         resp_list = self.client.get(reverse("dashboard:document_list"))
         self.assertEqual(resp_list.status_code, 200)
         self.assertContains(resp_list, "mi_asiento.pdf")
-        self.assertNotContains(resp_list, "contrato_confidencial.pdf")  # No ve el de Seguridad
+        self.assertNotContains(
+            resp_list, "contrato_confidencial.pdf"
+        )  # No ve el de Seguridad
 
         # 5. Puede ver el detalle de su documento
-        resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash}))
+        resp_detail = self.client.get(
+            reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        )
         self.assertEqual(resp_detail.status_code, 200)
 
         # 6. Intentar ver documento de otra UO devuelve 403
-        resp_sec_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": self.doc_sec.file_hash}))
+        resp_sec_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            )
+        )
         self.assertEqual(resp_sec_detail.status_code, 403)
 
     def test_dashboard_document_upload_multiple_individual_emails(self) -> None:
         """Verifica que se reciban múltiples campos individuales de correo (POST getlist)."""
         self.client.force_login(self.admin_user)
-        multi_pdf = SimpleUploadedFile("multi_email.pdf", b"%PDF-1.4\nMulti\n%%EOF", content_type="application/pdf")
+        multi_pdf = SimpleUploadedFile(
+            "multi_email.pdf", b"%PDF-1.4\nMulti\n%%EOF", content_type="application/pdf"
+        )
         post_data = {
             "original_file": multi_pdf,
             "origin_uo": self.uo_security.id,
-            "allowed_emails": ["primero@empresa.com", "segundo@empresa.com", "tercero@empresa.com"],
+            "allowed_emails": [
+                "primero@empresa.com",
+                "segundo@empresa.com",
+                "tercero@empresa.com",
+            ],
         }
-        resp = self.client.post(reverse("dashboard:document_upload"), post_data, follow=True)
+        resp = self.client.post(
+            reverse("dashboard:document_upload"), post_data, follow=True
+        )
         self.assertEqual(resp.status_code, 200)
-        doc = EncryptedDocument.objects.filter(original_filename="multi_email.pdf").first()
+        doc = EncryptedDocument.objects.filter(
+            original_filename="multi_email.pdf"
+        ).first()
         self.assertIsNotNone(doc)
-        self.assertEqual(set(doc.allowed_emails), {"primero@empresa.com", "segundo@empresa.com", "tercero@empresa.com"})
+        self.assertEqual(
+            set(doc.allowed_emails),
+            {"primero@empresa.com", "segundo@empresa.com", "tercero@empresa.com"},
+        )
 
     def test_dashboard_uo_members_ajax(self) -> None:
         """Verifica que el endpoint AJAX retorne los miembros y buzón de una UO."""
         self.client.force_login(self.operator_user)
-        resp = self.client.get(reverse("dashboard:uo_members_ajax", kwargs={"uo_id": self.uo_security.id}))
+        resp = self.client.get(
+            reverse("dashboard:uo_members_ajax", kwargs={"uo_id": self.uo_security.id})
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["uo_alias"], "SEGURIDAD")
@@ -520,7 +664,12 @@ class DashboardTestCase(TestCase):
         self.doc_sec.consumed_recipients = ["auditor@empresa.com"]
         self.doc_sec.save(update_fields=["consumed_recipients"])
 
-        response = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": self.doc_sec.file_hash}))
+        response = self.client.get(
+            reverse(
+                "dashboard:document_detail",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            )
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.doc_sec.file_hash)
         self.assertContains(response, "auditor@empresa.com")
@@ -534,18 +683,34 @@ class DashboardTestCase(TestCase):
         self.client.force_login(self.admin_user)
 
         # GET confirmación
-        resp_get = self.client.get(reverse("dashboard:document_terminate", kwargs={"file_hash": self.doc_sec.file_hash}))
+        resp_get = self.client.get(
+            reverse(
+                "dashboard:document_terminate",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            )
+        )
         self.assertEqual(resp_get.status_code, 200)
         self.assertContains(resp_get, "Confirmación Obligatoria de Clausura")
 
         # POST sin justificación (error 400)
-        resp_bad = self.client.post(reverse("dashboard:document_terminate", kwargs={"file_hash": self.doc_sec.file_hash}), {})
+        resp_bad = self.client.post(
+            reverse(
+                "dashboard:document_terminate",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            ),
+            {},
+        )
         self.assertEqual(resp_bad.status_code, 400)
-        self.assertContains(resp_bad, "Debe proporcionar un motivo justificado", status_code=400)
+        self.assertContains(
+            resp_bad, "Debe proporcionar un motivo justificado", status_code=400
+        )
 
         # POST con justificación válida
         resp_post = self.client.post(
-            reverse("dashboard:document_terminate", kwargs={"file_hash": self.doc_sec.file_hash}),
+            reverse(
+                "dashboard:document_terminate",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            ),
             {"justification": "Revocación por término de expediente."},
             follow=True,
         )
@@ -575,7 +740,10 @@ class DashboardTestCase(TestCase):
         self.assertContains(response, "192.168.1.100")
 
         # Filtrar por acción OTP_ENVIADO
-        resp_filter = self.client.get(reverse("dashboard:audit_logs") + f"?action={DocumentAccessLog.Action.OTP_ENVIADO}")
+        resp_filter = self.client.get(
+            reverse("dashboard:audit_logs")
+            + f"?action={DocumentAccessLog.Action.OTP_ENVIADO}"
+        )
         self.assertEqual(resp_filter.status_code, 200)
         self.assertContains(resp_filter, "Código de verificación enviado")
 
@@ -605,7 +773,9 @@ class DashboardTestCase(TestCase):
             "rate_limit": 120,
             "validity_days": 180,
         }
-        resp_create = self.client.post(reverse("dashboard:api_tokens"), post_data, follow=True)
+        resp_create = self.client.post(
+            reverse("dashboard:api_tokens"), post_data, follow=True
+        )
         self.assertEqual(resp_create.status_code, 200)
         self.assertContains(resp_create, "arca_live_")
         self.assertContains(resp_create, "Microservicio ERP Corporativo")
@@ -626,7 +796,9 @@ class DashboardTestCase(TestCase):
         """Verifica que un operador solo acceda a los documentos de sus UOs autorizadas."""
         # Crear documento en UO Legal
         doc_legal = upload_and_encrypt_document(
-            original_file=SimpleUploadedFile("legal.pdf", b"%PDF-1.4\nLegal\n%%EOF", content_type="application/pdf"),
+            original_file=SimpleUploadedFile(
+                "legal.pdf", b"%PDF-1.4\nLegal\n%%EOF", content_type="application/pdf"
+            ),
             allowed_emails=["abogado@empresa.com"],
             origin_uo=self.uo_legal,
             uploaded_by=self.admin_user,
@@ -642,7 +814,11 @@ class DashboardTestCase(TestCase):
         self.assertNotContains(resp_list, "legal.pdf")
 
         # Intentar acceder al detalle del documento de Legal debe devolver 403 Forbidden
-        resp_detail = self.client.get(reverse("dashboard:document_detail", kwargs={"file_hash": doc_legal.file_hash}))
+        resp_detail = self.client.get(
+            reverse(
+                "dashboard:document_detail", kwargs={"file_hash": doc_legal.file_hash}
+            )
+        )
         self.assertEqual(resp_detail.status_code, 403)
 
     def test_superuser_mode_selection_and_switch(self) -> None:
@@ -656,7 +832,9 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_get, "Operativa Documental")
 
         # Conmutar a modo Operativo vía POST
-        resp_post = self.client.post(reverse("dashboard:mode_selection"), {"mode": "operational"}, follow=True)
+        resp_post = self.client.post(
+            reverse("dashboard:mode_selection"), {"mode": "operational"}, follow=True
+        )
         self.assertEqual(resp_post.status_code, 200)
         self.assertEqual(self.client.session.get("dashboard_mode"), "operational")
 
@@ -694,7 +872,9 @@ class DashboardTestCase(TestCase):
             "description": "Inspección y control",
             "is_active": True,
         }
-        resp_create = self.client.post(reverse("dashboard:uo_create"), create_data, follow=True)
+        resp_create = self.client.post(
+            reverse("dashboard:uo_create"), create_data, follow=True
+        )
         self.assertEqual(resp_create.status_code, 200)
         self.assertTrue(OrganizationalUnit.objects.filter(alias="AUDITORIA").exists())
 
@@ -708,7 +888,11 @@ class DashboardTestCase(TestCase):
             "description": "Actualizado por superadmin",
             "is_active": True,
         }
-        resp_edit = self.client.post(reverse("dashboard:uo_edit", kwargs={"uo_id": uo_audit.id}), edit_data, follow=True)
+        resp_edit = self.client.post(
+            reverse("dashboard:uo_edit", kwargs={"uo_id": uo_audit.id}),
+            edit_data,
+            follow=True,
+        )
         self.assertEqual(resp_edit.status_code, 200)
         uo_audit.refresh_from_db()
         self.assertEqual(uo_audit.name, "Dirección General de Auditoría Interna")
@@ -736,13 +920,19 @@ class DashboardTestCase(TestCase):
             "email": "legal_mod@arcamitte.local",
             "description": "Actualizado por admin UO",
         }
-        resp_own = self.client.post(reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_legal.id}), edit_own, follow=True)
+        resp_own = self.client.post(
+            reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_legal.id}),
+            edit_own,
+            follow=True,
+        )
         self.assertEqual(resp_own.status_code, 200)
         self.uo_legal.refresh_from_db()
         self.assertEqual(self.uo_legal.name, "Asesoría Jurídica y Regulatoria")
 
         # 2. Intentar modificar otra UO (Seguridad) -> 403 Forbidden
-        resp_other = self.client.get(reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_security.id}))
+        resp_other = self.client.get(
+            reverse("dashboard:uo_edit", kwargs={"uo_id": self.uo_security.id})
+        )
         self.assertEqual(resp_other.status_code, 403)
 
     def test_uo_admin_can_manage_members_in_own_uo(self) -> None:
@@ -770,7 +960,11 @@ class DashboardTestCase(TestCase):
         # 1. Añadir miembro a UO Legal
         resp_add = self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "add_member", "user_id": new_user.id, "role": UserUOMembership.Role.OPERATOR},
+            {
+                "action": "add_member",
+                "user_id": new_user.id,
+                "role": UserUOMembership.Role.OPERATOR,
+            },
             follow=True,
         )
         self.assertEqual(resp_add.status_code, 200)
@@ -780,7 +974,11 @@ class DashboardTestCase(TestCase):
         # 2. Modificar rol a Auditor
         self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "update_role", "membership_id": m.id, "role": UserUOMembership.Role.AUDITOR},
+            {
+                "action": "update_role",
+                "membership_id": m.id,
+                "role": UserUOMembership.Role.AUDITOR,
+            },
             follow=True,
         )
         m.refresh_from_db()
@@ -796,7 +994,9 @@ class DashboardTestCase(TestCase):
         self.assertFalse(m.is_active)
 
         # 4. Intentar gestionar miembros en otra UO (Seguridad) -> 403 Forbidden
-        resp_sec = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_security.id}))
+        resp_sec = self.client.get(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_security.id})
+        )
         self.assertEqual(resp_sec.status_code, 403)
 
     def test_admin_reset_password_flow(self) -> None:
@@ -810,7 +1010,9 @@ class DashboardTestCase(TestCase):
         self.client.force_login(self.admin_user)
 
         resp = self.client.post(
-            reverse("dashboard:user_reset_password", kwargs={"user_id": target_user.id}),
+            reverse(
+                "dashboard:user_reset_password", kwargs={"user_id": target_user.id}
+            ),
             follow=True,
         )
         self.assertEqual(resp.status_code, 200)
@@ -889,8 +1091,8 @@ class DashboardTestCase(TestCase):
         # Cargar home en modo gobernanza
         resp_home = self.client.get(reverse("dashboard:home"))
         self.assertEqual(resp_home.status_code, 200)
-        self.assertNotContains(resp_home, "href=\"/admin/\"")
-        self.assertNotContains(resp_home, "href=\"/admin\"")
+        self.assertNotContains(resp_home, 'href="/admin/"')
+        self.assertNotContains(resp_home, 'href="/admin"')
         self.assertNotContains(resp_home, "Django Admin Clásico")
         self.assertNotContains(resp_home, "Django Admin")
 
@@ -904,7 +1106,11 @@ class DashboardTestCase(TestCase):
         self.client.force_login(self.admin_user)
 
         # 1. Cambiar a inglés
-        self.client.get(reverse("arcamitte:set-language") + "?lang=en&next=" + reverse("dashboard:home"))
+        self.client.get(
+            reverse("arcamitte:set-language")
+            + "?lang=en&next="
+            + reverse("dashboard:home")
+        )
 
         # 2. Cargar home en inglés
         resp_home = self.client.get(reverse("dashboard:home"))
@@ -977,8 +1183,8 @@ class DashboardTestCase(TestCase):
             current_user=other_operator,  # No es él mismo
         )
         self.assertFalse(form_last_super.is_valid())
-        self.assertIn("is_superuser", form_last_super.errors)
-        self.assertIn("único superusuario", str(form_last_super.errors["is_superuser"]))
+        self.assertIn("is_global_admin", form_last_super.errors)
+        self.assertIn("único superusuario", str(form_last_super.errors["is_global_admin"]))
 
         # 3. Asignar is_superuser=True automáticamente otorga is_staff=True
         new_target = User.objects.create_user(
@@ -1024,13 +1230,21 @@ class DashboardTestCase(TestCase):
         # 1. Intentar auto-degradar su rol de ADMIN a OPERATOR -> Denegado con mensaje de error
         resp_demote = self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "update_role", "membership_id": m.id, "role": UserUOMembership.Role.OPERATOR},
+            {
+                "action": "update_role",
+                "membership_id": m.id,
+                "role": UserUOMembership.Role.OPERATOR,
+            },
             follow=True,
         )
         self.assertEqual(resp_demote.status_code, 200)
         m.refresh_from_db()
-        self.assertEqual(m.role, UserUOMembership.Role.ADMIN)  # Debe seguir siendo ADMIN
-        self.assertContains(resp_demote, "no puede revocar sus propios privilegios de administrador")
+        self.assertEqual(
+            m.role, UserUOMembership.Role.ADMIN
+        )  # Debe seguir siendo ADMIN
+        self.assertContains(
+            resp_demote, "no puede revocar sus propios privilegios de administrador"
+        )
 
         # 2. Intentar auto-desactivar su membresía -> Denegado con mensaje de error
         resp_toggle = self.client.post(
@@ -1050,20 +1264,24 @@ class DashboardTestCase(TestCase):
             follow=True,
         )
         self.assertEqual(resp_remove.status_code, 200)
-        self.assertTrue(UserUOMembership.objects.filter(pk=m.pk).exists())  # Debe seguir existiendo
-        self.assertContains(resp_remove, "no puede auto-expulsarse de esta Unidad Organizativa")
+        self.assertTrue(
+            UserUOMembership.objects.filter(pk=m.pk).exists()
+        )  # Debe seguir existiendo
+        self.assertContains(
+            resp_remove, "no puede auto-expulsarse de esta Unidad Organizativa"
+        )
 
     def test_user_form_renders_clear_descriptions_and_protection(self) -> None:
         """Verifica que el formulario de edición de usuario distinga claramente is_staff de is_superuser y alerte de auto-edición."""
         self.client.force_login(self.admin_user)
 
         # Cargar edición de la propia cuenta del superusuario
-        resp_self = self.client.get(reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id}))
+        resp_self = self.client.get(
+            reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id})
+        )
         self.assertEqual(resp_self.status_code, 200)
         self.assertContains(resp_self, "Editando su propia cuenta")
-        self.assertContains(resp_self, "Acceso Administrativo Departamental")
-        self.assertContains(resp_self, "Superusuario Global del Sistema")
-        self.assertContains(resp_self, "Nivel Departamental")
+        self.assertContains(resp_self, "Administrador Global de Seguridad")
         self.assertContains(resp_self, "Control Total / Soberano")
         # Verificar que no se muestran tecnicismos de código como (is_staff) o (is_superuser) en el texto
         self.assertNotContains(resp_self, "(is_staff)")
@@ -1112,28 +1330,44 @@ class DashboardTestCase(TestCase):
             current_user=uo_admin,
         )
         self.assertFalse(form_unauth.is_valid())
-        self.assertIn("Solo un superusuario global puede conceder privilegios", str(form_unauth.errors))
+        self.assertIn(
+            "Solo un superusuario global puede conceder privilegios",
+            str(form_unauth.errors),
+        )
 
         self.client.force_login(uo_admin)
 
         # 2. Un no-superusuario NO puede editar a un superusuario global -> 403 Forbidden
-        resp_edit_super = self.client.get(reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id}))
+        resp_edit_super = self.client.get(
+            reverse("dashboard:user_edit", kwargs={"user_id": self.admin_user.id})
+        )
         self.assertEqual(resp_edit_super.status_code, 403)
 
         # 3. Un no-superusuario NO puede resetear la contraseña de un superusuario -> 403 Forbidden
-        resp_reset_super = self.client.post(reverse("dashboard:user_reset_password", kwargs={"user_id": self.admin_user.id}))
+        resp_reset_super = self.client.post(
+            reverse(
+                "dashboard:user_reset_password", kwargs={"user_id": self.admin_user.id}
+            )
+        )
         self.assertEqual(resp_reset_super.status_code, 403)
 
         # 4. En UO Members: Un no-superusuario NO puede degradar el rol de un superusuario
         resp_demote = self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "update_role", "membership_id": m_super.id, "role": UserUOMembership.Role.OPERATOR},
+            {
+                "action": "update_role",
+                "membership_id": m_super.id,
+                "role": UserUOMembership.Role.OPERATOR,
+            },
             follow=True,
         )
         self.assertEqual(resp_demote.status_code, 200)
         m_super.refresh_from_db()
         self.assertEqual(m_super.role, UserUOMembership.Role.ADMIN)
-        self.assertContains(resp_demote, "No tiene privilegios suficientes para modificar el rol de un superusuario")
+        self.assertContains(
+            resp_demote,
+            "No tiene privilegios suficientes para modificar el rol de un superusuario",
+        )
 
         # 5. En UO Members: Un no-superusuario NO puede desactivar la membresía de un superusuario
         resp_toggle = self.client.post(
@@ -1144,7 +1378,10 @@ class DashboardTestCase(TestCase):
         self.assertEqual(resp_toggle.status_code, 200)
         m_super.refresh_from_db()
         self.assertTrue(m_super.is_active)
-        self.assertContains(resp_toggle, "No tiene privilegios suficientes para modificar el estado de un superusuario")
+        self.assertContains(
+            resp_toggle,
+            "No tiene privilegios suficientes para modificar el estado de un superusuario",
+        )
 
         # 6. En UO Members: Un no-superusuario NO puede desvincular a un superusuario
         resp_remove = self.client.post(
@@ -1154,7 +1391,10 @@ class DashboardTestCase(TestCase):
         )
         self.assertEqual(resp_remove.status_code, 200)
         self.assertTrue(UserUOMembership.objects.filter(pk=m_super.pk).exists())
-        self.assertContains(resp_remove, "No tiene privilegios suficientes para desvincular a un superusuario")
+        self.assertContains(
+            resp_remove,
+            "No tiene privilegios suficientes para desvincular a un superusuario",
+        )
 
     def test_uo_members_search_bar_and_json_data(self) -> None:
         """Verifica que la vista de miembros de UO proporcione la barra de búsqueda interactiva y el JSON para filtro."""
@@ -1169,7 +1409,9 @@ class DashboardTestCase(TestCase):
             password="Password123!",
         )
 
-        resp = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}))
+        resp = self.client.get(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id})
+        )
         self.assertEqual(resp.status_code, 200)
 
         # Verificar presencia de la barra de búsqueda y campos en HTML
@@ -1214,15 +1456,22 @@ class DashboardTestCase(TestCase):
         self.client.force_login(self.admin_user)
 
         # 1. Comprobar GET en uo_members de LEGAL: worker debe salir marcado como ocupado
-        resp_get = self.client.get(reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}))
+        resp_get = self.client.get(
+            reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id})
+        )
         self.assertEqual(resp_get.status_code, 200)
         self.assertContains(resp_get, "available-users-json")
 
         json_data = resp_get.context["available_users_json"]
         import json as py_json
+
         parsed_users = py_json.loads(json_data)
-        worker_info = next((u for u in parsed_users if u["username"] == "analista_sec"), None)
-        free_info = next((u for u in parsed_users if u["username"] == "usuario_libre"), None)
+        worker_info = next(
+            (u for u in parsed_users if u["username"] == "analista_sec"), None
+        )
+        free_info = next(
+            (u for u in parsed_users if u["username"] == "usuario_libre"), None
+        )
 
         self.assertIsNotNone(worker_info)
         self.assertTrue(worker_info["is_occupied"])
@@ -1235,12 +1484,20 @@ class DashboardTestCase(TestCase):
         # 2. Intentar asignar worker a LEGAL mientras sigue activo en SEGURIDAD -> Bloqueado
         resp_add_blocked = self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "add_member", "user_id": worker.id, "role": UserUOMembership.Role.OPERATOR},
+            {
+                "action": "add_member",
+                "user_id": worker.id,
+                "role": UserUOMembership.Role.OPERATOR,
+            },
             follow=True,
         )
         self.assertEqual(resp_add_blocked.status_code, 200)
-        self.assertFalse(UserUOMembership.objects.filter(user=worker, uo=self.uo_legal).exists())
-        self.assertContains(resp_add_blocked, "ya se encuentra asignado a la Unidad Organizativa")
+        self.assertFalse(
+            UserUOMembership.objects.filter(user=worker, uo=self.uo_legal).exists()
+        )
+        self.assertContains(
+            resp_add_blocked, "ya se encuentra asignado a la Unidad Organizativa"
+        )
         self.assertContains(resp_add_blocked, "Debe ser desvinculado previamente")
 
         # 3. Desvincular a worker de SEGURIDAD (dejarlo libre)
@@ -1250,20 +1507,32 @@ class DashboardTestCase(TestCase):
             follow=True,
         )
         self.assertEqual(resp_remove.status_code, 200)
-        self.assertFalse(UserUOMembership.objects.filter(user=worker, uo=self.uo_security).exists())
+        self.assertFalse(
+            UserUOMembership.objects.filter(user=worker, uo=self.uo_security).exists()
+        )
 
         # 4. Ahora worker está libre: Asignarlo a LEGAL debe permitirse satisfactoriamente
         resp_add_success = self.client.post(
             reverse("dashboard:uo_members", kwargs={"uo_id": self.uo_legal.id}),
-            {"action": "add_member", "user_id": worker.id, "role": UserUOMembership.Role.AUDITOR},
+            {
+                "action": "add_member",
+                "user_id": worker.id,
+                "role": UserUOMembership.Role.AUDITOR,
+            },
             follow=True,
         )
         self.assertEqual(resp_add_success.status_code, 200)
-        self.assertTrue(UserUOMembership.objects.filter(user=worker, uo=self.uo_legal, is_active=True).exists())
+        self.assertTrue(
+            UserUOMembership.objects.filter(
+                user=worker, uo=self.uo_legal, is_active=True
+            ).exists()
+        )
         m_legal = UserUOMembership.objects.get(user=worker, uo=self.uo_legal)
         self.assertEqual(m_legal.role, UserUOMembership.Role.AUDITOR)
 
-    def test_dashboard_auditor_sees_audit_download_button_and_downloads_preserved(self) -> None:
+    def test_dashboard_auditor_sees_audit_download_button_and_downloads_preserved(
+        self,
+    ) -> None:
         """Verifica que el usuario Auditor vea el botón de descarga y pueda descargar la copia de auditoría."""
         auditor_user = User.objects.create_user(
             username="auditor_test",
@@ -1278,7 +1547,9 @@ class DashboardTestCase(TestCase):
         )
 
         test_content = b"%PDF-1.4\nContenido confidencial para prueba forense\n%%EOF"
-        upload_file = SimpleUploadedFile("informe_auditoria.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "informe_auditoria.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["auditor_dest@external.org"],
@@ -1290,7 +1561,9 @@ class DashboardTestCase(TestCase):
         self.client.force_login(auditor_user)
 
         # 1. El auditor entra al detalle: debe ver el botón de Descarga de Auditoría y su rol "Auditor"
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp_detail = self.client.get(detail_url)
         self.assertEqual(resp_detail.status_code, 200)
         self.assertTrue(resp_detail.context["can_audit_download"])
@@ -1301,7 +1574,9 @@ class DashboardTestCase(TestCase):
         self.assertContains(resp_detail, self.uo_legal.alias)
 
         # 2. Descarga de auditoría efectiva
-        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        audit_download_url = reverse(
+            "dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash}
+        )
         resp_download = self.client.get(audit_download_url)
         self.assertEqual(resp_download.status_code, 200)
         self.assertEqual(resp_download.content, test_content)
@@ -1335,7 +1610,9 @@ class DashboardTestCase(TestCase):
         )
 
         test_content = b"%PDF-1.4\nArchivo operativo normal\n%%EOF"
-        upload_file = SimpleUploadedFile("operacion.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "operacion.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["operacion@external.org"],
@@ -1347,14 +1624,18 @@ class DashboardTestCase(TestCase):
         self.client.force_login(operator_user)
 
         # 1. El operador no debe tener can_audit_download=True
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp_detail = self.client.get(detail_url)
         self.assertEqual(resp_detail.status_code, 200)
         self.assertFalse(resp_detail.context["can_audit_download"])
         self.assertNotContains(resp_detail, "Descargar copia de auditoría")
 
         # 2. Si intenta forzar la descarga de auditoría vía URL, debe ser denegado y redirigido
-        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        audit_download_url = reverse(
+            "dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash}
+        )
         resp_download = self.client.get(audit_download_url, follow=True)
         self.assertEqual(resp_download.status_code, 200)
         self.assertContains(resp_download, "No tiene permisos de auditoría")
@@ -1362,7 +1643,9 @@ class DashboardTestCase(TestCase):
     def test_physical_file_missing_auto_closes_asiento_with_vicisitud(self) -> None:
         """Verifica que si el archivo físico en disco no existe, el asiento se clausura automáticamente con vicisitud."""
         test_content = b"%PDF-1.4\nDocumento para prueba de perdida fisica\n%%EOF"
-        upload_file = SimpleUploadedFile("perdida_fisica.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "perdida_fisica.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["dest@empresa.com"],
@@ -1381,7 +1664,9 @@ class DashboardTestCase(TestCase):
         self.assertFalse(os.path.exists(file_path))
 
         self.client.force_login(self.admin_user)
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp = self.client.get(detail_url)
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.context["file_exists_on_disk"])
@@ -1415,7 +1700,9 @@ class DashboardTestCase(TestCase):
         )
 
         test_content = b"%PDF-1.4\nDocumento para verificacion UI\n%%EOF"
-        upload_file = SimpleUploadedFile("ui_doc.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "ui_doc.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["ui_dest@empresa.com"],
@@ -1432,7 +1719,9 @@ class DashboardTestCase(TestCase):
         self.assertNotIn(doc.id, resp_list.context["terminable_doc_ids"])
 
         # 2. En el detalle: el operador NO debe tener can_terminate=True ni ver el botón 'Terminar y Destruir'
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp_detail = self.client.get(detail_url)
         self.assertEqual(resp_detail.status_code, 200)
         self.assertFalse(resp_detail.context["can_terminate"])
@@ -1457,7 +1746,9 @@ class DashboardTestCase(TestCase):
         )
 
         test_content = b"%PDF-1.4\nDocumento personal sin UO\n%%EOF"
-        upload_file = SimpleUploadedFile("personal.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "personal.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["auditor_dest@empresa.com"],
@@ -1470,14 +1761,18 @@ class DashboardTestCase(TestCase):
         self.client.force_login(auditor)
 
         # Debe poder acceder al detalle sin PermissionDenied
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp_detail = self.client.get(detail_url)
         self.assertEqual(resp_detail.status_code, 200)
         self.assertTrue(resp_detail.context["can_audit_download"])
         self.assertContains(resp_detail, "Descarga de Auditoría")
 
         # Debe poder descargar la copia de auditoría
-        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        audit_download_url = reverse(
+            "dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash}
+        )
         resp_download = self.client.get(audit_download_url)
         self.assertEqual(resp_download.status_code, 200)
         self.assertEqual(resp_download.content, test_content)
@@ -1505,7 +1800,9 @@ class DashboardTestCase(TestCase):
 
         # Documento entre LEGAL y EXTERNAL (sin relación con SEGURIDAD)
         test_content = b"%PDF-1.4\nDocumento confidencial ajeno\n%%EOF"
-        upload_file = SimpleUploadedFile("unrelated.pdf", test_content, content_type="application/pdf")
+        upload_file = SimpleUploadedFile(
+            "unrelated.pdf", test_content, content_type="application/pdf"
+        )
         doc = upload_and_encrypt_document(
             original_file=upload_file,
             allowed_emails=["dest@empresa.com"],
@@ -1523,12 +1820,16 @@ class DashboardTestCase(TestCase):
         self.assertNotIn(doc, resp_list.context["documents"])
 
         # 2. El auditor NO puede inspeccionar el detalle (403 PermissionDenied)
-        detail_url = reverse("dashboard:document_detail", kwargs={"file_hash": doc.file_hash})
+        detail_url = reverse(
+            "dashboard:document_detail", kwargs={"file_hash": doc.file_hash}
+        )
         resp_detail = self.client.get(detail_url)
         self.assertEqual(resp_detail.status_code, 403)
 
         # 3. El auditor NO puede realizar la descarga de auditoría de UO ajena
-        audit_download_url = reverse("dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash})
+        audit_download_url = reverse(
+            "dashboard:document_audit_download", kwargs={"file_hash": doc.file_hash}
+        )
         resp_download = self.client.get(audit_download_url)
         self.assertEqual(resp_download.status_code, 302)
 
@@ -1553,13 +1854,13 @@ class DashboardTestCase(TestCase):
         change_url = reverse("dashboard:password_change")
 
         invalid_passwords = [
-            "Short1!a",              # Menos de 10 caracteres
-            "minusculas1234!#",      # Sin mayúsculas
-            "MAYUSCULAS1234!#",      # Sin minúsculas
-            "SinNumerosAqui!#",      # Sin dígitos
-            "SinSimbolos12345",      # Sin caracteres especiales
-            "Carlos_seguridad1!",    # Similar al username
-            "InitialTemp#2026",      # Reutilización de la contraseña actual/temporal
+            "Short1!a",  # Menos de 10 caracteres
+            "minusculas1234!#",  # Sin mayúsculas
+            "MAYUSCULAS1234!#",  # Sin minúsculas
+            "SinNumerosAqui!#",  # Sin dígitos
+            "SinSimbolos12345",  # Sin caracteres especiales
+            "Carlos_seguridad1!",  # Similar al username
+            "InitialTemp#2026",  # Reutilización de la contraseña actual/temporal
         ]
 
         for bad_pwd in invalid_passwords:
@@ -1571,9 +1872,16 @@ class DashboardTestCase(TestCase):
                     "confirm_password": bad_pwd,
                 },
             )
-            self.assertEqual(resp.status_code, 200, f"Debería haber rechazado la contraseña débil: {bad_pwd}")
+            self.assertEqual(
+                resp.status_code,
+                200,
+                f"Debería haber rechazado la contraseña débil: {bad_pwd}",
+            )
             profile.refresh_from_db()
-            self.assertTrue(profile.must_change_password, f"No debería haber permitido el cambio con: {bad_pwd}")
+            self.assertTrue(
+                profile.must_change_password,
+                f"No debería haber permitido el cambio con: {bad_pwd}",
+            )
 
         # Contraseña robusta que cumple toda la política
         valid_pwd = "Str0ngC0rp!Key#2026"
@@ -1596,7 +1904,8 @@ class DashboardTestCase(TestCase):
         """Verifica que las vistas con parámetro 'next' bloqueen redirecciones abiertas (CWE-601)."""
         # 1. set_language_view
         resp_lang = self.client.get(
-            reverse("arcamitte:set-language") + "?lang=en&next=https://evil-attacker.example.com/phish"
+            reverse("arcamitte:set-language")
+            + "?lang=en&next=https://evil-attacker.example.com/phish"
         )
         self.assertEqual(resp_lang.status_code, 302)
         self.assertNotIn("evil-attacker.example.com", resp_lang["Location"])
@@ -1604,7 +1913,8 @@ class DashboardTestCase(TestCase):
         # 2. DashboardModeSelectionView
         self.client.force_login(self.admin_user)
         resp_mode = self.client.get(
-            reverse("dashboard:mode_selection") + "?set=operational&next=//evil-attacker.example.com"
+            reverse("dashboard:mode_selection")
+            + "?set=operational&next=//evil-attacker.example.com"
         )
         self.assertEqual(resp_mode.status_code, 302)
         self.assertEqual(resp_mode["Location"], reverse("dashboard:home"))
@@ -1612,16 +1922,21 @@ class DashboardTestCase(TestCase):
     def test_login_brute_force_protection(self) -> None:
         """Verifica que tras 5 intentos fallidos de login se bloquee temporalmente con HTTP 429."""
         from django.core.cache import cache
+
         cache.clear()
         self.client.logout()
         login_url = reverse("dashboard:login")
 
         for _ in range(5):
-            resp = self.client.post(login_url, {"username": "operador1", "password": "WrongPassword!"})
+            resp = self.client.post(
+                login_url, {"username": "operador1", "password": "WrongPassword!"}
+            )
             self.assertEqual(resp.status_code, 200)
 
         # El 6º intento debe ser rechazado con 429 Too Many Requests
-        resp_locked = self.client.post(login_url, {"username": "operador1", "password": "WrongPassword!"})
+        resp_locked = self.client.post(
+            login_url, {"username": "operador1", "password": "WrongPassword!"}
+        )
         self.assertEqual(resp_locked.status_code, 429)
         cache.clear()
 
@@ -1638,25 +1953,32 @@ class DashboardTestCase(TestCase):
         with override_settings(ARCAMITTE_TRUST_X_FORWARDED_FOR=True):
             self.assertEqual(get_client_ip(req), "203.0.113.99")
             # Si XFF contiene payload malicioso que no es IP válida, cae a REMOTE_ADDR
-            req_spoof = rf.get("/", REMOTE_ADDR="10.0.0.15", HTTP_X_FORWARDED_FOR="malicious_sql_injection")
+            req_spoof = rf.get(
+                "/",
+                REMOTE_ADDR="10.0.0.15",
+                HTTP_X_FORWARDED_FOR="malicious_sql_injection",
+            )
             self.assertEqual(get_client_ip(req_spoof), "10.0.0.15")
 
         # Verificar created_by en token generado desde Dashboard y cabeceras no-store en descarga de auditoría
         self.client.force_login(self.admin_user)
         self.client.post(
             reverse("dashboard:api_tokens"),
-            {"name": "Token Con Autor", "scopes": ["documents:read"], "rate_limit": 60, "validity_days": 30},
+            {
+                "name": "Token Con Autor",
+                "scopes": ["documents:read"],
+                "rate_limit": 60,
+                "validity_days": 30,
+            },
         )
         tok = APIToken.objects.get(name="Token Con Autor")
         self.assertEqual(tok.created_by, self.admin_user)
 
         audit_resp = self.client.get(
-            reverse("dashboard:document_audit_download", kwargs={"file_hash": self.doc_sec.file_hash})
+            reverse(
+                "dashboard:document_audit_download",
+                kwargs={"file_hash": self.doc_sec.file_hash},
+            )
         )
         self.assertEqual(audit_resp.status_code, 200)
         self.assertIn("no-store", audit_resp["Cache-Control"])
-
-
-
-
-

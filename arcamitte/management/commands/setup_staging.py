@@ -189,6 +189,7 @@ class Command(BaseCommand):
                     "password": "PasswordDir#2026",
                     "uo_alias": "DIRECCION",
                     "role": "ADMIN",
+                    "is_staff": False,
                 },
                 {
                     "username": "gestor_rrhh",
@@ -196,6 +197,7 @@ class Command(BaseCommand):
                     "password": "PasswordRRHH#2026",
                     "uo_alias": "RRHH",
                     "role": "OPERATOR",
+                    "is_staff": False,
                 },
                 {
                     "username": "auditor_rrhh",
@@ -203,6 +205,7 @@ class Command(BaseCommand):
                     "password": "PasswordAuditor#2026",
                     "uo_alias": "RRHH",
                     "role": "AUDITOR",
+                    "is_staff": False,
                 },
                 {
                     "username": "gestor_legal",
@@ -210,6 +213,7 @@ class Command(BaseCommand):
                     "password": "PasswordLegal#2026",
                     "uo_alias": "LEGAL",
                     "role": "OPERATOR",
+                    "is_staff": False,
                 },
                 {
                     "username": "auditor_general",
@@ -217,6 +221,7 @@ class Command(BaseCommand):
                     "password": "PasswordAudGral#2026",
                     "uo_alias": "AUDITORIA",
                     "role": "AUDITOR",
+                    "is_staff": False,
                 },
             ],
         }

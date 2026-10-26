@@ -591,7 +591,7 @@ class BatchImportProvisioningTestCase(TestCase):
         )
         sync_user_role_permissions(operator_user)
 
-        self.assertTrue(operator_user.is_staff)
+        self.assertFalse(operator_user.is_staff)
         self.assertTrue(operator_user.has_perm("arcamitte.view_encrypteddocument"))
         self.assertTrue(operator_user.has_perm("arcamitte.add_encrypteddocument"))
         self.assertFalse(operator_user.has_perm("arcamitte.can_audit_download"))
@@ -610,7 +610,7 @@ class BatchImportProvisioningTestCase(TestCase):
         )
         sync_user_role_permissions(auditor_user)
 
-        self.assertTrue(auditor_user.is_staff)
+        self.assertFalse(auditor_user.is_staff)
         self.assertTrue(auditor_user.has_perm("arcamitte.view_encrypteddocument"))
         self.assertTrue(auditor_user.has_perm("arcamitte.can_audit_download"))
         self.assertTrue(auditor_user.has_perm("arcamitte.add_encrypteddocument"))

@@ -202,6 +202,21 @@ class UserProfile(models.Model):
             "Indica si el usuario tiene activo el segundo factor de autenticación TOTP."
         ),
     )
+    is_mfa_enforced = models.BooleanField(
+        default=False,
+        verbose_name=_("¿Exigir 2FA obligatorio?"),
+        help_text=_(
+            "Obliga al usuario a configurar y usar 2FA aunque no pertenezca al personal administrativo."
+        ),
+    )
+    is_global_admin = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name=_("Administrador Global de Seguridad"),
+        help_text=_(
+            "Otorga el máximo privilegio de gobierno criptográfico, perimetral y organizativo sobre toda la plataforma Arcamitte."
+        ),
+    )
     totp_scratch_codes = models.JSONField(
         default=list,
         blank=True,
@@ -240,6 +255,26 @@ class UserProfile(models.Model):
         if self.locked_until is None:
             return False
         return timezone.now() < self.locked_until
+
+    @property
+    def is_totp_required(self) -> bool:
+        """Indica si el usuario tiene exigencia obligatoria de 2FA."""
+        from arcamitte.services import is_totp_required_for_user
+
+        return is_totp_required_for_user(self.user)
+
+    @property
+    def role_display_name(self) -> str:
+        """Retorna el nombre del rol institucional limpio de Arcamitte."""
+        if self.is_global_admin or getattr(self.user, "is_superuser", False):
+            return str(_("Administrador Global de Seguridad"))
+        memberships = self.user.uo_memberships.filter(is_active=True).select_related(
+            "uo"
+        )
+        if memberships.exists():
+            roles = [f"{m.get_role_display()} ({m.uo.alias})" for m in memberships]
+            return ", ".join(roles)
+        return str(_("Usuario Estándar"))
 
     @property
     def is_password_expired(self) -> bool:
@@ -604,6 +639,21 @@ class EncryptedDocument(models.Model):
             "Fecha límite tras la cual el asiento se cerrará y el archivo será destruido físicamente (por defecto 2 semanas)."
         ),
     )
+    timestamp_token = models.TextField(
+        blank=True,
+        default="",
+        verbose_name=_("Token de Sello de Tiempo RFC 3161"),
+        help_text=_(
+            "Token DER en Base64 emitido por una Autoridad de Sellado de Tiempo (TSA)."
+        ),
+    )
+    timestamp_authority = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("Autoridad de Sellado de Tiempo (TSA)"),
+        help_text=_("URL o entidad emisora del sello cualificado de tiempo."),
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Fecha de alta"),
@@ -852,6 +902,17 @@ class DocumentAccessLog(models.Model):
         TOTP_RECUPERACION_USADO = "totp_recuperacion_usado", _(
             "Código de recuperación 2FA consumido"
         )
+        MALWARE_DETECTADO = "malware_detectado", _(
+            "Amenaza de malware bloqueada por antivirus"
+        )
+        SELLO_TIEMPO_RFC3161_GENERADO = "sello_tiempo_rfc3161_generado", _(
+            "Sello de tiempo RFC 3161 generado"
+        )
+        MARCA_AGUA_APLICADA = "marca_agua_aplicada", _(
+            "Marca de agua forense aplicada a PDF"
+        )
+        TOKEN_API_CREADO = "token_api_creado", _("Token API M2M generado")
+        TOKEN_API_REVOCADO = "token_api_revocado", _("Token API M2M revocado")
 
     document = models.ForeignKey(
         EncryptedDocument,
@@ -1035,6 +1096,21 @@ class AuditExportReceipt(models.Model):
         default="",
         verbose_name=_("Justificación / Motivo legal de la exportación"),
     )
+    timestamp_token = models.TextField(
+        blank=True,
+        default="",
+        verbose_name=_("Token de Sello de Tiempo RFC 3161"),
+        help_text=_(
+            "Token DER en Base64 emitido por una Autoridad de Sellado de Tiempo (TSA)."
+        ),
+    )
+    timestamp_authority = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("Autoridad de Sellado de Tiempo (TSA)"),
+        help_text=_("URL o entidad emisora del sello cualificado de tiempo."),
+    )
     created_at = models.DateTimeField(
         default=timezone.now,
         db_index=True,
@@ -1165,6 +1241,25 @@ class APIToken(models.Model):
             "Permite revocar el token de forma instantánea sin eliminar el registro histórico."
         ),
     )
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Fecha de revocación"),
+    )
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_api_tokens",
+        verbose_name=_("Revocado por"),
+    )
+    revocation_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("Motivo de revocación"),
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Fecha de creación"),
@@ -1261,3 +1356,50 @@ def auto_delete_physical_file_on_delete(
             logger.warning(
                 f"[ARCAMITTE] No se pudo ejecutar borrado seguro de {instance.encrypted_file}: {exc}"
             )
+
+
+class PlatformSecurityPolicy(models.Model):
+    """
+    Directivas institucionales de gobernanza y seguridad de la plataforma Arcamitte.
+    Modelo Singleton administrado exclusivamente por el Administrador Global de Seguridad.
+    """
+
+    mfa_enforced_for_auditors = models.BooleanField(
+        default=False,
+        verbose_name=_("Exigir 2FA Obligatorio para Auditores de UO"),
+        help_text=_(
+            "Obliga a todos los usuarios con rol de Auditor en cualquier Unidad Organizativa a enrolar y validar un segundo factor TOTP."
+        ),
+    )
+    mfa_enforced_for_operators = models.BooleanField(
+        default=False,
+        verbose_name=_("Exigir 2FA Obligatorio para Operadores de UO"),
+        help_text=_(
+            "Obliga a todos los usuarios con rol de Operador en cualquier Unidad Organizativa a enrolar y validar un segundo factor TOTP."
+        ),
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Última actualización"),
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="security_policies_updated",
+        verbose_name=_("Actualizado por"),
+    )
+
+    class Meta:
+        verbose_name = _("Directiva de Seguridad de Plataforma")
+        verbose_name_plural = _("Directivas de Seguridad de Plataforma")
+
+    def __str__(self) -> str:
+        return "Directiva Global de Seguridad de Plataforma"
+
+    @classmethod
+    def get_solo(cls) -> "PlatformSecurityPolicy":
+        """Retorna la instancia única de configuración de seguridad o la crea si no existe."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

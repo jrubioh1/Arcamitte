@@ -28,8 +28,14 @@
 		</a>
 		{% if can_audit_download %}
 			<a href="{% url 'dashboard:document_audit_download' doc.file_hash %}" class="btn btn-warning text-dark shadow-sm">
-				<i data-feather="shield" style="width:16px;height:16px;" class="me-1"></i> {% trans "Descarga de Auditoría" %}
+				<i data-feather="shield" style="width:16px;height:16px;" class="me-1"></i> {% trans "Descarga de Auditoría (Preservada)" %}
 			</a>
+		{% endif %}
+		{% if can_terminate and not doc.is_consumed and doc.encrypted_file %}
+			<button type="button" class="btn btn-outline-danger shadow-sm d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#downloadAndBurnModal">
+				<i data-feather="trash-2" style="width:16px;height:16px;"></i>
+				<span>{% trans "Descargar y Clausurar Asiento" %}</span>
+			</button>
 		{% endif %}
 		{% if can_terminate %}
 			<a href="{% url 'dashboard:document_terminate' doc.file_hash %}" class="btn btn-danger">
@@ -237,4 +243,43 @@
 		</table>
 	</div>
 </div>
+
+{% if can_terminate and not doc.is_consumed and doc.encrypted_file %}
+<div class="modal fade" id="downloadAndBurnModal" tabindex="-1" aria-labelledby="downloadAndBurnModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content border-0 shadow">
+			<form method="post" action="{% url 'dashboard:document_download_and_burn' doc.file_hash %}">
+				{% csrf_token %}
+				<div class="modal-header bg-danger text-white">
+					<h5 class="modal-title fs-6 fw-bold d-flex align-items-center gap-2" id="downloadAndBurnModalLabel">
+						<i data-feather="alert-octagon"></i>
+						{% trans "Consumo Destructivo: Descargar y Destruir Archivo" %}
+					</h5>
+					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-warning border-0 small mb-3">
+						<i data-feather="alert-triangle" class="me-1"></i>
+						<strong>{% trans "Advertencia de No Repudio (NIST SP 800-88):" %}</strong>
+						{% trans "Esta acción descargará el documento con marca de agua forense y simultáneamente destruirá de manera definitiva e irrecuperable el archivo del almacenamiento del servidor." %}
+					</div>
+					<div class="mb-3">
+						<label for="burnReasonInput" class="form-label fw-bold small">
+							{% trans "Motivo Legal de la Clausura y Entrega" %} <span class="text-danger">*</span>
+						</label>
+						<textarea name="reason" id="burnReasonInput" class="form-control" rows="3" required placeholder="{% trans 'Ej: Entrega fehaciente al destinatario, clausura de trámite administrativo...' %}"></textarea>
+					</div>
+				</div>
+				<div class="modal-footer bg-light">
+					<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+					<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
+						<i data-feather="download" style="width:14px;height:14px;"></i>
+						<span>{% trans "Descargar y Clausurar Definitivamente" %}</span>
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+{% endif %}
 {% endblock %}

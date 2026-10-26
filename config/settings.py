@@ -107,7 +107,7 @@ ARCAMITTE_SECURITY_ALERTS_EMAIL = config.get(
     "security", "security_alerts_email", fallback=""
 ).strip()
 ARCAMITTE_MFA_REQUIRED_FOR_STAFF = config.getboolean(
-    "security", "mfa_required_for_staff", fallback=False
+    "security", "mfa_required_for_staff", fallback=True
 )
 ARCAMITTE_SINGLE_SESSION_PER_USER = config.getboolean(
     "security", "single_session_per_user", fallback=True
@@ -129,6 +129,45 @@ _raw_siem_events = config.get(
 ARCAMITTE_SIEM_WEBHOOK_EVENTS = [
     e.strip().lower() for e in _raw_siem_events.split(",") if e.strip()
 ]
+
+# Marca de Agua Forense Dinámica en Descargas PDF (ENS ALTO / NIST SP 800-53 AU-10)
+ARCAMITTE_WATERMARK_ENABLED = config.getboolean(
+    "security", "watermark_enabled", fallback=True
+)
+ARCAMITTE_WATERMARK_OPACITY = float(
+    config.get("security", "watermark_opacity", fallback="0.18")
+)
+
+# Motor Antivirus ClamAV en Memoria (Protocolo zINSTREAM - Zero Disk Footprint)
+ARCAMITTE_CLAMAV_ENABLED = config.getboolean(
+    "antivirus", "clamav_enabled", fallback=False
+)
+ARCAMITTE_CLAMAV_HOST = config.get(
+    "antivirus", "clamav_host", fallback="127.0.0.1"
+).strip()
+ARCAMITTE_CLAMAV_PORT = config.getint("antivirus", "clamav_port", fallback=3310)
+ARCAMITTE_CLAMAV_SOCKET_PATH = config.get(
+    "antivirus", "clamav_socket_path", fallback=""
+).strip()
+ARCAMITTE_CLAMAV_TIMEOUT = config.getint(
+    "antivirus", "clamav_timeout", fallback=10
+)
+ARCAMITTE_CLAMAV_FAIL_OPEN = config.getboolean(
+    "antivirus", "clamav_fail_open", fallback=False
+)
+
+# Sellado Criptográfico Cualificado de Tiempo (RFC 3161 / eIDAS)
+ARCAMITTE_RFC3161_ENABLED = config.getboolean(
+    "timestamping", "rfc3161_enabled", fallback=False
+)
+ARCAMITTE_RFC3161_TSA_URL = config.get(
+    "timestamping",
+    "rfc3161_tsa_url",
+    fallback="http://timestamp.digicert.com",
+).strip()
+ARCAMITTE_RFC3161_TIMEOUT = config.getint(
+    "timestamping", "rfc3161_timeout", fallback=10
+)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = config.getboolean(

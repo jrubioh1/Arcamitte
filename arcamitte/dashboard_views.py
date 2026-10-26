@@ -33,19 +33,38 @@ from arcamitte.forms import (
 )
 from arcamitte.models import (
     APIToken,
+    AuditExportReceipt,
     DocumentAccessLog,
     EncryptedDocument,
     OrganizationalUnit,
+    PlatformSecurityPolicy,
+    UserProfile,
     UserUOMembership,
     default_document_expiry,
     get_or_create_user_profile,
 )
+from arcamitte.permissions import (
+    can_audit_download,
+    can_burn_download,
+    can_manage_api_tokens,
+    can_manage_security_perimeter,
+    can_manage_uo_members,
+    is_global_admin,
+    is_uo_admin,
+    is_uo_auditor,
+    is_uo_operator,
+)
 from arcamitte.services import (
+    admin_download_and_burn_document,
     check_and_auto_close_if_file_missing,
     decrypt_document_for_audit,
+    dispatch_siem_event,
     get_user_administered_uos,
+    is_totp_required_for_user,
     is_uo_admin,
+    record_audit_log,
     reset_user_password_and_notify,
+    reset_user_totp,
     terminate_document_manually,
     upload_and_encrypt_document,
 )
@@ -805,6 +824,62 @@ class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
         return apply_no_store_headers(response)
 
 
+class DashboardDocumentDownloadAndBurnView(LoginRequiredMixin, View):
+    """
+    Descarga de entrega y clausura definitiva del asiento documental (Consumo Destructivo).
+    Descifra el documento con marca forense, lo entrega como descarga y destruye físicamente
+    el binario en disco (NIST SP 800-88 / ENS ALTO), registrando la vicisitud legal.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest, file_hash: str) -> HttpResponse:
+        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        reason = request.POST.get("reason", "").strip() or _(
+            "Descarga y clausura definitiva de trámite"
+        )
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
+
+        (
+            success,
+            decrypted_bytes,
+            original_filename,
+            msg,
+        ) = admin_download_and_burn_document(
+            document=doc,
+            admin_user=request.user,
+            reason=reason,
+            client_ip=client_ip,
+            user_agent=user_agent,
+        )
+
+        if not success:
+            messages.error(request, msg)
+            return redirect("dashboard:document_detail", file_hash=doc.file_hash)
+
+        import mimetypes
+
+        raw_filename = original_filename or getattr(
+            doc, "original_filename", "documento_clausurado"
+        )
+        safe_filename = sanitize_content_disposition_filename(
+            raw_filename, default="documento_clausurado"
+        )
+        mtype = (
+            getattr(doc, "mime_type", None)
+            or mimetypes.guess_type(safe_filename)[0]
+            or "application/octet-stream"
+        )
+        response = HttpResponse(
+            decrypted_bytes,
+            content_type=mtype,
+        )
+        response["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
+        response["Content-Length"] = len(decrypted_bytes)
+        return apply_no_store_headers(response)
+
+
 class DashboardDocumentTerminateView(LoginRequiredMixin, View):
     """
     Clausura anticipada y destrucción física del archivo cifrado con motivo justificado.
@@ -994,7 +1069,7 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
     template_name = "arcamitte/api_tokens.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        if not (request.user.is_superuser or request.user.is_staff):
+        if not can_manage_api_tokens(request.user):
             raise PermissionDenied(
                 _("Se requieren privilegios administrativos para gestionar API Tokens.")
             )
@@ -1010,7 +1085,7 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        if not (request.user.is_superuser or request.user.is_staff):
+        if not can_manage_api_tokens(request.user):
             raise PermissionDenied(
                 _("Se requieren privilegios administrativos para gestionar API Tokens.")
             )
@@ -1047,8 +1122,29 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
             created_by=request.user,
         )
 
-        # Registrar en logs de auditoría del sistema
+        # Registrar en logs de auditoría criptográfica del sistema
         client_ip = get_client_ip(request)
+        record_audit_log(
+            document=None,
+            action=DocumentAccessLog.Action.TOKEN_API_CREADO,
+            email=request.user.email or request.user.username,
+            ip=client_ip,
+            details={
+                "token_id": token_obj.id,
+                "token_name": token_obj.name,
+                "prefix": token_obj.prefix,
+                "scopes": scopes,
+                "rate_limit": rate_limit,
+                "expires_at": expires_at.isoformat(),
+                "created_by": request.user.username,
+            },
+        )
+        dispatch_siem_event(
+            event_type="token_created",
+            details={"token_name": token_obj.name, "prefix": token_obj.prefix},
+            actor=request.user.username,
+            ip=client_ip,
+        )
         logger.info(
             f"[ARCAMITTE AUDIT] API Token generado: '{token_obj.name}' (prefijo: {token_obj.prefix}..., scopes: {scopes}) por {request.user.username} (IP: {client_ip})"
         )
@@ -1068,17 +1164,48 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
     login_url = "dashboard:login"
 
     def post(self, request: HttpRequest, token_id: int) -> HttpResponse:
-        if not (request.user.is_superuser or request.user.is_staff):
+        if not can_manage_api_tokens(request.user):
             raise PermissionDenied(
                 _("Se requieren privilegios administrativos para revocar API Tokens.")
             )
 
+        reason = request.POST.get("reason", "").strip() or str(
+            _("Revocación manual por el operador")
+        )
         token = get_object_or_404(APIToken, id=token_id)
         token.is_active = False
-        token.save(update_fields=["is_active"])
+        token.revoked_at = timezone.now()
+        token.revoked_by = request.user
+        token.revocation_reason = reason
+        token.save(
+            update_fields=["is_active", "revoked_at", "revoked_by", "revocation_reason"]
+        )
 
-        # Registrar en logs de auditoría del sistema
+        # Registrar en logs de auditoría criptográfica del sistema
         client_ip = get_client_ip(request)
+        record_audit_log(
+            document=None,
+            action=DocumentAccessLog.Action.TOKEN_API_REVOCADO,
+            email=request.user.email or request.user.username,
+            ip=client_ip,
+            details={
+                "token_id": token.id,
+                "token_name": token.name,
+                "prefix": token.prefix,
+                "revoked_by": request.user.username,
+                "reason": reason,
+            },
+        )
+        dispatch_siem_event(
+            event_type="token_revoked",
+            details={
+                "token_name": token.name,
+                "prefix": token.prefix,
+                "reason": reason,
+            },
+            actor=request.user.username,
+            ip=client_ip,
+        )
         logger.info(
             f"[ARCAMITTE AUDIT] API Token revocado: '{token.name}' (prefijo: {token.prefix}...) por {request.user.username} (IP: {client_ip})"
         )
@@ -1087,6 +1214,50 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
             request, _(f"El API Token '{token.name}' ha sido revocado inmediatamente.")
         )
         return redirect("dashboard:api_tokens")
+
+
+class DashboardApiTokenDetailView(LoginRequiredMixin, View):
+    """
+    Vista de detalle e inspección forense de un API Token.
+    Muestra metadatos completos, scopes, creador, métricas de consumo
+    y trazabilidad completa de eventos en DocumentAccessLog.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/api_token_detail.html"
+
+    def get(self, request: HttpRequest, token_id: int) -> HttpResponse:
+        if not can_manage_api_tokens(request.user):
+            raise PermissionDenied(
+                _("Se requieren privilegios administrativos para auditar API Tokens.")
+            )
+
+        token = get_object_or_404(APIToken, id=token_id)
+
+        raw_events = DocumentAccessLog.objects.filter(
+            action__in=[
+                DocumentAccessLog.Action.TOKEN_API_CREADO,
+                DocumentAccessLog.Action.TOKEN_API_REVOCADO,
+            ]
+        ).order_by("-created_at")
+        token_events = []
+        for e in raw_events:
+            det = e.details
+            if isinstance(det, str):
+                try:
+                    det = json.loads(det)
+                except Exception:
+                    det = {}
+            if isinstance(det, dict) and det.get("token_id") == token.id:
+                e.details = det
+                token_events.append(e)
+
+        context = {
+            "active_nav": "tokens",
+            "token": token,
+            "token_events": token_events,
+        }
+        return render(request, self.template_name, context)
 
 
 class DashboardUOMembersAjaxView(LoginRequiredMixin, View):
@@ -2815,6 +2986,322 @@ class DashboardUserUnlockView(LoginRequiredMixin, View):
         return redirect(next_url)
 
 
+class DashboardLockedUsersView(LoginRequiredMixin, View):
+    """
+    Panel centralizado para Superusuarios de cuentas de usuario bloqueadas,
+    suspendidas o con alertas de intentos fallidos de autenticación (fuerza bruta).
+    Permite desbloqueo reactivo inmediato (1-clic) y suspensión manual justificada.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/locked_users_list.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if not request.user.is_superuser:
+            raise PermissionDenied(
+                _(
+                    "Se requieren privilegios de Superusuario para gestionar usuarios bloqueados."
+                )
+            )
+
+        q = request.GET.get("q", "").strip()
+        qs = User.objects.filter(
+            models.Q(arcamitte_profile__locked_until__gt=timezone.now())
+            | models.Q(arcamitte_profile__failed_login_attempts__gt=0)
+            | models.Q(is_active=False)
+        ).distinct()
+
+        if q:
+            qs = qs.filter(
+                models.Q(username__icontains=q)
+                | models.Q(email__icontains=q)
+                | models.Q(first_name__icontains=q)
+                | models.Q(last_name__icontains=q)
+            )
+
+        users = qs.order_by("-arcamitte_profile__locked_until", "-date_joined")
+
+        context = {
+            "active_nav": "locked_users",
+            "users": users,
+            "search_query": q,
+            "total_locked": users.count(),
+        }
+        return render(request, self.template_name, context)
+
+
+class DashboardUserManualLockView(LoginRequiredMixin, View):
+    """
+    Suspensión o bloqueo administrativo inmediato de una cuenta de usuario con
+    constancia de justificación legal (ENS ALTO). Revoca de forma forzosa las
+    sesiones activas en base de datos.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        if not request.user.is_superuser:
+            raise PermissionDenied(
+                _("Se requieren privilegios de Superusuario para suspender cuentas.")
+            )
+
+        target = get_object_or_404(User, pk=user_id)
+        if target == request.user:
+            messages.error(
+                request,
+                _(
+                    "Por salvaguarda operativa, no puede suspender su propia cuenta de superusuario."
+                ),
+            )
+            return redirect("dashboard:locked_users")
+
+        reason = request.POST.get("reason", "").strip()
+        if not reason:
+            messages.error(
+                request,
+                _(
+                    "Debe proporcionar una justificación obligatoria para la suspensión administrativa."
+                ),
+            )
+            return redirect("dashboard:locked_users")
+
+        target.is_active = False
+        target.save(update_fields=["is_active"])
+
+        profile = get_or_create_user_profile(target)
+        profile.locked_until = timezone.now() + datetime.timedelta(days=3650)
+
+        # Revocar sesiones concurrentes activas
+        if profile.current_session_key:
+            from django.contrib.sessions.models import Session
+
+            Session.objects.filter(session_key=profile.current_session_key).delete()
+            profile.current_session_key = ""
+
+        profile.save(
+            update_fields=[
+                "locked_until",
+                "current_session_key",
+                "updated_at",
+            ]
+        )
+
+        client_ip = get_client_ip(request)
+        record_audit_log(
+            document=None,
+            action=DocumentAccessLog.Action.BLOQUEO_USUARIO,
+            email=target.email or target.username,
+            ip=client_ip,
+            details={
+                "target_username": target.username,
+                "operator": request.user.username,
+                "reason": reason,
+                "action": "suspension_manual",
+            },
+        )
+        dispatch_siem_event(
+            event_type="user_suspended",
+            details={"target_username": target.username, "reason": reason},
+            actor=request.user.username,
+            ip=client_ip,
+        )
+
+        messages.warning(
+            request,
+            _(
+                f"La cuenta del usuario '{target.username}' ha sido suspendida administrativamente y sus sesiones activas revocadas."
+            ),
+        )
+        return redirect("dashboard:locked_users")
+
+
+class Dashboard2FAGovernanceView(LoginRequiredMixin, View):
+    """
+    Panel de Gobernanza de Segundo Factor (2FA / TOTP RFC 6238).
+    Muestra métricas globales de adopción, auditoría de usuarios y permite forzar
+    individualmente el segundo factor ('is_mfa_enforced') o resetear credenciales extraviadas.
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/2fa_governance.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if not can_manage_security_perimeter(request.user):
+            raise PermissionDenied(
+                _(
+                    "Se requieren privilegios de Administrador Global de Seguridad para gestionar la gobernanza de 2FA."
+                )
+            )
+
+        q = request.GET.get("q", "").strip()
+        status_filter = request.GET.get("status", "").strip()
+        policy = PlatformSecurityPolicy.get_solo()
+
+        users_qs = (
+            User.objects.all()
+            .select_related("arcamitte_profile")
+            .prefetch_related("uo_memberships__uo")
+        )
+        if q:
+            users_qs = users_qs.filter(
+                models.Q(username__icontains=q)
+                | models.Q(email__icontains=q)
+                | models.Q(first_name__icontains=q)
+                | models.Q(last_name__icontains=q)
+            )
+
+        total_users = User.objects.count()
+        totp_enabled_count = UserProfile.objects.filter(is_totp_enabled=True).count()
+        totp_enforced_count = UserProfile.objects.filter(is_mfa_enforced=True).count()
+        adoption_pct = (
+            round((totp_enabled_count / total_users * 100), 1) if total_users > 0 else 0
+        )
+
+        user_list = []
+        for u in users_qs.order_by("username"):
+            profile = getattr(u, "arcamitte_profile", None)
+            is_enabled = bool(profile and profile.is_totp_enabled)
+            is_required = is_totp_required_for_user(u)
+            is_enforced = bool(profile and getattr(profile, "is_mfa_enforced", False))
+
+            if status_filter == "active" and not is_enabled:
+                continue
+            if status_filter == "pending" and (not is_required or is_enabled):
+                continue
+            if status_filter == "optional" and is_required:
+                continue
+
+            user_list.append(
+                {
+                    "user": u,
+                    "profile": profile,
+                    "is_enabled": is_enabled,
+                    "is_required": is_required,
+                    "is_enforced": is_enforced,
+                }
+            )
+
+        context = {
+            "active_nav": "2fa_governance",
+            "policy": policy,
+            "users_data": user_list,
+            "search_query": q,
+            "status_filter": status_filter,
+            "total_users": total_users,
+            "totp_enabled_count": totp_enabled_count,
+            "totp_enforced_count": totp_enforced_count,
+            "adoption_pct": adoption_pct,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        if not can_manage_security_perimeter(request.user):
+            raise PermissionDenied(
+                _(
+                    "Se requieren privilegios de Administrador Global de Seguridad para gestionar la gobernanza de 2FA."
+                )
+            )
+
+        action = request.POST.get("action")
+        if action == "update_role_policies":
+            policy = PlatformSecurityPolicy.get_solo()
+            policy.mfa_enforced_for_auditors = (
+                request.POST.get("mfa_enforced_for_auditors") == "on"
+            )
+            policy.mfa_enforced_for_operators = (
+                request.POST.get("mfa_enforced_for_operators") == "on"
+            )
+            policy.updated_by = request.user
+            policy.save(
+                update_fields=[
+                    "mfa_enforced_for_auditors",
+                    "mfa_enforced_for_operators",
+                    "updated_by",
+                    "updated_at",
+                ]
+            )
+            messages.success(
+                request,
+                _(
+                    "Directivas de obligatoriedad de 2FA por rol actualizadas con éxito."
+                ),
+            )
+            return redirect("dashboard:2fa_governance")
+
+        user_id = request.POST.get("user_id")
+        target_user = get_object_or_404(User, pk=user_id)
+        profile = get_or_create_user_profile(target_user)
+
+        new_enforced_state = not profile.is_mfa_enforced
+        profile.is_mfa_enforced = new_enforced_state
+        profile.save(update_fields=["is_mfa_enforced"])
+
+        action_name = (
+            _("exigido")
+            if new_enforced_state
+            else _("liberado de exigencia individual")
+        )
+        messages.success(
+            request,
+            _("Segundo factor (2FA) %(action)s para el usuario '%(username)s'.")
+            % {"action": action_name, "username": target_user.username},
+        )
+        return redirect("dashboard:2fa_governance")
+
+
+class DashboardUserReset2FAView(LoginRequiredMixin, View):
+    """
+    Reseteo administrativo del segundo factor (2FA) para usuarios que hayan
+    extraviado su dispositivo móvil o códigos de recuperación.
+    """
+
+    login_url = "dashboard:login"
+
+    def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
+        if not can_manage_security_perimeter(request.user):
+            raise PermissionDenied(
+                _(
+                    "Se requieren privilegios de Administrador Global de Seguridad para resetear credenciales 2FA."
+                )
+            )
+
+        target = get_object_or_404(User, pk=user_id)
+        reason = request.POST.get("reason", "").strip() or _(
+            "Reseteo administrativo por extravío de autenticador"
+        )
+
+        reset_user_totp(target, operator=request.user, reason=reason)
+
+        client_ip = get_client_ip(request)
+        record_audit_log(
+            document=None,
+            action=DocumentAccessLog.Action.TOTP_CONFIGURADO,
+            email=target.email or target.username,
+            ip=client_ip,
+            details={
+                "target_username": target.username,
+                "operator": request.user.username,
+                "reason": reason,
+                "action": "admin_reset_totp",
+            },
+        )
+        dispatch_siem_event(
+            event_type="totp_admin_reset",
+            details={"target_username": target.username, "reason": reason},
+            actor=request.user.username,
+            ip=client_ip,
+        )
+
+        messages.warning(
+            request,
+            _(
+                f"El segundo factor (2FA) de '{target.username}' ha sido reseteado. Deberá enrolar un nuevo autenticador en su próximo acceso."
+            ),
+        )
+        next_url = request.POST.get("next") or reverse("dashboard:2fa_governance")
+        return redirect(next_url)
+
+
 class DashboardIPBanListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     """
     Panel de gobernanza de la lista negra perimetral de direcciones IP bloqueadas.
@@ -3098,6 +3585,39 @@ class DashboardAuditVerifyReceiptView(LoginRequiredMixin, View):
         )
 
 
+class DashboardAuditReceiptTSRDownloadView(LoginRequiredMixin, View):
+    """
+    Descarga el token criptográfico de sellado de tiempo RFC 3161 (.TSR)
+    asociado a un recibo de auditoría certificado.
+    """
+
+    login_url = "dashboard:login"
+
+    def get(self, request: HttpRequest, receipt_id: str) -> HttpResponse:
+        receipt = get_object_or_404(AuditExportReceipt, receipt_id=receipt_id)
+        if not receipt.timestamp_token:
+            raise Http404(
+                _("El recibo no dispone de un sello de tiempo RFC 3161 asociado.")
+            )
+
+        from arcamitte.timestamping import token_from_base64
+
+        try:
+            tsr_bytes = token_from_base64(receipt.timestamp_token)
+        except Exception:
+            tsr_bytes = receipt.timestamp_token.encode()
+
+        response = HttpResponse(
+            tsr_bytes,
+            content_type="application/timestamp-reply",
+        )
+        response["Content-Disposition"] = (
+            f'attachment; filename="recibo_{receipt.receipt_id}.tsr"'
+        )
+        response["Content-Length"] = len(tsr_bytes)
+        return apply_no_store_headers(response)
+
+
 class DashboardTOTPVerifyView(View):
     """
     Vista de verificación de segundo factor (2FA / TOTP RFC 6238).
@@ -3351,7 +3871,9 @@ class DashboardTOTPSetupView(LoginRequiredMixin, View):
             confirm_code = request.POST.get("confirmation_code", "").strip()
             from arcamitte.services import verify_user_totp_or_scratch
 
-            is_valid, _ = verify_user_totp_or_scratch(request.user, confirm_code)
+            is_valid, _is_scratch = verify_user_totp_or_scratch(
+                request.user, confirm_code
+            )
             if not is_valid and not request.user.check_password(confirm_code):
                 messages.error(
                     request,
@@ -3472,13 +3994,13 @@ class DashboardTOTPDisableView(LoginRequiredMixin, View):
     login_url = "dashboard:login"
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        if getattr(settings, "ARCAMITTE_MFA_REQUIRED_FOR_STAFF", False) and (
-            request.user.is_staff or request.user.is_superuser
-        ):
+        from arcamitte.services import is_totp_required_for_user
+
+        if is_totp_required_for_user(request.user):
             messages.error(
                 request,
                 _(
-                    "La directiva de seguridad corporativa exige 2FA obligatorio para perfiles de administración. "
+                    "La directiva de seguridad corporativa exige 2FA obligatorio para su perfil institucional. "
                     "No tiene permisos para desactivar este control."
                 ),
             )
@@ -3487,7 +4009,7 @@ class DashboardTOTPDisableView(LoginRequiredMixin, View):
         confirm_input = request.POST.get("confirmation_code", "").strip()
         from arcamitte.services import verify_user_totp_or_scratch
 
-        is_valid, _ = verify_user_totp_or_scratch(request.user, confirm_input)
+        is_valid, _is_scratch = verify_user_totp_or_scratch(request.user, confirm_input)
         if not is_valid and not request.user.check_password(confirm_input):
             messages.error(
                 request,
