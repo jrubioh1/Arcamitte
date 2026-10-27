@@ -133,7 +133,7 @@ def request_rfc3161_timestamp(
     effective_tsa_url = (
         tsa_url
         if tsa_url is not None
-        else getattr(settings, "ARCAMITTE_RFC3161_TSA_URL", "http://timestamp.digicert.com")
+        else getattr(settings, "ARCAMITTE_RFC3161_TSA_URL", "https://timestamp.digicert.com")
     )
     effective_timeout = (
         timeout

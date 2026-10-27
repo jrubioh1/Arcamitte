@@ -78,8 +78,8 @@
 							</h6>
 							<div class="row g-2">
 								<div class="col-md-7">
-									<label class="form-label small text-muted">{% trans "Unidad Organizativa" %}</label>
-									<select name="initial_uo" class="form-select form-select-sm">
+									<label for="id_initial_uo" class="form-label small text-muted">{% trans "Unidad Organizativa" %}</label>
+									<select id="id_initial_uo" name="initial_uo" class="form-select form-select-sm">
 										<option value="">{% trans "-- Sin asignar UO inicialmente --" %}</option>
 										{% for uo in admin_uos %}
 											<option value="{{ uo.id }}">{{ uo.alias }} - {{ uo.name }}</option>
@@ -87,8 +87,8 @@
 									</select>
 								</div>
 								<div class="col-md-5">
-									<label class="form-label small text-muted">{% trans "Rol en la UO" %}</label>
-									<select name="initial_role" class="form-select form-select-sm">
+									<label for="id_initial_role" class="form-label small text-muted">{% trans "Rol en la UO" %}</label>
+									<select id="id_initial_role" name="initial_role" class="form-select form-select-sm">
 										{% for code, label in roles %}
 											<option value="{{ code }}" {% if code == 'OPERATOR' %}selected{% endif %}>{{ label }}</option>
 										{% endfor %}

@@ -53,10 +53,10 @@
 					{% csrf_token %}
 
 					<div class="mb-4">
-						<label class="form-label fw-bold text-dark">
+						<label for="id_justification" class="form-label fw-bold text-dark">
 							{% trans "Motivo Justificado de Revocación / Destrucción" %} <span class="text-danger">*</span>
 						</label>
-						<textarea name="justification" class="form-control" rows="3" required placeholder="{% trans 'Indique el motivo legal, técnico o corporativo para clausurar y destruir este documento...' %}"></textarea>
+						<textarea id="id_justification" name="justification" class="form-control" rows="3" required placeholder="{% trans 'Indique el motivo legal, técnico o corporativo para clausurar y destruir este documento...' %}"></textarea>
 						<div class="form-text small text-muted">
 							{% trans "Este motivo quedará registrado de forma inalterable en el historial forense." %}
 						</div>

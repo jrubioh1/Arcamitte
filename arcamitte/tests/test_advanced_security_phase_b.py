@@ -394,7 +394,7 @@ class AdvancedSecurityPhaseBTests(TestCase):
 
         self.assertIsNotNone(receipt.timestamp_token)
         self.assertTrue(len(receipt.timestamp_token) > 0)
-        self.assertEqual(receipt.timestamp_authority, "http://timestamp.digicert.com")
+        self.assertEqual(receipt.timestamp_authority, "https://timestamp.digicert.com")
 
         # Verificar que el servicio verify_export_receipt convalida el sello RFC 3161
         verification = verify_export_receipt(receipt.receipt_id, file_bytes=csv_bytes)
@@ -415,7 +415,7 @@ class AdvancedSecurityPhaseBTests(TestCase):
             exported_by=self.user,
             records_count=10,
             timestamp_token=b64_token,
-            timestamp_authority="http://timestamp.digicert.com",
+            timestamp_authority="https://timestamp.digicert.com",
         )
 
         self.client.force_login(self.user)

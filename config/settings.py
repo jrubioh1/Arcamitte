@@ -44,9 +44,9 @@ if csrf_trusted_origins_str:
     ]
 else:
     CSRF_TRUSTED_ORIGINS = [
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://0.0.0.0:8000",
+        "https://localhost:8000",
+        "https://127.0.0.1:8000",
+        "https://0.0.0.0:8000",
     ]
 
 # Soporte para túneles y balanceadores / proxies inversos (Nginx, Traefik, Docker)
@@ -163,7 +163,7 @@ ARCAMITTE_RFC3161_ENABLED = config.getboolean(
 ARCAMITTE_RFC3161_TSA_URL = config.get(
     "timestamping",
     "rfc3161_tsa_url",
-    fallback="http://timestamp.digicert.com",
+    fallback="https://timestamp.digicert.com",
 ).strip()
 ARCAMITTE_RFC3161_TIMEOUT = config.getint(
     "timestamping", "rfc3161_timeout", fallback=10

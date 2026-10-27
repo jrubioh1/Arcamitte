@@ -88,7 +88,7 @@
 											{% csrf_token %}
 											<input type="hidden" name="action" value="update_role">
 											<input type="hidden" name="membership_id" value="{{ m.id }}">
-											<select name="role" class="form-select form-select-sm" style="min-width: 140px;" onchange="this.form.submit()">
+											<select id="id_role_{{ m.id }}" name="role" aria-label="{% trans 'Rol de miembro en la UO' %}" class="form-select form-select-sm" style="min-width: 140px;" onchange="this.form.submit()">
 												{% for code, label in roles %}
 													<option value="{{ code }}" {% if m.role == code %}selected{% endif %}>{{ label }}</option>
 												{% endfor %}
@@ -241,8 +241,8 @@
 						</div>
 
 						<div class="mb-3">
-							<label class="form-label fw-semibold small mb-1">{% trans "Rol a Asignar en la UO" %}</label>
-							<select name="role" class="form-select form-select-sm" required>
+							<label for="id_new_member_role" class="form-label fw-semibold small mb-1">{% trans "Rol a Asignar en la UO" %}</label>
+							<select id="id_new_member_role" name="role" class="form-select form-select-sm" required>
 								{% for code, label in roles %}
 									<option value="{{ code }}" {% if code == 'OPERATOR' %}selected{% endif %}>{{ label }}</option>
 								{% endfor %}
@@ -270,7 +270,7 @@
 	</div>
 </div>
 
-<script id="available-users-json" type="application/json">{{ available_users_json|safe }}</script>
+{{ available_users_data|json_script:"available-users-json" }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
 	var rawDataEl = document.getElementById('available-users-json');

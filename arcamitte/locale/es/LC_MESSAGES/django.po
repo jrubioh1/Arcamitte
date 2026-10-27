@@ -6580,3 +6580,44 @@ msgstr "Ocurrió un error inesperado al procesar el archivo: %(error)s"
 msgid "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
 msgstr "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
 
+msgid "Buscar dirección IP"
+msgstr "Buscar dirección IP"
+
+msgid "Buscar documentos"
+msgstr "Buscar documentos"
+
+msgid "Buscar en registros de auditoría"
+msgstr "Buscar en registros de auditoría"
+
+msgid "Buscar recibos de auditoría"
+msgstr "Buscar recibos de auditoría"
+
+msgid "Buscar unidades organizativas"
+msgstr "Buscar unidades organizativas"
+
+msgid "Buscar usuario en gobernanza 2FA"
+msgstr "Buscar usuario en gobernanza 2FA"
+
+msgid "Buscar usuarios"
+msgstr "Buscar usuarios"
+
+msgid "Buscar usuarios bloqueados"
+msgstr "Buscar usuarios bloqueados"
+
+msgid "Filtrar por acción de auditoría"
+msgstr "Filtrar por acción de auditoría"
+
+msgid "Filtrar por estado de bloqueo"
+msgstr "Filtrar por estado de bloqueo"
+
+msgid "Filtrar por estado del documento"
+msgstr "Filtrar por estado del documento"
+
+msgid "Filtrar registros"
+msgstr "Filtrar registros"
+
+msgid "Rol de miembro en la UO"
+msgstr "Rol de miembro en la UO"
+
+msgid "Token API generado"
+msgstr "Token API generado"

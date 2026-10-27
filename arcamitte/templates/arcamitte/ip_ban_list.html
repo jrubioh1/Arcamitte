@@ -79,11 +79,11 @@
 			<div class="col-md-7">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" id="ipSearchInput" name="q" value="{{ query|default:'' }}" class="form-control font-mono" placeholder="{% trans 'Buscar por IP o motivo...' %}" autocomplete="off">
+					<input type="text" id="ipSearchInput" name="q" value="{{ query|default:'' }}" aria-label="{% trans 'Buscar dirección IP' %}" class="form-control font-mono" placeholder="{% trans 'Buscar por IP o motivo...' %}" autocomplete="off">
 				</div>
 			</div>
 			<div class="col-md-4">
-				<select id="ipStatusSelect" name="status" class="form-select arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
+				<select id="ipStatusSelect" name="status" aria-label="{% trans 'Filtrar por estado de bloqueo' %}" class="form-select arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
 					<option value="">-- {% trans "Todos los estados" %} --</option>
 					<option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Bloqueo Activo" %}</option>
 					<option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Desactivado / Expirado" %}</option>

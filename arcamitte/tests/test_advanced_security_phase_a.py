@@ -39,23 +39,39 @@ class TOTPCryptographicEngineTests(TestCase):
     """Pruebas del motor criptográfico RFC 6238 / RFC 4226 sin dependencias externas."""
 
     def test_rfc6238_official_appendix_b_vectors(self) -> None:
-        """Verifica los vectores de prueba oficiales de la especificación RFC 6238 Apéndice B."""
-        # Secreto oficial RFC: '12345678901234567890' (20 bytes ASCII)
+        """Verifica los vectores de prueba oficiales de la especificación RFC 6238 Apéndice B con HMAC-SHA256."""
+        # Secreto oficial RFC para SHA-256: '12345678901234567890123456789012' (32 bytes ASCII)
         import base64
 
-        rfc_secret_b32 = base64.b32encode(b"12345678901234567890").decode("ascii")
+        rfc_secret_b32 = base64.b32encode(b"12345678901234567890123456789012").decode("ascii")
 
-        test_cases = [
-            (59, "287082"),
-            (1111111109, "081804"),
-            (1111111111, "050471"),
-            (1234567890, "005924"),
-            (2000000000, "279037"),
+        # Vectores oficiales RFC 6238 Apéndice B (SHA-256, 8 dígitos)
+        test_cases_8_digits = [
+            (59, "46119246"),
+            (1111111109, "68084774"),
+            (1111111111, "67062674"),
+            (1234567890, "91819424"),
+            (2000000000, "90698825"),
         ]
-        for timestamp, expected_code in test_cases:
-            with self.subTest(timestamp=timestamp):
-                code = generate_totp_code(rfc_secret_b32, timestamp=timestamp)
+        for timestamp, expected_code in test_cases_8_digits:
+            with self.subTest(timestamp=timestamp, digits=8):
+                code = generate_totp_code(rfc_secret_b32, timestamp=timestamp, digits=8)
                 self.assertEqual(code, expected_code)
+                self.assertTrue(verify_totp_code(rfc_secret_b32, expected_code, timestamp=timestamp))
+
+        # Vectores estándar de 6 dígitos (módulo 10^6)
+        test_cases_6_digits = [
+            (59, "119246"),
+            (1111111109, "084774"),
+            (1111111111, "062674"),
+            (1234567890, "819424"),
+            (2000000000, "698825"),
+        ]
+        for timestamp, expected_code in test_cases_6_digits:
+            with self.subTest(timestamp=timestamp, digits=6):
+                code = generate_totp_code(rfc_secret_b32, timestamp=timestamp, digits=6)
+                self.assertEqual(code, expected_code)
+                self.assertTrue(verify_totp_code(rfc_secret_b32, expected_code, timestamp=timestamp))
 
     def test_generate_and_verify_totp_code(self) -> None:
         """Comprueba generación de secretos y validación en tiempo constante con ventana de deriva."""
@@ -109,6 +125,7 @@ class TOTPCryptographicEngineTests(TestCase):
         uri = get_totp_uri(secret, username="operador1", issuer="Arcamitte")
         self.assertTrue(uri.startswith("otpauth://totp/Arcamitte%3Aoperador1?"))
         self.assertIn(f"secret={secret}", uri)
+        self.assertIn("algorithm=SHA256", uri)
 
         qr_data_uri = generate_qr_svg_data_uri(uri)
         self.assertTrue(qr_data_uri.startswith("data:image/svg+xml"))

@@ -34,10 +34,10 @@
 					{% csrf_token %}
 
 					<div class="mb-3">
-						<label class="form-label fw-semibold">
+						<label for="id_original_file" class="form-label fw-semibold">
 							{% trans "Archivo Confidencial Original" %} <span class="text-danger">*</span>
 						</label>
-						<input type="file" name="original_file" class="form-control" required accept=".pdf,.docx,.xlsx,.pptx,.odt,.ods,.odp,.doc,.xls,.ppt">
+						<input type="file" id="id_original_file" name="original_file" class="form-control" required accept=".pdf,.docx,.xlsx,.pptx,.odt,.ods,.odp,.doc,.xls,.ppt">
 						<div class="form-text small text-muted">
 							{% trans "Formatos admitidos: PDF, Microsoft Office y LibreOffice." %}
 						</div>
@@ -132,10 +132,10 @@
 					</div>
 
 					<div class="mb-3">
-						<label class="form-label fw-semibold">
+						<label for="id_description" class="form-label fw-semibold">
 							{% trans "Descripción / Asunto del Trámite" %}
 						</label>
-						<textarea name="description" class="form-control" rows="2" placeholder="{% trans 'Documento confidencial tramitado a través de Arcamitte...' %}">{{ description_val }}</textarea>
+						<textarea id="id_description" name="description" class="form-control" rows="2" placeholder="{% trans 'Documento confidencial tramitado a través de Arcamitte...' %}">{{ description_val }}</textarea>
 					</div>
 
 					<div class="row">
@@ -160,10 +160,10 @@
 						</div>
 
 						<div class="col-md-6 mb-3">
-							<label class="form-label fw-semibold">
+							<label for="id_expires_at" class="form-label fw-semibold">
 								{% trans "Fecha y Hora de Caducidad" %}
 							</label>
-							<input type="datetime-local" name="expires_at" class="form-control" value="{{ default_expires_at }}" required>
+							<input type="datetime-local" id="id_expires_at" name="expires_at" class="form-control" value="{{ default_expires_at }}" required>
 							<div class="form-text small text-muted">
 								{% trans "Por defecto 2 semanas. Al expirar, se clausura el canje y se destruye el fichero." %}
 							</div>
@@ -225,6 +225,7 @@
 	</div>
 </div>
 
+{{ allowed_emails_list|json_script:"initial-emails-data" }}
 <script>
 document.addEventListener("DOMContentLoaded", function() {
 	const originSelect = document.getElementById("id_origin_uo");
@@ -246,7 +247,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	let currentMailboxEmail = "";
 	let currentStaffMembers = [];
 
-	const initialEmails = {{ allowed_emails_json|safe }};
+	const initialEmails = JSON.parse(document.getElementById("initial-emails-data") ? document.getElementById("initial-emails-data").textContent : '[""]');
 
 	function escapeHtml(str) {
 		return (str || "").replace(/"/g, '&quot;');

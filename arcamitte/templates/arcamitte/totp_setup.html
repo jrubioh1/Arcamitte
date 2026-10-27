@@ -110,8 +110,8 @@
 								{% trans "Al generar un nuevo juego de códigos de rescate, los códigos anteriores quedarán invalidados inmediatamente." %}
 							</p>
 							<div class="mb-3">
-								<label class="form-label small fw-semibold">{% trans "Código TOTP o Contraseña actual" %}</label>
-								<input type="password" name="confirmation_code" class="form-control" placeholder="{% trans 'Introduzca código de 6 dígitos o su clave' %}" required />
+								<label for="id_confirm_regen_code" class="form-label small fw-semibold">{% trans "Código TOTP o Contraseña actual" %}</label>
+								<input type="password" id="id_confirm_regen_code" name="confirmation_code" class="form-control" placeholder="{% trans 'Introduzca código de 6 dígitos o su clave' %}" required />
 							</div>
 						</div>
 						<div class="modal-footer">
@@ -139,8 +139,8 @@
 								{% trans "Desactivar 2FA reduce la protección de su cuenta frente a ataques de fuerza bruta y phishing de credenciales." %}
 							</div>
 							<div class="mb-3">
-								<label class="form-label small fw-semibold">{% trans "Código TOTP vigente o Contraseña actual" %}</label>
-								<input type="password" name="confirmation_code" class="form-control" placeholder="{% trans 'Introduzca código o contraseña' %}" required />
+								<label for="id_confirm_disable_code" class="form-label small fw-semibold">{% trans "Código TOTP vigente o Contraseña actual" %}</label>
+								<input type="password" id="id_confirm_disable_code" name="confirmation_code" class="form-control" placeholder="{% trans 'Introduzca código o contraseña' %}" required />
 							</div>
 						</div>
 						<div class="modal-footer">
@@ -190,8 +190,9 @@
 						<form method="post" autocomplete="off">
 							{% csrf_token %}
 							<div class="mb-4">
-								<label class="form-label fw-semibold small">{% trans "Código de verificación de 6 dígitos" %}</label>
-								<input class="form-control form-control-lg text-center fw-bold letter-spacing-1" 
+								<label for="id_totp_enroll_code" class="form-label fw-semibold small">{% trans "Código de verificación de 6 dígitos" %}</label>
+								<input id="id_totp_enroll_code"
+								       class="form-control form-control-lg text-center fw-bold letter-spacing-1" 
 								       type="text" 
 								       name="code" 
 								       placeholder="000000" 

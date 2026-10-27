@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import activate, check_for_language, gettext as _
 from django.views import View
+from django.views.decorators.http import require_http_methods
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -60,6 +61,7 @@ logger = logging.getLogger(__name__)
 
 
 
+@require_http_methods(["GET", "POST"])
 def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
     """Cambia el idioma activo de la interfaz y redirige a la vista previa."""
     lang_code = request.GET.get("lang") or request.POST.get("language")
@@ -270,15 +272,15 @@ class RedeemOtpView(ArcamitteI18nViewMixin, View):
 
     def _resolve_credentials(self, request: HttpRequest) -> Tuple[str, str]:
         file_hash = (
-            request.GET.get("hash")
-            or request.POST.get("file_hash")
+            request.POST.get("file_hash")
             or request.session.get("arcamitte_file_hash")
+            or request.GET.get("hash")
             or ""
         ).strip().lower()
 
+        # Mitigación SonarCloud S8435: No enviar ni extraer datos sensibles (email) en query params de URL
         email = (
-            request.GET.get("email")
-            or request.POST.get("email")
+            request.POST.get("email")
             or request.session.get("arcamitte_email")
             or ""
         ).strip().lower()

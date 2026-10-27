@@ -746,8 +746,11 @@ class ArcamitteViewsSecurityTestCase(TestCase):
         self.assertContains(resp_en, "Document Identifier (SHA-256 Hash)")
         self.assertContains(resp_en, "Email Address")
 
-        # 3. Vista descargar en inglés
-        redeem_url = reverse("arcamitte:redeem-otp") + f"?hash={self.document.file_hash}&email={self.allowed_email}"
+        # 3. Vista descargar en inglés (email transmitido por sesión segura, sin query param sensible)
+        session = self.client.session
+        session["arcamitte_email"] = self.allowed_email
+        session.save()
+        redeem_url = reverse("arcamitte:redeem-otp") + f"?hash={self.document.file_hash}"
         resp_redeem_en = self.client.get(redeem_url)
         self.assertEqual(resp_redeem_en.status_code, 200)
         self.assertContains(resp_redeem_en, "Document Verification and Download")

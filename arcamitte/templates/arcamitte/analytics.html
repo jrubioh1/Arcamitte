@@ -119,9 +119,9 @@
 
 			<!-- Rango Manual personalizado (reactivo al elegir ambas fechas) -->
 			<div id="customDateContainer" class="d-none d-flex align-items-center gap-2 ms-auto">
-				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Desde' %}" title="{% trans 'Fecha Inicio' %}">
+				<input type="date" id="dateFromInput" aria-label="{% trans 'Fecha Inicio' %}" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Desde' %}" title="{% trans 'Fecha Inicio' %}">
 				<span class="text-muted small">&rarr;</span>
-				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Hasta' %}" title="{% trans 'Fecha Fin' %}">
+				<input type="date" id="dateToInput" aria-label="{% trans 'Fecha Fin' %}" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Hasta' %}" title="{% trans 'Fecha Fin' %}">
 			</div>
 		</div>
 
@@ -129,10 +129,10 @@
 		<div class="row g-2 align-items-end">
 			<!-- Selector de UO (incluyendo Asientos sin UO de origen) -->
 			<div class="col-lg-3 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
-				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+				<label for="uoFilterSelect" class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
 					<i data-feather="grid" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Unidad Organizativa" %}</span>
 				</label>
-				<select id="uoFilterSelect" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar UO...' %}">
+				<select id="uoFilterSelect" aria-label="{% trans 'Unidad Organizativa' %}" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar UO...' %}">
 					{% if is_global_admin %}
 						<option value="" {% if not selected_uo %}selected{% endif %}>
 							-- {% trans "Toda la Organización (Global)" %} --
@@ -155,10 +155,10 @@
 
 			<!-- Rol en el Trámite (Origen / Destino) -->
 			<div class="col-lg-2 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
-				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+				<label for="uoRoleFilterSelect" class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
 					<i data-feather="repeat" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Intervención UO" %}</span>
 				</label>
-				<select id="uoRoleFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Origen o Destino' %}">
+				<select id="uoRoleFilterSelect" aria-label="{% trans 'Intervención UO' %}" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Origen o Destino' %}">
 					<option value="all" {% if selected_uo_role == "all" %}selected{% endif %}>{% trans "Origen o Destino" %}</option>
 					<option value="origin" {% if selected_uo_role == "origin" %}selected{% endif %}>{% trans "Solo Emisora (Origen)" %}</option>
 					<option value="target" {% if selected_uo_role == "target" %}selected{% endif %}>{% trans "Solo Receptora (Destino)" %}</option>
@@ -167,10 +167,10 @@
 
 			<!-- Selector de Usuario -->
 			<div class="col-lg-2 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
-				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+				<label for="userFilterSelect" class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
 					<i data-feather="user" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Usuario" %}</span>
 				</label>
-				<select id="userFilterSelect" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar usuario...' %}">
+				<select id="userFilterSelect" aria-label="{% trans 'Usuario' %}" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar usuario...' %}">
 					<option value="" {% if not selected_user %}selected{% endif %}>-- {% trans "Todos los Usuarios" %} --</option>
 					{% for u in analytics_users %}
 						<option value="{{ u.username }}" {% if selected_user == u.username %}selected{% endif %}>
@@ -182,10 +182,10 @@
 
 			<!-- Política BAR -->
 			<div class="col-lg-3 col-md-6 col-sm-6 d-flex flex-column justify-content-end">
-				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+				<label for="burnPolicyFilterSelect" class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
 					<i data-feather="flame" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Política Destrucción (BAR)" %}</span>
 				</label>
-				<select id="burnPolicyFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todas las políticas' %}">
+				<select id="burnPolicyFilterSelect" aria-label="{% trans 'Política Destrucción (BAR)' %}" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todas las políticas' %}">
 					<option value="" {% if not selected_burn_policy %}selected{% endif %}>-- {% trans "Todas las políticas" %} --</option>
 					{% for val, label in burn_policy_choices %}
 						<option value="{{ val }}" {% if selected_burn_policy == val %}selected{% endif %}>{{ label }}</option>
@@ -195,10 +195,10 @@
 
 			<!-- Estado Documental -->
 			<div class="col-lg-2 col-md-6 col-sm-6 d-flex flex-column justify-content-end">
-				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+				<label for="statusFilterSelect" class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
 					<i data-feather="check-circle" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Estado Documental" %}</span>
 				</label>
-				<select id="statusFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
+				<select id="statusFilterSelect" aria-label="{% trans 'Estado Documental' %}" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
 					<option value="" {% if not selected_status %}selected{% endif %}>-- {% trans "Todos los estados" %} --</option>
 					<option value="active" {% if selected_status == "active" %}selected{% endif %}>{% trans "En Custodia Activa" %}</option>
 					<option value="consumed" {% if selected_status == "consumed" %}selected{% endif %}>{% trans "Destruidos por Canje (BAR)" %}</option>
@@ -397,7 +397,7 @@
 					<span class="input-group-text bg-light text-muted border-end-0">
 						<i data-feather="search" style="width:13px;height:13px;"></i>
 					</span>
-					<input type="search" id="drilldownSearchInput" class="form-control form-control-sm border-start-0" placeholder="{% trans 'Filtrar rápidamente en estos registros por nombre, hash, departamento, IP...' %}">
+					<input type="search" id="drilldownSearchInput" aria-label="{% trans 'Filtrar registros' %}" class="form-control form-control-sm border-start-0" placeholder="{% trans 'Filtrar rápidamente en estos registros por nombre, hash, departamento, IP...' %}">
 				</div>
 				<span id="drilldownFilterCounter" class="text-muted small text-nowrap"></span>
 			</div>
@@ -438,7 +438,7 @@
 
 {% block extra_js %}
 <!-- Apache ECharts 5.5.1 -->
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR" crossorigin="anonymous"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
 	// 1. Instancias de Apache ECharts

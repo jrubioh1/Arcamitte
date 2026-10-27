@@ -1560,6 +1560,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 "uo": uo,
                 "memberships": memberships,
                 "available_users": available_users,
+                "available_users_data": available_users_data,
                 "available_users_json": json.dumps(available_users_data),
                 "roles": UserUOMembership.Role.choices,
                 "active_nav": "uos",
@@ -3492,7 +3493,16 @@ class DashboardUserReset2FAView(LoginRequiredMixin, View):
             )
             % {"username": target.username},
         )
-        next_url = request.POST.get("next") or reverse("dashboard:2fa_governance")
+        raw_next = request.POST.get("next")
+        default_url = reverse("dashboard:2fa_governance")
+        if raw_next and url_has_allowed_host_and_scheme(
+            url=raw_next,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = raw_next
+        else:
+            next_url = default_url
         return redirect(next_url)
 
 

@@ -53,7 +53,7 @@ def get_totp_uri(
     params = {
         "secret": clean_secret,
         "issuer": issuer,
-        "algorithm": "SHA1",
+        "algorithm": "SHA256",
         "digits": "6",
         "period": "30",
     }
@@ -64,9 +64,10 @@ def generate_totp_code(
     secret: str,
     timestamp: int | None = None,
     interval: int = 30,
+    digits: int = 6,
 ) -> str:
     """
-    Calcula el código TOTP de 6 dígitos en un instante temporal según RFC 6238 / RFC 4226.
+    Calcula el código TOTP en un instante temporal según RFC 6238 / RFC 4226 con HMAC-SHA256.
     """
     current_time = int(time.time()) if timestamp is None else timestamp
     counter = current_time // interval
@@ -74,13 +75,14 @@ def generate_totp_code(
     key_bytes = _normalize_b32_secret(secret)
     msg_bytes = struct.pack(">Q", counter)
 
-    hmac_digest = hmac.new(key_bytes, msg_bytes, hashlib.sha1).digest()
-    offset = hmac_digest[19] & 0x0F
+    hmac_digest = hmac.new(key_bytes, msg_bytes, hashlib.sha256).digest()
+    offset = hmac_digest[-1] & 0x0F
     truncated_hash = (
         struct.unpack(">I", hmac_digest[offset : offset + 4])[0] & 0x7FFFFFFF
     )
-    code = truncated_hash % 1_000_000
-    return f"{code:06d}"
+    modulo = 10**digits
+    code = truncated_hash % modulo
+    return f"{code:0{digits}d}"
 
 
 def verify_totp_code(
@@ -97,7 +99,7 @@ def verify_totp_code(
         return False
 
     clean_code = code.strip().replace(" ", "").replace("-", "")
-    if len(clean_code) != 6 or not clean_code.isdigit():
+    if len(clean_code) not in (6, 8) or not clean_code.isdigit():
         return False
 
     current_time = int(time.time()) if timestamp is None else timestamp
@@ -108,15 +110,18 @@ def verify_totp_code(
     except Exception:
         return False
 
+    digits = len(clean_code)
+    modulo = 10**digits
+
     for step in range(-window, window + 1):
         counter = current_counter + step
         msg_bytes = struct.pack(">Q", counter)
-        hmac_digest = hmac.new(key_bytes, msg_bytes, hashlib.sha1).digest()
-        offset = hmac_digest[19] & 0x0F
+        hmac_digest = hmac.new(key_bytes, msg_bytes, hashlib.sha256).digest()
+        offset = hmac_digest[-1] & 0x0F
         truncated_hash = (
             struct.unpack(">I", hmac_digest[offset : offset + 4])[0] & 0x7FFFFFFF
         )
-        candidate = f"{(truncated_hash % 1_000_000):06d}"
+        candidate = f"{(truncated_hash % modulo):0{digits}d}"
 
         if hmac.compare_digest(candidate, clean_code):
             return True

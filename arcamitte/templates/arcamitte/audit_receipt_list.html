@@ -34,7 +34,7 @@
 			<div class="col-md-11">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" id="receiptSearchInput" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por código de recibo, hash SHA-256, operador o justificación legal...' %}" autocomplete="off">
+					<input type="text" id="receiptSearchInput" name="q" value="{{ query|default:'' }}" aria-label="{% trans 'Buscar recibos de auditoría' %}" class="form-control" placeholder="{% trans 'Buscar por código de recibo, hash SHA-256, operador o justificación legal...' %}" autocomplete="off">
 				</div>
 			</div>
 			<div class="col-md-1">

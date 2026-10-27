@@ -90,32 +90,32 @@
 						<table class="table table-sm table-borderless small mb-0">
 							<tbody>
 								<tr>
-									<td class="text-muted fw-bold" style="width:40%;">{% trans "Código de Recibo:" %}</td>
+									<th scope="row" class="text-muted fw-bold" style="width:40%;">{% trans "Código de Recibo:" %}</th>
 									<td class="font-mono fw-bold text-dark">{{ result.receipt_id }}</td>
 								</tr>
 								<tr>
-									<td class="text-muted fw-bold">{% trans "Fecha de Emisión:" %}</td>
+									<th scope="row" class="text-muted fw-bold">{% trans "Fecha de Emisión:" %}</th>
 									<td class="font-mono text-dark">{{ result.created_at|date:"d/m/Y H:i:s" }} UTC</td>
 								</tr>
 								<tr>
-									<td class="text-muted fw-bold">{% trans "Operador Responsable:" %}</td>
+									<th scope="row" class="text-muted fw-bold">{% trans "Operador Responsable:" %}</th>
 									<td>{{ result.exported_by }}</td>
 								</tr>
 								<tr>
-									<td class="text-muted fw-bold">{% trans "Registros Certificados:" %}</td>
+									<th scope="row" class="text-muted fw-bold">{% trans "Registros Certificados:" %}</th>
 									<td>{{ result.records_count }}</td>
 								</tr>
 								<tr>
-									<td class="text-muted fw-bold">{% trans "Motivo Legal Declarado:" %}</td>
+									<th scope="row" class="text-muted fw-bold">{% trans "Motivo Legal Declarado:" %}</th>
 									<td class="text-break">{{ result.reason|default:"-" }}</td>
 								</tr>
 								<tr>
-									<td class="text-muted fw-bold">{% trans "Hash Oficial Registrado:" %}</td>
+									<th scope="row" class="text-muted fw-bold">{% trans "Hash Oficial Registrado:" %}</th>
 									<td><code class="font-mono text-primary text-break" style="font-size:0.75rem;">{{ result.expected_hash }}</code></td>
 								</tr>
 								{% if result.computed_hash %}
 									<tr>
-										<td class="text-muted fw-bold">{% trans "Hash del Archivo Subido:" %}</td>
+										<th scope="row" class="text-muted fw-bold">{% trans "Hash del Archivo Subido:" %}</th>
 										<td>
 											<code class="font-mono {% if result.hash_match %}text-success{% else %}text-danger{% endif %} text-break" style="font-size:0.75rem;">
 												{{ result.computed_hash }}
@@ -125,7 +125,7 @@
 								{% endif %}
 								{% if result.timestamp_verification.has_timestamp %}
 									<tr>
-										<td class="text-muted fw-bold">{% trans "Sello de Tiempo RFC 3161:" %}</td>
+										<th scope="row" class="text-muted fw-bold">{% trans "Sello de Tiempo RFC 3161:" %}</th>
 										<td>
 											{% if result.timestamp_verification.is_valid %}
 												<span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">

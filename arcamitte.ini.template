@@ -86,7 +86,7 @@ clamav_fail_open = false
 # Sellado Criptográfico Cualificado de Tiempo (RFC 3161 / eIDAS / ENS ALTO)
 rfc3161_enabled = false
 # URL de la Autoridad de Sellado de Tiempo (TSA) conforme a RFC 3161
-rfc3161_tsa_url = http://timestamp.digicert.com
+rfc3161_tsa_url = https://timestamp.digicert.com
 rfc3161_timeout = 10
 
 [email]

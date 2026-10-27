@@ -294,6 +294,7 @@ def record_audit_log(
     document: Any = None,
     origin_uo: Any = None,
     target_uo: Any = None,
+    ip_address: str | None = None,
 ) -> Any:
     """
     Crea y persiste un registro de auditoría en DocumentAccessLog con encadenamiento
@@ -302,6 +303,8 @@ def record_audit_log(
     import json
     from django.core.serializers.json import DjangoJSONEncoder
     from arcamitte.models import DocumentAccessLog
+
+    effective_ip = ip or ip_address
 
     details_str = (
         json.dumps(details, ensure_ascii=False, cls=DjangoJSONEncoder)
@@ -315,7 +318,7 @@ def record_audit_log(
         details=details_str,
         origin_uo=origin_uo,
         target_uo=target_uo,
-        ip_address=ip,
+        ip_address=effective_ip,
         user_agent=user_agent,
     )
 
@@ -827,7 +830,7 @@ def request_document_access(
         hashlib.pbkdf2_hmac(
             "sha256",
             clean_email.encode("utf-8"),
-            b"arcamitte_timing_salt",
+            secrets.token_bytes(16),
             TIMING_ATTACK_PBKDF2_ITERATIONS,
         )
         return True, GENERIC_ACCESS_MESSAGE
@@ -838,7 +841,7 @@ def request_document_access(
         hashlib.pbkdf2_hmac(
             "sha256",
             b"invalid_email",
-            b"arcamitte_timing_salt",
+            secrets.token_bytes(16),
             TIMING_ATTACK_PBKDF2_ITERATIONS,
         )
         return True, GENERIC_ACCESS_MESSAGE
@@ -849,7 +852,7 @@ def request_document_access(
         hashlib.pbkdf2_hmac(
             "sha256",
             normalized_email.encode("utf-8"),
-            b"arcamitte_timing_salt",
+            secrets.token_bytes(16),
             TIMING_ATTACK_PBKDF2_ITERATIONS,
         )
         return True, GENERIC_ACCESS_MESSAGE
@@ -859,7 +862,7 @@ def request_document_access(
         hashlib.pbkdf2_hmac(
             "sha256",
             normalized_email.encode("utf-8"),
-            b"arcamitte_timing_salt",
+            secrets.token_bytes(16),
             TIMING_ATTACK_PBKDF2_ITERATIONS,
         )
         return True, GENERIC_ACCESS_MESSAGE
@@ -1046,7 +1049,7 @@ def request_document_access(
     hashlib.pbkdf2_hmac(
         "sha256",
         normalized_email.encode("utf-8"),
-        b"arcamitte_timing_salt",
+        secrets.token_bytes(16),
         TIMING_ATTACK_PBKDF2_ITERATIONS,
     )
     return True, GENERIC_ACCESS_MESSAGE
@@ -1060,7 +1063,7 @@ def generate_corporate_email_text(
     incluyendo nombre del archivo, descripción, identificador SHA-256 e instrucciones de acceso.
     """
     url_root = (
-        base_url or getattr(settings, "ARCAMITTE_BASE_URL", "http://127.0.0.1:8000")
+        base_url or getattr(settings, "ARCAMITTE_BASE_URL", "https://127.0.0.1:8000")
     ).rstrip("/")
     solicitar_url = f"{url_root}/arcamitte/solicitar/?hash={document.file_hash}"
     policy_desc = (
@@ -2103,7 +2106,10 @@ def generate_secure_temporary_password(length: int = 14) -> str:
     for _idx in range(length - len(pwd_chars)):
         pwd_chars.append(secrets.choice(all_chars))
 
-    secrets.SystemRandom().shuffle(pwd_chars)
+    # Barajado criptográfico seguro (Fisher-Yates) evitando generadores pseudoaleatorios (SonarCloud S2245)
+    for i in range(len(pwd_chars) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        pwd_chars[i], pwd_chars[j] = pwd_chars[j], pwd_chars[i]
     return "".join(pwd_chars)
 
 
@@ -2883,7 +2889,7 @@ def create_certified_audit_export(
             tsr_bytes = request_rfc3161_timestamp(bytes.fromhex(export_hash))
             timestamp_token_b64 = token_to_base64(tsr_bytes)
             tsa_authority = getattr(
-                settings, "ARCAMITTE_RFC3161_TSA_URL", "http://timestamp.digicert.com"
+                settings, "ARCAMITTE_RFC3161_TSA_URL", "https://timestamp.digicert.com"
             )
         except TimestampingError as ts_exc:
             logger.warning(
@@ -3079,6 +3085,7 @@ def dispatch_siem_event(
     details: dict[str, Any],
     actor: str = "Sistema",
     ip: str | None = None,
+    ip_address: str | None = None,
 ) -> None:
     """
     Despacha un evento de telemetría de seguridad en formato JSON estructurado hacia
@@ -3093,11 +3100,12 @@ def dispatch_siem_event(
     if event_type.lower() not in [e.lower() for e in subscribed_events]:
         return
 
+    effective_ip = ip or ip_address
     payload = {
         "timestamp": timezone.now().isoformat(),
         "event": event_type.upper(),
         "actor": actor,
-        "client_ip": ip or "127.0.0.1",
+        "client_ip": effective_ip or "127.0.0.1",
         "service": "arcamitte",
         "details": details,
     }

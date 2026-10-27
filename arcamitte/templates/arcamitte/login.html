@@ -15,7 +15,7 @@
 
 	<script src="https://cdn.tailwindcss.com"></script>
 	<script>tailwind.config = { corePlugins: { preflight: false } };</script>
-	<link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+	<link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" integrity="sha384-+Bl0lf5p8/ohqkq+KZo/rczUOIZfQpTE+zDHmmjdpnuuLiXwLaTmgCPIYAho9GqV" crossorigin="anonymous" />
 	<link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
 </head>
 
@@ -68,17 +68,17 @@
 							<form method="post" autocomplete="off">
 								{% csrf_token %}
 								<div class="mb-3">
-									<label class="form-label fw-semibold small">{% trans "Usuario" %}</label>
-									<input class="form-control" type="text" name="username" placeholder="{% trans 'Introduzca su usuario' %}" autofocus required />
+									<label for="id_username" class="form-label fw-semibold small">{% trans "Usuario" %}</label>
+									<input id="id_username" class="form-control" type="text" name="username" placeholder="{% trans 'Introduzca su usuario' %}" autofocus required />
 								</div>
 								<div class="mb-3">
 									<div class="d-flex justify-content-between align-items-center mb-1">
-										<label class="form-label fw-semibold small mb-0">{% trans "Contraseña" %}</label>
+										<label for="id_password" class="form-label fw-semibold small mb-0">{% trans "Contraseña" %}</label>
 										<a href="{% url 'dashboard:password_reset_request' %}" class="small text-muted text-decoration-none">
 											{% trans "¿Olvidó su contraseña?" %}
 										</a>
 									</div>
-									<input class="form-control" type="password" name="password" placeholder="{% trans 'Introduzca su contraseña' %}" required />
+									<input id="id_password" class="form-control" type="password" name="password" placeholder="{% trans 'Introduzca su contraseña' %}" required />
 								</div>
 								<div class="d-grid mt-4">
 									<button type="submit" class="btn btn-primary">
@@ -100,7 +100,7 @@
 		</div>
 	</main>
 
-	<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js" integrity="sha384-1kLJYX46ZnwQlslYwA2oUgv/EzbmdyB4kkcJ7y1lTUYKb8kIKDM0o8JAUE0iBnii" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js" integrity="sha384-qEqAs1VsN9WH2myXDbiP2wGGIttL9bMRZBKCl54ZnzpDlVqbYANP9vMaoT/wvQcf" crossorigin="anonymous"></script>
 	<script src="{% static 'arcamitte/js/arcamitte.js' %}"></script>
 </body>

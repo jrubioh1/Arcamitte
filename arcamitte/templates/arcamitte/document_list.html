@@ -27,11 +27,11 @@
 			<div class="col-md-7">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" id="docSearchInput" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por nombre, hash SHA-256 o descripción...' %}" autocomplete="off">
+					<input type="text" id="docSearchInput" name="q" value="{{ query|default:'' }}" aria-label="{% trans 'Buscar documentos' %}" class="form-control" placeholder="{% trans 'Buscar por nombre, hash SHA-256 o descripción...' %}" autocomplete="off">
 				</div>
 			</div>
 			<div class="col-md-4">
-				<select id="docStatusSelect" name="status" class="form-select arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
+				<select id="docStatusSelect" name="status" aria-label="{% trans 'Filtrar por estado del documento' %}" class="form-select arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
 					<option value="">-- {% trans "Todos los estados" %} --</option>
 					<option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Activos (Pendientes de canje)" %}</option>
 					<option value="consumed" {% if status_filter == 'consumed' %}selected{% endif %}>{% trans "Consumidos (Destruidos en disco)" %}</option>

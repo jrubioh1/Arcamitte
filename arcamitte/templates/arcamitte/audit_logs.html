@@ -84,11 +84,11 @@
 			<div class="col-md-7">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" id="auditSearchInput" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por IP, hash, correo o detalles...' %}" autocomplete="off">
+					<input type="text" id="auditSearchInput" name="q" value="{{ query|default:'' }}" aria-label="{% trans 'Buscar en registros de auditoría' %}" class="form-control" placeholder="{% trans 'Buscar por IP, hash, correo o detalles...' %}" autocomplete="off">
 				</div>
 			</div>
 			<div class="col-md-4">
-				<select id="auditActionSelect" name="action" class="form-select arca-searchable-select" data-placeholder="{% trans 'Escribir o seleccionar acción...' %}">
+				<select id="auditActionSelect" name="action" aria-label="{% trans 'Filtrar por acción de auditoría' %}" class="form-select arca-searchable-select" data-placeholder="{% trans 'Escribir o seleccionar acción...' %}">
 					<option value="">-- {% trans "Todas las acciones" %} --</option>
 					{% for val, label in action_choices %}
 						<option value="{{ val }}" {% if action_filter == val %}selected{% endif %}>{{ label }}</option>
