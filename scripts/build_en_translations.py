@@ -9,6 +9,7 @@ Builds and compiles 100% complete English (en) and Spanish (es) gettext catalogs
 """
 
 import ast
+import os
 import re
 import struct
 from pathlib import Path
@@ -776,13 +777,22 @@ def unescape_po_string(val: str) -> str:
     return val.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
 
 
-def _ensure_safe_repo_path(path: Path) -> Path:
-    """Verifica de forma canónica que la ruta resida dentro del repositorio (Anti-Path Traversal CWE-22)."""
-    repo_root = Path(__file__).resolve().parent.parent
-    resolved = path.resolve()
-    if not resolved.is_relative_to(repo_root):
-        raise ValueError(f"Path traversal detected: {path}")
-    return resolved
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _resolve_safe_catalog_path(path: Path, expected_name: str, lang: str) -> Path:
+    """
+    Resuelve y valida estrictamente una ruta de catálogo gettext eliminando cualquier riesgo
+    de Path Traversal (CWE-22 / SonarCloud S2083) mediante sanitización con os.path.basename.
+    """
+    clean_name = os.path.basename(str(path))
+    if clean_name != expected_name:
+        raise ValueError(f"Nombre de archivo no permitido: {clean_name}")
+    clean_lang = "en" if lang == "en" else "es"
+    safe_path = (REPO_ROOT / "arcamitte" / "locale" / clean_lang / "LC_MESSAGES" / clean_name).resolve()
+    if not safe_path.is_relative_to(REPO_ROOT):
+        raise ValueError(f"Path traversal detectado: {safe_path}")
+    return safe_path
 
 
 def update_po_file(po_path: Path, code_msgids: set[str], lang: str) -> tuple[int, int]:
@@ -792,9 +802,9 @@ def update_po_file(po_path: Path, code_msgids: set[str], lang: str) -> tuple[int
     - Fills empty or fuzzy msgstr values (using TRANSLATIONS for 'en', or identity for 'es')
     - Appends any missing msgids from code_msgids
     """
-    po_path = _ensure_safe_repo_path(po_path)
+    safe_po_file = _resolve_safe_catalog_path(po_path, "django.po", lang)
 
-    content = po_path.read_text(encoding="utf-8")
+    content = safe_po_file.read_text(encoding="utf-8")
     blocks = content.split("\n\n")
     updated_blocks = []
     seen_msgids = set()
@@ -887,7 +897,7 @@ def update_po_file(po_path: Path, code_msgids: set[str], lang: str) -> tuple[int
         seen_msgids.add(m)
         added_count += 1
 
-    po_path.write_text("\n\n".join(updated_blocks) + "\n", encoding="utf-8")
+    safe_po_file.write_text("\n\n".join(updated_blocks) + "\n", encoding="utf-8")
     return updated_count, added_count
 
 
@@ -896,10 +906,11 @@ def compile_mo_file(po_path: Path, mo_path: Path) -> int:
     Pure-Python GNU gettext .mo binary compiler.
     Reads a UTF-8 .po file and writes a valid little-endian .mo binary file.
     """
-    po_path = _ensure_safe_repo_path(po_path)
-    mo_path = _ensure_safe_repo_path(mo_path)
+    clean_lang = "en" if "en" in str(po_path) else "es"
+    safe_po_file = _resolve_safe_catalog_path(po_path, "django.po", clean_lang)
+    safe_mo_file = _resolve_safe_catalog_path(mo_path, "django.mo", clean_lang)
 
-    content = po_path.read_text(encoding="utf-8")
+    content = safe_po_file.read_text(encoding="utf-8")
     blocks = content.split("\n\n")
     messages: dict[str, str] = {}
 
@@ -982,7 +993,7 @@ def compile_mo_file(po_path: Path, mo_path: Path) -> int:
     output += ids_bytes
     output += strs_bytes
 
-    mo_path.write_bytes(output)
+    safe_mo_file.write_bytes(output)
     return n
 
 

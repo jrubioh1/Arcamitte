@@ -65,10 +65,13 @@ from arcamitte.services import (
 
 User = get_user_model()
 
+from arcamitte.security_utils import (
+    redirect_to_next_or_default,
+    safe_redirect,
+)
 from arcamitte.utils import (
     apply_no_store_headers,
     get_client_ip,
-    safe_redirect,
     sanitize_content_disposition_filename,
 )
 from arcamitte.validators import (
@@ -1974,11 +1977,8 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
         else:
             messages.error(request, msg)
 
-        fallback_url = reverse("dashboard:user_list")
-        return safe_redirect(
-            request,
-            target_url=request.POST.get("next") or request.META.get("HTTP_REFERER"),
-            default_url=fallback_url,
+        return redirect_to_next_or_default(
+            request, default_url=reverse("dashboard:user_list")
         )
 
 
@@ -3161,11 +3161,8 @@ class DashboardUserUnlockView(LoginRequiredMixin, View):
             % {"username": target.username},
         )
 
-        fallback_url = reverse("dashboard:user_list")
-        return safe_redirect(
-            request,
-            target_url=request.POST.get("next") or request.META.get("HTTP_REFERER"),
-            default_url=fallback_url,
+        return redirect_to_next_or_default(
+            request, default_url=reverse("dashboard:user_list")
         )
 
 

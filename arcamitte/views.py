@@ -50,10 +50,13 @@ from arcamitte.services import (
     request_document_access,
     upload_and_encrypt_document,
 )
+from arcamitte.security_utils import (
+    handle_api_exception,
+    redirect_to_next_or_default,
+)
 from arcamitte.utils import (
     apply_no_store_headers,
     get_client_ip,
-    safe_redirect,
     sanitize_content_disposition_filename,
 )
 
@@ -70,8 +73,7 @@ def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
     except Exception:
         fallback_url = "/arcamitte/solicitar/"
 
-    raw_target = request.GET.get("next") or request.META.get("HTTP_REFERER")
-    response = safe_redirect(request, target_url=raw_target, default_url=fallback_url)
+    response = redirect_to_next_or_default(request, default_url=fallback_url)
 
     # Sanitización de cookie contra la lista estática y confiable de idiomas configurados
     valid_lang = None
@@ -573,10 +575,11 @@ class APIDocumentRootView(APIView):
                 uploaded_by=uploader_user,
             )
         except Exception as exc:
-            logger.error("[ARCAMITTE API ERROR] Fallo al procesar subida de documento: %s", exc, exc_info=True)
-            return Response(
-                {"error": _("Ha ocurrido un error al procesar y cifrar el documento.")},
-                status=status.HTTP_400_BAD_REQUEST,
+            return handle_api_exception(
+                exc,
+                log_message="[ARCAMITTE API ERROR] Fallo al procesar subida de documento",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                user_message=_("Ha ocurrido un error al procesar y cifrar el documento."),
             )
 
         return Response(

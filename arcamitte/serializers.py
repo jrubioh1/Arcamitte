@@ -27,6 +27,21 @@ def _handle_validation_error(exc: Exception, user_message: str, field_name: str 
     raise serializers.ValidationError(user_message)
 
 
+def validate_safe_serializer_email(value: str) -> str:
+    """Valida un correo electrónico corporativo de forma segura y centralizada."""
+    try:
+        return validate_safe_email(value)
+    except DjangoValidationError as exc:
+        _handle_validation_error(
+            exc,
+            _("El correo electrónico introducido no es válido o no cumple los requisitos corporativos."),
+            "email",
+        )
+    except Exception as exc:
+        logger.error("Error inesperado validando email: %s", exc, exc_info=True)
+        raise serializers.ValidationError(_("Error al validar el correo electrónico."))
+
+
 @extend_schema_field(serializers.ListField(child=serializers.EmailField()))
 class EmailListField(serializers.Field):
     """
@@ -85,17 +100,7 @@ class PublicAccessRequestSerializer(serializers.Serializer):
         return clean
 
     def validate_email(self, value: str) -> str:
-        try:
-            return validate_safe_email(value)
-        except DjangoValidationError as exc:
-            _handle_validation_error(
-                exc,
-                _("El correo electrónico introducido no es válido o no cumple los requisitos corporativos."),
-                "email",
-            )
-        except Exception as exc:
-            logger.error("Error inesperado validando email: %s", exc, exc_info=True)
-            raise serializers.ValidationError(_("Error al validar el correo electrónico."))
+        return validate_safe_serializer_email(value)
 
 
 class PublicConsumeSerializer(serializers.Serializer):
@@ -130,17 +135,7 @@ class PublicConsumeSerializer(serializers.Serializer):
         return clean
 
     def validate_email(self, value: str) -> str:
-        try:
-            return validate_safe_email(value)
-        except DjangoValidationError as exc:
-            _handle_validation_error(
-                exc,
-                _("El correo electrónico introducido no es válido o no cumple los requisitos corporativos."),
-                "email",
-            )
-        except Exception as exc:
-            logger.error("Error inesperado validando email: %s", exc, exc_info=True)
-            raise serializers.ValidationError(_("Error al validar el correo electrónico."))
+        return validate_safe_serializer_email(value)
 
     def validate_otp_code(self, value: str) -> str:
         clean = (value or "").strip()

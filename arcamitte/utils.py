@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import hashlib
 import ipaddress
 import os
 import re
 from typing import Any, Optional
 
 from django.conf import settings
-from django.http import HttpRequest, HttpResponseRedirect
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.http import HttpRequest
 
 
 def _validate_ip_string(raw_ip: Optional[str]) -> Optional[str]:
@@ -68,46 +66,22 @@ def apply_no_store_headers(response: Any) -> Any:
     return response
 
 
-def get_safe_redirect_url(
-    request: HttpRequest,
-    target_url: Optional[str] = None,
-    default_url: str = "/",
-    disallowed_substrings: tuple[str, ...] = ("set-language",),
-) -> str:
-    """
-    Resuelve y valida una URL de redirección interna evitando ataques de Open Redirect (CWE-601 / OWASP A01).
-    Si el destino no pertenece al host actual o contiene secuencias no permitidas, retorna default_url.
-    """
-    candidate = (target_url or "").strip()
-    if not candidate:
-        return default_url
+# Re-export centralizado de utilidades de seguridad para evitar duplicación
+from arcamitte.security_utils import (  # noqa: E402
+    get_safe_redirect_url,
+    handle_api_exception,
+    hash_api_token,
+    redirect_to_next_or_default,
+    safe_redirect,
+)
 
-    for disallowed in disallowed_substrings:
-        if disallowed in candidate:
-            return default_url
-
-    if url_has_allowed_host_and_scheme(
-        url=candidate,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ):
-        return candidate
-    return default_url
-
-
-def safe_redirect(
-    request: HttpRequest,
-    target_url: Optional[str] = None,
-    default_url: str = "/",
-) -> HttpResponseRedirect:
-    """Ejecuta una redirección segura HTTP garantizando un destino interno validado."""
-    return HttpResponseRedirect(get_safe_redirect_url(request, target_url, default_url))
-
-
-def hash_api_token(raw_key: str) -> str:
-    """
-    Calcula el hash criptográfico SHA-256 para almacenamiento y autenticación de API Tokens (NIST SP 800-107).
-    Los tokens de Arcamitte se generan con 256 bits de entropía pseudoaleatoria criptográfica (secrets.token_urlsafe).
-    """
-    # CodeQL [py/weak-cryptographic-hash] SHA-256 es el estándar formal para tokens M2M de alta entropía (NIST SP 800-107)
-    return hashlib.sha256(raw_key.strip().encode("utf-8")).hexdigest()
+__all__ = [
+    "apply_no_store_headers",
+    "get_client_ip",
+    "get_safe_redirect_url",
+    "handle_api_exception",
+    "hash_api_token",
+    "redirect_to_next_or_default",
+    "safe_redirect",
+    "sanitize_content_disposition_filename",
+]
