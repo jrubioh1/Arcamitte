@@ -51,7 +51,7 @@
 					<dd class="col-sm-8 font-mono"><span class="badge bg-light text-dark border">{{ token.prefix }}...</span></dd>
 
 					<dt class="col-sm-4 text-muted">{% trans "Creado por" %}:</dt>
-					<dd class="col-sm-8 font-mono">{{ token.created_by.username|default:"Sistema" }} ({{ token.created_by.email|default:"-" }})</dd>
+					<dd class="col-sm-8 font-mono">{% if token.created_by %}{{ token.created_by.username }}{% else %}{% trans "Sistema" %}{% endif %} ({{ token.created_by.email|default:"-" }})</dd>
 
 					<dt class="col-sm-4 text-muted">{% trans "Fecha de Creación" %}:</dt>
 					<dd class="col-sm-8">{{ token.created_at|date:"d/m/Y H:i:s" }} UTC</dd>
@@ -115,12 +115,12 @@
 
 						<dt class="col-sm-4 text-danger">{% trans "Revocado por" %}:</dt>
 						<dd class="col-sm-8 font-mono text-danger">
-							{{ token.revoked_by.username|default:"Administrador" }}
+							{% if token.revoked_by %}{{ token.revoked_by.username }}{% else %}{% trans "Administrador" %}{% endif %}
 						</dd>
 
 						<dt class="col-sm-4 text-danger">{% trans "Motivo Legal" %}:</dt>
 						<dd class="col-sm-8 text-danger">
-							{{ token.revocation_reason|default:"Revocación manual por el operador" }}
+							{% if token.revocation_reason %}{{ token.revocation_reason }}{% else %}{% trans "Revocación manual por el operador" %}{% endif %}
 						</dd>
 					{% else %}
 						<dt class="col-sm-4 text-success">{% trans "Estado Operativo" %}:</dt>

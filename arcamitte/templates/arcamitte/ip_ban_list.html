@@ -136,7 +136,7 @@
 							{% endif %}
 						</td>
 						<td class="small">
-							{{ b.created_by.username|default:"Sistema (Auto)" }}
+							{% if b.created_by %}{{ b.created_by.username }}{% else %}{% trans "Sistema (Auto)" %}{% endif %}
 						</td>
 						<td class="text-end text-nowrap">
 							{% if b.is_active %}

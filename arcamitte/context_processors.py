@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.http import HttpRequest
+from django.utils.translation import gettext_lazy as _
 
 from arcamitte.models import UserUOMembership
 
@@ -56,7 +57,7 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
 
     if user.is_superuser:
         user_primary_role = "SUPERUSER"
-        user_primary_role_display = "Superusuario"
+        user_primary_role_display = str(_("Superusuario"))
         user_primary_uo_alias = ""
         user_primary_uo_name = ""
     elif primary_membership:
@@ -66,7 +67,7 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
         user_primary_uo_name = primary_membership.uo.name
     else:
         user_primary_role = "STANDALONE"
-        user_primary_role_display = "Personal / Sin UO"
+        user_primary_role_display = str(_("Personal / Sin UO"))
         user_primary_uo_alias = ""
         user_primary_uo_name = ""
 

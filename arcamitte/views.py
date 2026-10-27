@@ -553,9 +553,6 @@ class APIDocumentRootView(APIView):
             origin_uo = token.uo
 
         uploader_user = request.user if request.user.is_authenticated else None
-        api_token_obj = token if isinstance(token, APIToken) else None
-        client_ip = get_client_ip(request)
-        user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
 
         try:
             document = upload_and_encrypt_document(
@@ -567,9 +564,6 @@ class APIDocumentRootView(APIView):
                 origin_uo=origin_uo,
                 target_uo=data.get("target_uo"),
                 uploaded_by=uploader_user,
-                api_token=api_token_obj,
-                client_ip=client_ip,
-                user_agent=user_agent,
             )
         except Exception as exc:
             logger.error(f"[ARCAMITTE API ERROR] Fallo al procesar subida de documento: {exc}")
@@ -830,7 +824,12 @@ class APIOURecipientsView(APIView):
 
         if not uo:
             return Response(
-                {"error": _(f"No existe ninguna Unidad Organizativa activa identificada como '{val_str}'.")},
+                {
+                    "error": _(
+                        "No existe ninguna Unidad Organizativa activa identificada como '%(val)s'."
+                    )
+                    % {"val": val_str}
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 

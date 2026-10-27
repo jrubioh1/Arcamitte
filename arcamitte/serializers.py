@@ -212,7 +212,8 @@ class APIDocumentUploadSerializer(serializers.Serializer):
             uo = OrganizationalUnit.objects.filter(numeric_code=int(val_str), is_active=True).first()
         if not uo:
             raise serializers.ValidationError(
-                _(f"No existe ninguna Unidad Organizativa activa con alias o código '{val_str}'.")
+                _("No existe ninguna Unidad Organizativa activa con alias o código '%(val)s'.")
+                % {"val": val_str}
             )
         return uo
 
@@ -225,7 +226,8 @@ class APIDocumentUploadSerializer(serializers.Serializer):
             uo = OrganizationalUnit.objects.filter(numeric_code=int(val_str), is_active=True).first()
         if not uo:
             raise serializers.ValidationError(
-                _(f"No existe ninguna Unidad Organizativa activa con alias o código '{val_str}'.")
+                _("No existe ninguna Unidad Organizativa activa con alias o código '%(val)s'.")
+                % {"val": val_str}
             )
         return uo
 

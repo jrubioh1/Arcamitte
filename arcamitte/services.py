@@ -213,6 +213,11 @@ def shred_and_delete_file(file_field: Any) -> bool:
         return False
 
     try:
+        try:
+            file_field.close()
+        except Exception:
+            pass
+
         path = None
         try:
             path = file_field.path
@@ -1218,6 +1223,7 @@ def consume_document_with_otp(
 
             document.encrypted_file.seek(0)
             encrypted_file_bytes = document.encrypted_file.read()
+            document.encrypted_file.close()
 
             dek_fernet = Fernet(dek_bytes)
             decrypted_bytes = dek_fernet.decrypt(encrypted_file_bytes)
@@ -1836,8 +1842,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             if not code or not alias or not name or not email:
                 raise ValidationError(
                     _(
-                        f"Cada UO debe incluir obligatoriamente 'numeric_code', 'alias', 'name' y 'email'. Entrada inválida: {uo_data}"
+                        "Cada UO debe incluir obligatoriamente 'numeric_code', 'alias', 'name' y 'email'. Entrada inválida: %(data)s"
                     )
+                    % {"data": uo_data}
                 )
 
             try:
@@ -1845,8 +1852,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             except (ValueError, TypeError):
                 raise ValidationError(
                     _(
-                        f"El campo 'numeric_code' en UO '{alias}' debe ser un número entero válido: {code}"
+                        "El campo 'numeric_code' en UO '%(alias)s' debe ser un número entero válido: %(code)s"
                     )
+                    % {"alias": alias, "code": code}
                 )
 
             clean_email = validate_safe_email(email)
@@ -1888,8 +1896,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             if not username or not email:
                 raise ValidationError(
                     _(
-                        f"Cada usuario debe incluir obligatoriamente 'username' y 'email'. Entrada inválida: {u_data}"
+                        "Cada usuario debe incluir obligatoriamente 'username' y 'email'. Entrada inválida: %(data)s"
                     )
+                    % {"data": u_data}
                 )
 
             clean_email = validate_safe_email(email)
@@ -1909,8 +1918,9 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             if not target_uo:
                 raise ValidationError(
                     _(
-                        f"No se encontró la UO '{uo_alias or uo_code}' asociada al usuario '{username}'. Debe definirse previamente."
+                        "No se encontró la UO '%(uo)s' asociada al usuario '%(username)s'. Debe definirse previamente."
                     )
+                    % {"uo": uo_alias or uo_code, "username": username}
                 )
 
             role = (
@@ -2852,7 +2862,11 @@ def verify_export_receipt(
         return {
             "found": False,
             "is_valid": False,
-            "error": "No se encontró ningún recibo oficial con el identificador o hash indicado.",
+            "error": str(
+                _(
+                    "No se encontró ningún recibo oficial con el identificador o hash indicado."
+                )
+            ),
         }
 
     computed_hash = None

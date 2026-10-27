@@ -158,10 +158,11 @@ class DashboardLoginView(auth_views.LoginView):
                     form.add_error(
                         None,
                         _(
-                            f"Esta cuenta de usuario se encuentra temporalmente bloqueada por reiterados "
-                            f"intentos fallidos de acceso. Podrá reintentarlo automáticamente a las {unlock_time_str} "
-                            f"o contactar a un administrador para su desbloqueo inmediato."
-                        ),
+                            "Esta cuenta de usuario se encuentra temporalmente bloqueada por reiterados "
+                            "intentos fallidos de acceso. Podrá reintentarlo automáticamente a las %(time)s "
+                            "o contactar a un administrador para su desbloqueo inmediato."
+                        )
+                        % {"time": unlock_time_str},
                     )
                     return self.render_to_response(
                         self.get_context_data(form=form), status=429
@@ -969,9 +970,13 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         )
 
         if success:
-            messages.success(request, _(f"Asiento terminado con éxito: {msg}"))
+            messages.success(
+                request, _("Asiento terminado con éxito: %(msg)s") % {"msg": msg}
+            )
         else:
-            messages.error(request, _(f"Error al terminar el asiento: {msg}"))
+            messages.error(
+                request, _("Error al terminar el asiento: %(msg)s") % {"msg": msg}
+            )
 
         return redirect("dashboard:document_detail", file_hash=doc.file_hash)
 
@@ -1074,18 +1079,12 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
                 _("Se requieren privilegios administrativos para gestionar API Tokens.")
             )
 
-        tokens = (
-            APIToken.objects.select_related("uo", "created_by")
-            .annotate(documents_count=models.Count("uploaded_documents"))
-            .order_by("-created_at")
-        )
-        available_uos = get_user_accessible_uos(request.user).order_by("numeric_code")
+        tokens = APIToken.objects.all().order_by("-created_at")
         new_token = request.session.pop("new_raw_token", None)
 
         context = {
             "active_nav": "tokens",
             "tokens": tokens,
-            "available_uos": available_uos,
             "new_raw_token": new_token,
         }
         return render(request, self.template_name, context)
@@ -1118,17 +1117,10 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
         except ValueError:
             validity_days = 365
 
-        uo_obj = None
-        uo_id = request.POST.get("uo", "").strip()
-        if uo_id:
-            accessible_uos = get_user_accessible_uos(request.user)
-            uo_obj = accessible_uos.filter(pk=uo_id).first()
-
         expires_at = timezone.now() + datetime.timedelta(days=validity_days)
 
         token_obj, raw_secret = APIToken.generate_token(
             name=name,
-            uo=uo_obj,
             scopes=scopes,
             rate_limit=rate_limit,
             expires_at=expires_at,
@@ -1164,116 +1156,11 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
 
         request.session["new_raw_token"] = raw_secret
         messages.success(
-            request, _(f"API Token '{token_obj.name}' generado correctamente.")
+            request,
+            _("API Token '%(name)s' generado correctamente.")
+            % {"name": token_obj.name},
         )
         return redirect("dashboard:api_tokens")
-
-
-class DashboardApiTokenDetailView(LoginRequiredMixin, View):
-    """
-    Vista de inspección en detalle de un API Token M2M, incluyendo sus metadatos
-    criptográficos, estadísticas operativas, asientos documentales emitidos o dentro
-    de su alcance y trazas forenses de auditoría asociadas.
-    """
-
-    login_url = "dashboard:login"
-    template_name = "arcamitte/api_token_detail.html"
-
-    def get(self, request: HttpRequest, token_id: int) -> HttpResponse:
-        if not (request.user.is_superuser or request.user.is_staff):
-            raise PermissionDenied(_("Se requieren privilegios administrativos para inspeccionar API Tokens."))
-
-        token = get_object_or_404(
-            APIToken.objects.select_related("uo", "created_by"),
-            pk=token_id,
-        )
-
-        # Aislar visibilidad si el usuario no es superusuario
-        if not request.user.is_superuser:
-            user_uos = get_user_accessible_uos(request.user)
-            if token.uo and token.uo not in user_uos and token.created_by_id != request.user.id:
-                raise PermissionDenied(_("No tiene autorización para inspeccionar este API Token."))
-
-        scope_mode = request.GET.get("scope", "emitted").strip().lower()
-        status_filter = request.GET.get("status", "").strip().lower()
-        query = request.GET.get("q", "").strip()
-        now = timezone.now()
-
-        # Conjunto base de asientos emitidos directamente con este API Token
-        emitted_docs_qs = EncryptedDocument.objects.filter(
-            uploaded_by_token=token
-        ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token")
-
-        # Conjunto ampliado al perímetro de la UO del token (si tiene UO asignada)
-        if token.uo:
-            perimeter_docs_qs = EncryptedDocument.objects.filter(
-                models.Q(uploaded_by_token=token)
-                | models.Q(origin_uo=token.uo)
-                | models.Q(target_uo=token.uo)
-            ).select_related("origin_uo", "target_uo", "uploaded_by", "uploaded_by_token").distinct()
-        else:
-            perimeter_docs_qs = emitted_docs_qs
-
-        # Si el usuario selecciona 'perimeter' (o si no hay documentos con uploaded_by_token pero el token tiene UO),
-        # permitimos conmutar limpiamente entre asientos emitidos por el token y asientos del perímetro de su UO.
-        if scope_mode == "perimeter" and token.uo:
-            base_qs = perimeter_docs_qs
-        else:
-            scope_mode = "emitted"
-            base_qs = emitted_docs_qs
-
-        # Métricas sobre el conjunto activo seleccionado
-        total_docs = base_qs.count()
-        emitted_count = emitted_docs_qs.count()
-        perimeter_count = perimeter_docs_qs.count()
-        consumed_docs = base_qs.filter(is_consumed=True).count()
-        active_docs = base_qs.filter(is_consumed=False).filter(
-            models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)
-        ).count()
-        expired_docs = base_qs.filter(is_consumed=False, expires_at__lte=now).count()
-
-        filtered_qs = base_qs
-        if query:
-            filtered_qs = filtered_qs.filter(
-                models.Q(original_filename__icontains=query)
-                | models.Q(file_hash__icontains=query)
-                | models.Q(description__icontains=query)
-            )
-
-        if status_filter == "active":
-            filtered_qs = filtered_qs.filter(is_consumed=False).filter(
-                models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True)
-            )
-        elif status_filter == "consumed":
-            filtered_qs = filtered_qs.filter(is_consumed=True)
-        elif status_filter == "expired":
-            filtered_qs = filtered_qs.filter(is_consumed=False, expires_at__lte=now)
-
-        documents = filtered_qs.order_by("-created_at")[:100]
-
-        # Trazas forenses de los asientos vinculados
-        access_logs = (
-            DocumentAccessLog.objects.filter(document__in=base_qs)
-            .select_related("document", "origin_uo", "target_uo")
-            .order_by("-created_at")[:30]
-        )
-
-        context = {
-            "active_nav": "tokens",
-            "token": token,
-            "documents": documents,
-            "access_logs": access_logs,
-            "scope_mode": scope_mode,
-            "status_filter": status_filter,
-            "query": query,
-            "total_docs": total_docs,
-            "emitted_count": emitted_count,
-            "perimeter_count": perimeter_count,
-            "active_docs": active_docs,
-            "consumed_docs": consumed_docs,
-            "expired_docs": expired_docs,
-        }
-        return render(request, self.template_name, context)
 
 
 class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
@@ -1331,7 +1218,9 @@ class DashboardApiTokenRevokeView(LoginRequiredMixin, View):
         )
 
         messages.warning(
-            request, _(f"El API Token '{token.name}' ha sido revocado inmediatamente.")
+            request,
+            _("El API Token '%(name)s' ha sido revocado inmediatamente.")
+            % {"name": token.name},
         )
         return redirect("dashboard:api_tokens")
 
@@ -2579,9 +2468,9 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
 
         # 4. Estado de Custodia y Políticas BAR (Donut)
         custody_breakdown = [
-            {"name": str(_("En Custodia Activa")), "value": active_docs},
-            {"name": str(_("Destruido por Canje (BAR)")), "value": consumed_docs},
-            {"name": str(_("Caducado sin Acceso")), "value": expired_docs},
+            {"key": "active", "name": str(_("En Custodia Activa")), "value": active_docs},
+            {"key": "consumed", "name": str(_("Destruido por Canje (BAR)")), "value": consumed_docs},
+            {"key": "expired", "name": str(_("Caducado sin Acceso")), "value": expired_docs},
         ]
 
         policy_first_access = docs_qs.filter(
@@ -2673,7 +2562,7 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                             else (
                                 analytics_uos.first().alias
                                 if analytics_uos.count() == 1
-                                else "Mis UOs"
+                                else str(_("Mis UOs"))
                             )
                         )
                     ),
@@ -2729,7 +2618,7 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
         now = timezone.now()
 
         # 1. Asientos en Custodia Activa
-        if drill_type in ["active", "en custodia activa"]:
+        if drill_type in ["active", "en custodia activa", "active custody"]:
             docs = docs_qs.filter(is_consumed=False, expires_at__gt=now).order_by(
                 "-created_at"
             )[:100]
@@ -2748,7 +2637,13 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
             )
 
         # 2. Asientos Consumidos / Incinerados
-        elif drill_type in ["consumed", "destruido por canje (bar)", "destruido"]:
+        elif drill_type in [
+            "consumed",
+            "destruido por canje (bar)",
+            "destruido",
+            "destroyed on redemption (bar)",
+            "destroyed",
+        ]:
             docs = docs_qs.filter(is_consumed=True).order_by("-consumed_at")[:100]
             items = [self._format_doc(d) for d in docs]
             return JsonResponse(
@@ -2767,7 +2662,12 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
             )
 
         # 3. Asientos Caducados sin Acceso
-        elif drill_type in ["expired", "caducado sin acceso", "caducado"]:
+        elif drill_type in [
+            "expired",
+            "caducado sin acceso",
+            "caducado",
+            "expired without access",
+        ]:
             docs = docs_qs.filter(is_consumed=False, expires_at__lte=now).order_by(
                 "-expires_at"
             )[:100]
@@ -2850,8 +2750,16 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
                         "Accesos a documentos que ya fueron incinerados conforme a la política BAR"
                     )
                 )
+            elif "enviado" in val_lower or "sent" in val_lower:
+                action_filter = DocumentAccessLog.Action.OTP_ENVIADO
+                title = str(_("Códigos OTP Enviados"))
+                subtitle = str(_("Verificaciones remitidas a buzones autorizados"))
             elif (
-                "bloqueado" in val_lower or "fallido" in val_lower or "otp" in val_lower
+                "bloqueado" in val_lower
+                or "fallido" in val_lower
+                or "blocked" in val_lower
+                or "locked" in val_lower
+                or "otp" in val_lower
             ):
                 action_filter = DocumentAccessLog.Action.OTP_INVALIDO_BLOQUEADO
                 title = str(_("Bloqueos por Intentos OTP Fallidos"))
@@ -2860,7 +2768,12 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
                         "Peticiones bloqueadas por reiteración de claves erróneas (protección anti-fuerza bruta)"
                     )
                 )
-            elif "auditoría" in val_lower or "pericial" in val_lower:
+            elif (
+                "auditoría" in val_lower
+                or "pericial" in val_lower
+                or "audit" in val_lower
+                or "forensic" in val_lower
+            ):
                 action_filter = DocumentAccessLog.Action.ADMIN_DESCARGA_PRESERVADA
                 title = str(_("Descargas Periciales de Auditoría Legal"))
                 subtitle = str(
@@ -2868,14 +2781,10 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
                         "Acceso administrativo especial registrado por inspectores o auditores"
                     )
                 )
-            elif "descarga" in val_lower or "ok" in val_lower:
+            elif "descarga" in val_lower or "ok" in val_lower or "download" in val_lower:
                 action_filter = DocumentAccessLog.Action.DESCIFRADO_EXITOSO_BURN
                 title = str(_("Descargas Exitosas y Canjes"))
                 subtitle = str(_("Entregas confidenciales completadas legítimamente"))
-            elif "enviado" in val_lower:
-                action_filter = DocumentAccessLog.Action.OTP_ENVIADO
-                title = str(_("Códigos OTP Enviados"))
-                subtitle = str(_("Verificaciones remitidas a buzones autorizados"))
             else:
                 action_filter = None
                 title = str(_("Registros Forenses de Seguridad"))
@@ -3089,8 +2998,9 @@ class DashboardUserUnlockView(LoginRequiredMixin, View):
         messages.success(
             request,
             _(
-                f"La cuenta del usuario '{target.username}' ha sido desbloqueada con éxito."
-            ),
+                "La cuenta del usuario '%(username)s' ha sido desbloqueada con éxito."
+            )
+            % {"username": target.username},
         )
 
         fallback_url = reverse("dashboard:user_list")
@@ -3229,8 +3139,9 @@ class DashboardUserManualLockView(LoginRequiredMixin, View):
         messages.warning(
             request,
             _(
-                f"La cuenta del usuario '{target.username}' ha sido suspendida administrativamente y sus sesiones activas revocadas."
-            ),
+                "La cuenta del usuario '%(username)s' ha sido suspendida administrativamente y sus sesiones activas revocadas."
+            )
+            % {"username": target.username},
         )
         return redirect("dashboard:locked_users")
 
@@ -3415,8 +3326,9 @@ class DashboardUserReset2FAView(LoginRequiredMixin, View):
         messages.warning(
             request,
             _(
-                f"El segundo factor (2FA) de '{target.username}' ha sido reseteado. Deberá enrolar un nuevo autenticador en su próximo acceso."
-            ),
+                "El segundo factor (2FA) de '%(username)s' ha sido reseteado. Deberá enrolar un nuevo autenticador en su próximo acceso."
+            )
+            % {"username": target.username},
         )
         next_url = request.POST.get("next") or reverse("dashboard:2fa_governance")
         return redirect(next_url)
@@ -3505,7 +3417,9 @@ class DashboardIPBanCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
             created_by=request.user,
         )
         messages.success(
-            request, _(f"La dirección IP {ip_address} ha sido bloqueada correctamente.")
+            request,
+            _("La dirección IP %(ip)s ha sido bloqueada correctamente.")
+            % {"ip": ip_address},
         )
         return redirect("dashboard:ip_ban_list")
 
@@ -3530,8 +3444,9 @@ class DashboardIPBanUnbanView(LoginRequiredMixin, UserPassesTestMixin, View):
         messages.success(
             request,
             _(
-                f"El baneo sobre la dirección IP {banned_obj.ip_address} ha sido revocado."
-            ),
+                "El baneo sobre la dirección IP %(ip)s ha sido revocado."
+            )
+            % {"ip": banned_obj.ip_address},
         )
         return redirect("dashboard:ip_ban_list")
 
@@ -3909,9 +3824,10 @@ class DashboardTOTPVerifyView(View):
             messages.warning(
                 request,
                 _(
-                    f"Ha accedido utilizando un código de rescate de emergencia. "
-                    f"Le quedan {len(profile.totp_scratch_codes)} códigos disponibles."
-                ),
+                    "Ha accedido utilizando un código de rescate de emergencia. "
+                    "Le quedan %(count)s códigos disponibles."
+                )
+                % {"count": len(profile.totp_scratch_codes)},
             )
 
         if user.is_superuser:

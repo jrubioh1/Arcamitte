@@ -141,7 +141,7 @@
 							{{ log.ip_address|default:"-" }}
 						</td>
 						<td class="small">
-							<strong>{{ log.email|default:"Sistema" }}</strong>
+							<strong>{% if log.email %}{{ log.email }}{% else %}{% trans "Sistema" %}{% endif %}</strong>
 						</td>
 						<td class="small text-muted">
 							{{ log.details }}

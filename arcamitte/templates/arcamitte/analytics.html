@@ -123,9 +123,9 @@
 
 			<!-- Rango Manual personalizado (visible si se pulsa Rango Manual) -->
 			<div id="customDateContainer" class="d-none d-flex align-items-center gap-2 ms-auto">
-				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 140px;" placeholder="Desde" title="Fecha Inicio">
+				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 140px;" placeholder="{% trans 'Desde' %}" title="{% trans 'Fecha Inicio' %}">
 				<span class="text-muted small">&rarr;</span>
-				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 140px;" placeholder="Hasta" title="Fecha Fin">
+				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 140px;" placeholder="{% trans 'Hasta' %}" title="{% trans 'Fecha Fin' %}">
 				<button type="button" id="applyCustomDateBtn" class="btn btn-sm btn-outline-primary py-1 px-2">
 					{% trans "Aplicar Rango" %}
 				</button>
@@ -502,20 +502,61 @@ document.addEventListener("DOMContentLoaded", function() {
 		return params.toString();
 	}
 
+	const I18N = {
+		policyPrefix: "{% trans 'Política:' %} ",
+		statusPrefix: "{% trans 'Estado:' %} ",
+		statusActive: "{% trans 'Activos' %}",
+		statusConsumed: "{% trans 'Destruidos (BAR)' %}",
+		statusExpired: "{% trans 'Caducados' %}",
+		noActiveFilters: "{% trans 'Sin filtros activos' %}",
+		loadingMetrics: "{% trans 'Cargando métricas...' %}",
+		encryptedRecords: "{% trans 'Asientos Cifrados (Altas)' %}",
+		effectiveRedemptions: "{% trans 'Canjes Efectivos (BAR)' %}",
+		clickForNominals: "{% trans 'Pinche para ver registros nominales' %}",
+		custody: "{% trans 'Custodia' %}",
+		noActivity: "{% trans 'Sin actividad' %}",
+		outboundSeries: "{% trans 'Emitidos (Salientes)' %}",
+		inboundSeries: "{% trans 'Recibidos (Entrantes)' %}",
+		downloadsOk: "{% trans 'Descargas OK' %}",
+		otpSent: "{% trans 'OTP Enviados' %}",
+		postConsumptionBar: "{% trans 'Post-Consumo (BAR)' %}",
+		otpBlocked: "{% trans 'OTP Bloqueados' %}",
+		legalAudit: "{% trans 'Auditoría Legal' %}",
+		incidentsAndAccess: "{% trans 'Incidencias y Accesos' %}",
+		postConsumptionAttempts: "{% trans 'Intentos Post-Consumo' %}",
+		blockedOtpCodes: "{% trans 'Códigos OTP Bloqueados' %}",
+		forensicAudits: "{% trans 'Auditorías Periciales' %}",
+		clickForForensicDetail: "{% trans 'Pinche para ver el detalle forense' %}",
+		securityIncidents: "{% trans 'Incidencias de Seguridad' %}",
+		securityMetrics: "{% trans 'Métricas de Seguridad' %}",
+		loadingRecords: "{% trans 'Cargando registros...' %}",
+		queryingDatabase: "{% trans 'Consultando base de datos criptográfica' %}",
+		recordsSuffix: " {% trans 'registros' %}",
+		queryError: "{% trans 'Error de consulta' %}",
+		queryErrorSub: "{% trans 'No se pudieron obtener los registros nominales.' %}",
+		zeroFound: "{% trans '0 encontrados' %}",
+		showingPrefix: "{% trans 'Mostrando' %}",
+		ofConnector: "{% trans 'de' %}",
+		noNominalsToExport: "{% trans 'No hay registros nominales para exportar.' %}",
+		csvDocsHeader: "{% trans 'ID;Nombre de Archivo;Hash SHA-256;UO Origen;UO Destino;Estado;Política BAR;Fecha Alta;Fecha Expiración;Fecha Canje' %}",
+		csvLogsHeader: "{% trans 'ID;Fecha y Hora;Acción / Evento;Documento;Hash;IP Solicitante;Correo;Detalles Forenses;UO' %}",
+		selectBothDates: "{% trans 'Por favor, seleccione ambas fechas (Desde y Hasta).' %}"
+	};
+
 	function updateSummaryBadge(meta) {
 		const summaryEl = document.getElementById("activeFiltersSummary");
 		if (!summaryEl) return;
 		let parts = [];
 		if (meta && meta.date_label) parts.push(meta.date_label);
 		if (activeFilters.uo) parts.push("UO: " + activeFilters.uo);
-		if (activeFilters.burn_policy) parts.push("Política: " + activeFilters.burn_policy);
+		if (activeFilters.burn_policy) parts.push(I18N.policyPrefix + activeFilters.burn_policy);
 		if (activeFilters.status) {
-			const statusLabels = { active: "Activos", consumed: "Destruidos (BAR)", expired: "Caducados" };
-			parts.push("Estado: " + (statusLabels[activeFilters.status] || activeFilters.status));
+			const statusLabels = { active: I18N.statusActive, consumed: I18N.statusConsumed, expired: I18N.statusExpired };
+			parts.push(I18N.statusPrefix + (statusLabels[activeFilters.status] || activeFilters.status));
 		}
 		summaryEl.innerHTML = parts.length > 0
 			? parts.map(p => `<span class="badge bg-light text-dark border me-1">${p}</span>`).join("")
-			: `<span class="text-muted">Sin filtros activos</span>`;
+			: `<span class="text-muted">${I18N.noActiveFilters}</span>`;
 
 		const timelineRangeBadge = document.getElementById("timelineRangeBadge");
 		if (timelineRangeBadge && meta && meta.range) {
@@ -532,7 +573,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	function fetchAnalyticsData() {
 		const refreshIcon = document.getElementById("refreshIcon");
 		if (refreshIcon) refreshIcon.classList.add("spin-animation");
-		allCharts.forEach(c => c.showLoading({ text: "Cargando métricas...", color: colors.primary }));
+		allCharts.forEach(c => c.showLoading({ text: I18N.loadingMetrics, color: colors.primary }));
 
 		const qs = buildQueryString();
 		const url = "{% url 'dashboard:analytics_data' %}" + (qs ? "?" + qs : "");
@@ -602,7 +643,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				axisPointer: { type: "cross", label: { backgroundColor: "#64748b" } }
 			},
 			legend: {
-				data: ["Asientos Cifrados (Altas)", "Canjes Efectivos (BAR)"],
+				data: [I18N.encryptedRecords, I18N.effectiveRedemptions],
 				bottom: showZoom ? 26 : 0,
 				icon: "circle",
 				textStyle: { color: "#64748b", fontSize: 12 }
@@ -633,7 +674,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			},
 			series: [
 				{
-					name: "Asientos Cifrados (Altas)",
+					name: I18N.encryptedRecords,
 					type: "line",
 					smooth: true,
 					data: timeline.created,
@@ -646,7 +687,7 @@ document.addEventListener("DOMContentLoaded", function() {
 					}
 				},
 				{
-					name: "Canjes Efectivos (BAR)",
+					name: I18N.effectiveRedemptions,
 					type: "line",
 					smooth: true,
 					data: timeline.consumed,
@@ -669,7 +710,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		const option = {
 			tooltip: {
 				trigger: "item",
-				formatter: "{b}: <b>{c}</b> ({d}%)<br><span style='font-size:11px;color:#94a3b8;'>Pinche para ver registros nominales</span>",
+				formatter: `{b}: <b>{c}</b> ({d}%)<br><span style='font-size:11px;color:#94a3b8;'>${I18N.clickForNominals}</span>`,
 				backgroundColor: "#ffffff",
 				borderColor: "#e2e8f0",
 				textStyle: { color: "#1e293b", fontSize: 12 }
@@ -682,7 +723,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			color: [colors.success, colors.primary, colors.gray],
 			series: [
 				{
-					name: "Custodia",
+					name: I18N.custody,
 					type: "pie",
 					radius: ["48%", "72%"],
 					center: ["50%", "45%"],
@@ -712,7 +753,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	// 6. Render Gráfico 3: Flujo Inter-UO
 	function renderMesh(uoMesh) {
 		if (!uoMesh) return;
-		const categories = uoMesh.categories && uoMesh.categories.length > 0 ? uoMesh.categories : ["Sin actividad"];
+		const categories = uoMesh.categories && uoMesh.categories.length > 0 ? uoMesh.categories : [I18N.noActivity];
 		const outbound = uoMesh.outbound || [];
 		const inbound = uoMesh.inbound || [];
 
@@ -725,7 +766,7 @@ document.addEventListener("DOMContentLoaded", function() {
 				textStyle: { color: "#1e293b", fontSize: 12 }
 			},
 			legend: {
-				data: ["Emitidos (Salientes)", "Recibidos (Entrantes)"],
+				data: [I18N.outboundSeries, I18N.inboundSeries],
 				bottom: 0,
 				icon: "circle",
 				textStyle: { color: "#64748b", fontSize: 11 }
@@ -751,13 +792,13 @@ document.addEventListener("DOMContentLoaded", function() {
 			},
 			series: [
 				{
-					name: "Emitidos (Salientes)",
+					name: I18N.outboundSeries,
 					type: "bar",
 					data: outbound,
 					itemStyle: { color: colors.primary, borderRadius: [0, 4, 4, 0] }
 				},
 				{
-					name: "Recibidos (Entrantes)",
+					name: I18N.inboundSeries,
 					type: "bar",
 					data: inbound,
 					itemStyle: { color: colors.info, borderRadius: [0, 4, 4, 0] }
@@ -771,11 +812,11 @@ document.addEventListener("DOMContentLoaded", function() {
 	function renderSecurity(security) {
 		if (!security) return;
 		const indicators = [
-			{ name: "Descargas OK", max: Math.max(security.descargas_exitosas * 1.3, 10) },
-			{ name: "OTP Enviados", max: Math.max(security.otp_enviados * 1.3, 10) },
-			{ name: "Post-Consumo (BAR)", max: Math.max(security.intentos_post_consumo * 2, 5) },
-			{ name: "OTP Bloqueados", max: Math.max(security.otp_bloqueados * 2, 5) },
-			{ name: "Auditoría Legal", max: Math.max(security.auditorias_periciales * 2, 5) }
+			{ name: I18N.downloadsOk, max: Math.max(security.descargas_exitosas * 1.3, 10) },
+			{ name: I18N.otpSent, max: Math.max(security.otp_enviados * 1.3, 10) },
+			{ name: I18N.postConsumptionBar, max: Math.max(security.intentos_post_consumo * 2, 5) },
+			{ name: I18N.otpBlocked, max: Math.max(security.otp_bloqueados * 2, 5) },
+			{ name: I18N.legalAudit, max: Math.max(security.auditorias_periciales * 2, 5) }
 		];
 		const values = [
 			security.descargas_exitosas,
@@ -792,13 +833,13 @@ document.addEventListener("DOMContentLoaded", function() {
 				borderColor: "#e2e8f0",
 				textStyle: { color: "#1e293b", fontSize: 12 },
 				formatter: function(params) {
-					let str = "<b>Incidencias y Accesos</b><br/>";
-					str += "• Descargas OK: " + security.descargas_exitosas + "<br/>";
-					str += "• OTP Enviados: " + security.otp_enviados + "<br/>";
-					str += "<span style='color:#e11d48;'>• Intentos Post-Consumo: " + security.intentos_post_consumo + "</span><br/>";
-					str += "<span style='color:#e11d48;'>• Códigos OTP Bloqueados: " + security.otp_bloqueados + "</span><br/>";
-					str += "• Auditorías Periciales: " + security.auditorias_periciales + "<br/>";
-					str += "<span style='font-size:11px;color:#64748b;'>Pinche para ver el detalle forense</span>";
+					let str = `<b>${I18N.incidentsAndAccess}</b><br/>`;
+					str += `• ${I18N.downloadsOk}: ` + security.descargas_exitosas + "<br/>";
+					str += `• ${I18N.otpSent}: ` + security.otp_enviados + "<br/>";
+					str += `<span style='color:#e11d48;'>• ${I18N.postConsumptionAttempts}: ` + security.intentos_post_consumo + "</span><br/>";
+					str += `<span style='color:#e11d48;'>• ${I18N.blockedOtpCodes}: ` + security.otp_bloqueados + "</span><br/>";
+					str += `• ${I18N.forensicAudits}: ` + security.auditorias_periciales + "<br/>";
+					str += `<span style='font-size:11px;color:#64748b;'>${I18N.clickForForensicDetail}</span>`;
 					return str;
 				}
 			},
@@ -818,12 +859,12 @@ document.addEventListener("DOMContentLoaded", function() {
 			},
 			series: [
 				{
-					name: "Incidencias de Seguridad",
+					name: I18N.securityIncidents,
 					type: "radar",
 					data: [
 						{
 							value: values,
-							name: "Métricas de Seguridad",
+							name: I18N.securityMetrics,
 							itemStyle: { color: colors.danger },
 							areaStyle: { color: "rgba(225, 29, 72, 0.25)" }
 						}
@@ -854,8 +895,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		containerEl.innerHTML = "";
 		emptyEl.style.display = "none";
 		badgeEl.textContent = "...";
-		titleEl.textContent = "Cargando registros...";
-		subtitleEl.textContent = "Consultando base de datos criptográfica";
+		titleEl.textContent = I18N.loadingRecords;
+		subtitleEl.textContent = I18N.queryingDatabase;
 
 		drilldownModal.show();
 
@@ -873,7 +914,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			loadingEl.style.display = "none";
 			titleEl.textContent = data.title;
 			subtitleEl.textContent = data.subtitle;
-			badgeEl.textContent = data.count + " registros";
+			badgeEl.textContent = data.count + I18N.recordsSuffix;
 
 			currentDrilldownData = {
 				mode: data.mode,
@@ -891,8 +932,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		.catch(err => {
 			console.error("Error al cargar registros nominales:", err);
 			loadingEl.style.display = "none";
-			titleEl.textContent = "Error de consulta";
-			subtitleEl.textContent = "No se pudieron obtener los registros nominales.";
+			titleEl.textContent = I18N.queryError;
+			subtitleEl.textContent = I18N.queryErrorSub;
 			emptyEl.style.display = "block";
 		});
 	}
@@ -905,13 +946,13 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (!itemsToRender || itemsToRender.length === 0) {
 			containerEl.innerHTML = "";
 			emptyEl.style.display = "block";
-			if (filterCounter) filterCounter.textContent = "0 encontrados";
+			if (filterCounter) filterCounter.textContent = I18N.zeroFound;
 			return;
 		}
 
 		emptyEl.style.display = "none";
 		if (filterCounter) {
-			filterCounter.textContent = `Mostrando ${itemsToRender.length} de ${currentDrilldownData.items.length}`;
+			filterCounter.textContent = `${I18N.showingPrefix} ${itemsToRender.length} ${I18N.ofConnector} ${currentDrilldownData.items.length}`;
 		}
 
 		if (currentDrilldownData.mode === "documents") {
@@ -1055,18 +1096,18 @@ document.addEventListener("DOMContentLoaded", function() {
 	if (exportNominalsCsvBtn) {
 		exportNominalsCsvBtn.addEventListener("click", function() {
 			if (!currentDrilldownData.items || currentDrilldownData.items.length === 0) {
-				alert("No hay registros nominales para exportar.");
+				alert(I18N.noNominalsToExport);
 				return;
 			}
 
 			let csvContent = "\uFEFF"; // BOM UTF-8 para Excel
 			if (currentDrilldownData.mode === "documents") {
-				csvContent += "ID;Nombre de Archivo;Hash SHA-256;UO Origen;UO Destino;Estado;Política BAR;Fecha Alta;Fecha Expiración;Fecha Canje\r\n";
+				csvContent += I18N.csvDocsHeader + "\r\n";
 				currentDrilldownData.items.forEach(doc => {
 					csvContent += `"${doc.id}";"${doc.filename.replace(/"/g, '""')}";"${doc.file_hash}";"${doc.origin_uo}";"${doc.target_uo}";"${doc.status_text}";"${doc.burn_policy}";"${doc.created_at}";"${doc.expires_at}";"${doc.consumed_at}"\r\n`;
 				});
 			} else {
-				csvContent += "ID;Fecha y Hora;Acción / Evento;Documento;Hash;IP Solicitante;Correo;Detalles Forenses;UO\r\n";
+				csvContent += I18N.csvLogsHeader + "\r\n";
 				currentDrilldownData.items.forEach(log => {
 					csvContent += `"${log.id}";"${log.created_at}";"${log.action_display.replace(/"/g, '""')}";"${(log.document_filename || '').replace(/"/g, '""')}";"${log.document_hash_short}";"${log.ip_address}";"${log.email}";"${(log.details || '').replace(/"/g, '""')}";"${log.origin_uo}"\r\n`;
 				});
@@ -1096,7 +1137,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 	// 11. Eventos en los Gráficos de ECharts
 	custodyChart.on("click", function(params) {
-		if (params && params.name) openDrilldown(params.name);
+		if (params && (params.data?.key || params.name)) openDrilldown(params.data?.key || params.name);
 	});
 
 	timelineChart.on("click", function(params) {
@@ -1105,7 +1146,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 	meshChart.on("click", function(params) {
 		if (params && params.name) {
-			const dir = params.seriesName && params.seriesName.includes("Emitidos") ? "uo_outbound" : "uo_inbound";
+			const dir = params.seriesIndex === 0 ? "uo_outbound" : "uo_inbound";
 			openDrilldown(dir, params.name);
 		}
 	});
@@ -1153,7 +1194,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			const dFrom = document.getElementById("dateFromInput").value;
 			const dTo = document.getElementById("dateToInput").value;
 			if (!dFrom || !dTo) {
-				alert("Por favor, seleccione ambas fechas (Desde y Hasta).");
+				alert(I18N.selectBothDates);
 				return;
 			}
 			activeFilters.range = "custom";

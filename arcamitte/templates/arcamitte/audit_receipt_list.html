@@ -60,7 +60,7 @@
 						<td class="font-mono fw-bold text-dark text-nowrap">
 							<i data-feather="file-text" style="width:14px;height:14px;" class="text-primary me-1"></i>{{ r.receipt_id }}
 							{% if r.timestamp_token %}
-								<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Sello Cualificado RFC 3161 ({{ r.timestamp_authority }})"><i data-feather="clock" style="width:11px;height:11px;"></i> TSA</span>
+								<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="{% trans 'Sello Cualificado RFC 3161' %} ({{ r.timestamp_authority }})"><i data-feather="clock" style="width:11px;height:11px;"></i> TSA</span>
 							{% endif %}
 						</td>
 						<td class="font-mono small text-muted text-nowrap">

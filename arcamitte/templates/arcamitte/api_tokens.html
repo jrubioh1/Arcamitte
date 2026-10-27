@@ -60,10 +60,10 @@
 								<td>
 									<strong>{{ token.name }}</strong>
 									<div class="text-muted small">
-										{% trans "Expira:" %} {{ token.expires_at|date:"d/m/Y"|default:"Permanente" }}
+										{% trans "Expira:" %} {% if token.expires_at %}{{ token.expires_at|date:"d/m/Y" }}{% else %}{% trans "Permanente" %}{% endif %}
 									</div>
 									<div class="text-muted small" style="font-size:0.75rem;">
-										{% trans "Por:" %} <span class="font-mono">{{ token.created_by.username|default:"Sistema" }}</span>
+										{% trans "Por:" %} <span class="font-mono">{% if token.created_by %}{{ token.created_by.username }}{% else %}{% trans "Sistema" %}{% endif %}</span>
 									</div>
 								</td>
 								<td class="font-mono small text-muted">
@@ -140,7 +140,7 @@
 
 					<div class="mb-3">
 						<label class="form-label fw-semibold">{% trans "Nombre del Servicio / Cliente" %} <span class="text-danger">*</span></label>
-						<input type="text" name="name" class="form-control" placeholder="ej. Microservicio RRHH" required>
+						<input type="text" name="name" class="form-control" placeholder="{% trans 'ej. Microservicio RRHH' %}" required>
 						<div class="form-text small text-muted">{% trans "Identificador descriptivo de la aplicación cliente." %}</div>
 					</div>
 

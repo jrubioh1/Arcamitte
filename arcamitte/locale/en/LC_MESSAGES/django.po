@@ -375,14 +375,13 @@ msgid ""
 msgstr "This user account is temporarily locked due to repeated "
 
 #: arcamitte/dashboard_views.py:164
-#, fuzzy
 #| msgid ""
 #| "Ha superado el límite de solicitudes permitidas. Por favor, espere un "
 #| "minuto antes de reintentar."
 msgid ""
 "Se ha superado el número máximo de intentos de inicio de sesión permitidos. "
 "Por seguridad, espere 5 minutos antes de volver a intentarlo."
-msgstr "Request limit exceeded. Please wait a minute before trying again."
+msgstr "Maximum allowed login attempts exceeded. For security, please wait 5 minutes before trying again."
 
 #: arcamitte/dashboard_views.py:185
 msgid ""
@@ -436,16 +435,13 @@ msgid "Descarga y clausura definitiva de trámite"
 msgstr "Download and permanent entry closure"
 
 #: arcamitte/dashboard_views.py:896 arcamitte/dashboard_views.py:928
-#, fuzzy
 #| msgid ""
 #| "Solo la UO emisora, el autor del asiento personal o un superadministrador "
 #| "puede clausurar el documento."
 msgid ""
 "Solo un Administrador de la UO emisora, el autor del asiento personal o un "
 "superadministrador puede clausurar el documento."
-msgstr ""
-"Only the issuing OU, the author of a personal record, or a "
-"superadministrator can terminate this document."
+msgstr "Only an Administrator of the issuing OU, the author of the personal record, or a superadministrator can close the document."
 
 #: arcamitte/dashboard_views.py:901
 msgid "Este documento ya no se encuentra activo."
@@ -457,7 +453,7 @@ msgstr "You must provide a justified reason for early destruction."
 
 #: arcamitte/dashboard_views.py:1061 arcamitte/dashboard_views.py:1077
 msgid "Se requieren privilegios administrativos para gestionar API Tokens."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Administrative privileges required to manage API Tokens."
 
 #: arcamitte/dashboard_views.py:1084
 msgid "Debe proporcionar un nombre o identificador para el servicio."
@@ -465,17 +461,16 @@ msgstr "You must provide a name or identifier for the service."
 
 #: arcamitte/dashboard_views.py:1156
 msgid "Se requieren privilegios administrativos para revocar API Tokens."
-msgstr "Administrative privileges are required to revoke API Tokens."
+msgstr "Administrative privileges required to revoke API Tokens."
 
 #: arcamitte/dashboard_views.py:1161
 msgid "Revocación manual por el operador"
 msgstr "Manual revocation by operator"
 
 #: arcamitte/dashboard_views.py:1220
-#, fuzzy
 #| msgid "Se requieren privilegios administrativos para gestionar API Tokens."
 msgid "Se requieren privilegios administrativos para auditar API Tokens."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Administrative privileges required to audit API Tokens."
 
 #: arcamitte/dashboard_views.py:1258 arcamitte/dashboard_views.py:2088
 msgid "Unidad Organizativa no encontrada."
@@ -643,14 +638,13 @@ msgid "No tiene permisos para resetear la contraseña de este usuario."
 msgstr "You do not have permissions to reset this user's password."
 
 #: arcamitte/dashboard_views.py:1909
-#, fuzzy
 #| msgid ""
 #| "Ha superado el límite de solicitudes permitidas. Por favor, espere un "
 #| "minuto antes de reintentar."
 msgid ""
 "Ha superado el límite de solicitudes de recuperación. Por favor, espere unos "
 "minutos antes de reintentar."
-msgstr "Request limit exceeded. Please wait a minute before trying again."
+msgstr "You have exceeded the recovery request limit. Please wait a few minutes before trying again."
 
 #: arcamitte/dashboard_views.py:1929
 msgid ""
@@ -665,17 +659,15 @@ msgid "Su contraseña ha sido actualizada con éxito."
 msgstr "Your password has been successfully updated."
 
 #: arcamitte/dashboard_views.py:2033
-#, fuzzy
 #| msgid "Nivel de privilegios dentro de esta Unidad Organizativa."
 msgid "No dispone de privilegios de analítica en ninguna Unidad Organizativa."
-msgstr "Privilege level within this Organizational Unit."
+msgstr "You do not have analytics privileges in any Organizational Unit."
 
 #: arcamitte/dashboard_views.py:2104
-#, fuzzy
 #| msgid ""
 #| "No tiene permisos para administrar usuarios ni Unidades Organizativas."
 msgid "No tiene permisos sobre la Unidad Organizativa solicitada."
-msgstr "You do not have permissions to manage users or Organizational Units."
+msgstr "You do not have permissions for the requested Organizational Unit."
 
 #: arcamitte/dashboard_views.py:2230
 msgid "Histórico Completo"
@@ -686,42 +678,36 @@ msgid "Acceso no autorizado a métricas analíticas."
 msgstr "Unauthorized access to analytical metrics."
 
 #: arcamitte/dashboard_views.py:2264 arcamitte/dashboard_views.py:2568
-#, fuzzy
 #| msgid "Error al verificar credenciales."
 msgid "Error al delimitar registros."
-msgstr "Error verifying credentials."
+msgstr "Error filtering records."
 
 #: arcamitte/dashboard_views.py:2421
-#, fuzzy
 #| msgid "desconocido"
 msgid "Desconocida / Personal"
-msgstr "unknown"
+msgstr "Unknown / Personal"
 
 #: arcamitte/dashboard_views.py:2424
-#, fuzzy
 #| msgid "Ninguna / Destinatario Externo"
 msgid "Destinatarios Externos"
-msgstr "None / External Recipient"
+msgstr "External Recipients"
 
 #: arcamitte/dashboard_views.py:2444 arcamitte/dashboard_views.py:2862
 #: arcamitte/templates/arcamitte/analytics.html:192
 #: arcamitte/templates/arcamitte/analytics.html:252
-#, fuzzy
 #| msgid "Cuenta Activa"
 msgid "En Custodia Activa"
-msgstr "Active Account"
+msgstr "In Active Custody"
 
 #: arcamitte/dashboard_views.py:2445
-#, fuzzy
 #| msgid "Correos Autorizados para Canje (OTP)"
 msgid "Destruido por Canje (BAR)"
-msgstr "Authorized Redemption Emails (OTP)"
+msgstr "Destroyed upon Redemption (BAR)"
 
 #: arcamitte/dashboard_views.py:2446
-#, fuzzy
 #| msgid "Caducados"
 msgid "Caducado sin Acceso"
-msgstr "Expired"
+msgstr "Expired without Access"
 
 #: arcamitte/dashboard_views.py:2457
 msgid "Primer Acceso (FIRST_ACCESS)"
@@ -737,22 +723,19 @@ msgid "Global (Toda la Organización)"
 msgstr "Global (Entire Organization)"
 
 #: arcamitte/dashboard_views.py:2558
-#, fuzzy
 #| msgid "Destinatario autorizado:"
 msgid "Acceso no autorizado."
-msgstr "Authorized recipient:"
+msgstr "Unauthorized access."
 
 #: arcamitte/dashboard_views.py:2602
-#, fuzzy
 #| msgid "Documento no encontrado."
 msgid "Documentos en Custodia Activa"
-msgstr "Document not found."
+msgstr "Documents in Active Custody"
 
 #: arcamitte/dashboard_views.py:2604
-#, fuzzy
 #| msgid "El archivo cifrado no está disponible en el servidor."
 msgid "Archivos cifrados disponibles actualmente para canje seguro"
-msgstr "The encrypted file is not available on the server."
+msgstr "Encrypted files currently available for secure redemption"
 
 #: arcamitte/dashboard_views.py:2619
 msgid "Documentos Incinerados / Canjeados (BAR)"
@@ -764,20 +747,18 @@ msgid ""
 msgstr "Files physically shredded from disk after download per policy"
 
 #: arcamitte/dashboard_views.py:2640
-#, fuzzy
 #| msgid "Documentos Cifrados"
 msgid "Documentos Caducados sin Acceso"
-msgstr "Encrypted Documents"
+msgstr "Expired Documents without Access"
 
 #: arcamitte/dashboard_views.py:2642
 msgid "Plazo de vigencia vencido sin haberse completado el canje"
 msgstr "Validity period expired without redemption completed"
 
 #: arcamitte/dashboard_views.py:2657
-#, fuzzy
 #| msgid "Trámites en custodia"
 msgid "Total de Trámites en Custodia"
-msgstr "Records in custody"
+msgstr "Total Records in Custody"
 
 #: arcamitte/dashboard_views.py:2660
 msgid "Todos los asientos bajo el perímetro y filtros seleccionados"
@@ -802,10 +783,9 @@ msgid ""
 msgstr "Access attempts to documents already burned per BAR policy"
 
 #: arcamitte/dashboard_views.py:2719
-#, fuzzy
 #| msgid "Código bloqueado por intentos fallidos"
 msgid "Bloqueos por Intentos OTP Fallidos"
-msgstr "Code locked due to failed attempts"
+msgstr "Lockouts due to Failed OTP Attempts"
 
 #: arcamitte/dashboard_views.py:2722
 msgid ""
@@ -814,52 +794,46 @@ msgid ""
 msgstr "Requests blocked due to repeated wrong passphrases (anti-brute-force defense)"
 
 #: arcamitte/dashboard_views.py:2727
-#, fuzzy
 #| msgid "Descargar copia de auditoría"
 msgid "Descargas Periciales de Auditoría Legal"
-msgstr "Download audit copy"
+msgstr "Forensic Legal Audit Downloads"
 
 #: arcamitte/dashboard_views.py:2730
 msgid "Acceso administrativo especial registrado por inspectores o auditores"
 msgstr "Special administrative access recorded by inspectors or auditors"
 
 #: arcamitte/dashboard_views.py:2735
-#, fuzzy
 #| msgid "Destinatarios y Canjes"
 msgid "Descargas Exitosas y Canjes"
-msgstr "Recipients and Redemptions"
+msgstr "Successful Downloads & Redemptions"
 
 #: arcamitte/dashboard_views.py:2736
 msgid "Entregas confidenciales completadas legítimamente"
 msgstr "Confidential deliveries legitimately completed"
 
 #: arcamitte/dashboard_views.py:2739
-#, fuzzy
 #| msgid "Código OTP"
 msgid "Códigos OTP Enviados"
-msgstr "OTP Code"
+msgstr "Sent OTP Codes"
 
 #: arcamitte/dashboard_views.py:2740
 msgid "Verificaciones remitidas a buzones autorizados"
 msgstr "Verifications dispatched to authorized inboxes"
 
 #: arcamitte/dashboard_views.py:2743
-#, fuzzy
 #| msgid "Avisos de seguridad:"
 msgid "Registros Forenses de Seguridad"
-msgstr "Security notices:"
+msgstr "Forensic Security Records"
 
 #: arcamitte/dashboard_views.py:2744
-#, fuzzy
 #| msgid "Trazabilidad Reciente"
 msgid "Trazabilidad perimetral del sistema"
-msgstr "Recent Traceability"
+msgstr "System perimeter traceability"
 
 #: arcamitte/dashboard_views.py:2771
-#, fuzzy
 #| msgid "Emitido por"
 msgid "Trámites Emitidos por UO"
-msgstr "Issued by"
+msgstr "Records Issued by OU"
 
 #: arcamitte/dashboard_views.py:2774
 msgid "Documentos originados en este departamento hacia otras áreas o terceros"
@@ -867,37 +841,34 @@ msgstr "Documents originated in this department towards other areas or third par
 
 #: arcamitte/dashboard_views.py:2781
 msgid "Trámites Recibidos por UO"
-msgstr "Procedures Received by UO"
+msgstr "Procedures Received by OU"
 
 #: arcamitte/dashboard_views.py:2783
 msgid "Documentos dirigidos hacia esta dependencia organizativa"
 msgstr "Documents addressed to this organizational unit"
 
 #: arcamitte/dashboard_views.py:2829
-#, fuzzy
 #| msgid "Operativa Documental"
 msgid "Actividad Documental del"
-msgstr "Document Operations"
+msgstr "Document Activity on"
 
 #: arcamitte/dashboard_views.py:2830
 msgid "Asientos creados o consumidos en esta fecha"
 msgstr "Entries created or consumed on this date"
 
 #: arcamitte/dashboard_views.py:2843
-#, fuzzy
 #| msgid "Registro de Documento"
 msgid "Listado Nominal de Documentos"
-msgstr "Document Registration"
+msgstr "Nominal Document List"
 
 #: arcamitte/dashboard_views.py:2845
 msgid "Asientos registrados bajo el perímetro y filtros seleccionados"
 msgstr "Entries recorded under the selected scope and filters"
 
 #: arcamitte/dashboard_views.py:2856
-#, fuzzy
 #| msgid "Destinatarios y Canjes"
 msgid "Destruido por Canje"
-msgstr "Recipients and Redemptions"
+msgstr "Destroyed upon Redemption"
 
 #: arcamitte/dashboard_views.py:2859
 #: arcamitte/templates/arcamitte/api_token_detail.html:21
@@ -909,73 +880,63 @@ msgid "Caducado"
 msgstr "Expired"
 
 #: arcamitte/dashboard_views.py:2870
-#, fuzzy
 #| msgid "Admin UO"
 msgid "Sin UO"
-msgstr "OU Admin"
+msgstr "No OU"
 
 #: arcamitte/dashboard_views.py:2872
-#, fuzzy
 #| msgid "Ninguna / Destinatario Externo"
 msgid "Destinatario Externo"
-msgstr "None / External Recipient"
+msgstr "External Recipient"
 
 #: arcamitte/dashboard_views.py:2906
-#, fuzzy
 #| msgid "Documento"
 msgid "Sin documento"
-msgstr "Document"
+msgstr "No document"
 
 #: arcamitte/dashboard_views.py:2945
-#, fuzzy
 #| msgid "No tiene permisos para administrar a este usuario."
 msgid "No tiene permisos para desbloquear a este usuario."
-msgstr "You do not have permissions to manage this user."
+msgstr "You do not have permission to unlock this user."
 
 #: arcamitte/dashboard_views.py:2985
-#, fuzzy
 #| msgid "Se requieren privilegios administrativos para gestionar API Tokens."
 msgid ""
 "Se requieren privilegios de Superusuario para gestionar usuarios bloqueados."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Superuser privileges required to manage locked users."
 
 #: arcamitte/dashboard_views.py:3027
-#, fuzzy
 #| msgid "Se requieren privilegios administrativos para gestionar API Tokens."
 msgid "Se requieren privilegios de Superusuario para suspender cuentas."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Superuser privileges required to suspend accounts."
 
 #: arcamitte/dashboard_views.py:3035
-#, fuzzy
 #| msgid ""
 #| "Protegido por seguridad: No puede desactivar su propia cuenta de usuario."
 msgid ""
 "Por salvaguarda operativa, no puede suspender su propia cuenta de "
 "superusuario."
-msgstr "Protected by security: You cannot deactivate your own user account."
+msgstr "For operational safety, you cannot suspend your own superuser account."
 
 #: arcamitte/dashboard_views.py:3045
-#, fuzzy
 #| msgid ""
 #| "Debe proporcionar un motivo justificado para la destrucción anticipada."
 msgid ""
 "Debe proporcionar una justificación obligatoria para la suspensión "
 "administrativa."
-msgstr "You must provide a justified reason for early destruction."
+msgstr "You must provide a mandatory justification for administrative suspension."
 
 #: arcamitte/dashboard_views.py:3116 arcamitte/dashboard_views.py:3185
-#, fuzzy
 #| msgid "Se requieren privilegios administrativos para gestionar API Tokens."
 msgid ""
 "Se requieren privilegios de Superusuario para gestionar la gobernanza de 2FA."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Superuser privileges required to manage 2FA governance."
 
 #: arcamitte/dashboard_views.py:3221
-#, fuzzy
 #| msgid "Se requieren privilegios administrativos para gestionar API Tokens."
 msgid ""
 "Se requieren privilegios de Superusuario para resetear credenciales 2FA."
-msgstr "Administrative privileges are required to manage API Tokens."
+msgstr "Superuser privileges required to reset 2FA credentials."
 
 #: arcamitte/dashboard_views.py:3228
 msgid "Reseteo administrativo por extravío de autenticador"
@@ -1002,10 +963,9 @@ msgid ""
 msgstr "Two-Factor Authentication (2FA) configured successfully. Please save your recovery codes."
 
 #: arcamitte/dashboard_views.py:3717
-#, fuzzy
 #| msgid "El código de verificación no es válido o ha expirado."
 msgid "El código de 6 dígitos o código de rescate es inválido o ha expirado."
-msgstr "The verification code is invalid or has expired."
+msgstr "The 6-digit code or recovery code is invalid or has expired."
 
 #: arcamitte/dashboard_views.py:3743
 msgid "Ha accedido utilizando un código de rescate de emergencia. "
@@ -1233,17 +1193,15 @@ msgid ""
 msgstr "Username matches an email registered by another account."
 
 #: arcamitte/forms.py:386
-#, fuzzy
 #| msgid ""
 #| "Dirección de correo electrónico corporativo o buzón compartido de la UO."
 msgid "El correo electrónico corporativo es estrictamente obligatorio."
-msgstr "Corporate email address or shared inbox of the OU."
+msgstr "Corporate email is strictly mandatory."
 
 #: arcamitte/forms.py:396
-#, fuzzy
 #| msgid "No hay miembros registrados con correo en esta UO."
 msgid "Ya existe otro usuario registrado con este correo electrónico."
-msgstr "No members with registered email in this OU."
+msgstr "Another user is already registered with this email address."
 
 #: arcamitte/forms.py:406
 msgid ""
@@ -1446,86 +1404,80 @@ msgid ""
 msgstr "If checked, the user must update their password after logging in."
 
 #: arcamitte/models.py:173
-#, fuzzy
 #| msgid "Intentos fallidos"
 msgid "Intentos fallidos de acceso"
-msgstr "Failed attempts"
+msgstr "Failed login attempts"
 
 #: arcamitte/models.py:174
-#, fuzzy
 #| msgid "Contador de intentos fallidos. Se revoca al alcanzar 3."
 msgid "Contador de intentos fallidos consecutivos."
-msgstr "Failed attempts counter. Revoked upon reaching 3."
+msgstr "Consecutive failed attempts counter."
 
 #: arcamitte/models.py:180
 msgid "Bloqueado hasta"
-msgstr ""
+msgstr "Locked until"
 
 #: arcamitte/models.py:181
 msgid "Fecha y hora límite del bloqueo temporal por fuerza bruta."
-msgstr ""
+msgstr "Expiration date and time of temporary brute-force lockout."
 
 #: arcamitte/models.py:185
-#, fuzzy
 #| msgid "Última actualización"
 msgid "Última actualización de contraseña"
-msgstr "Last update"
+msgstr "Last password update"
 
 #: arcamitte/models.py:187
 msgid ""
 "Marca temporal del último cambio de contraseña para control de caducidad."
-msgstr ""
+msgstr "Timestamp of the last password change for expiration control."
 
 #: arcamitte/models.py:194
-#, fuzzy
 #| msgid "Presente cifrado"
 msgid "Secreto TOTP cifrado"
-msgstr "Present encrypted"
+msgstr "Encrypted TOTP secret"
 
 #: arcamitte/models.py:195
 msgid "Secreto Base32 cifrado con la clave maestra de servidor."
-msgstr ""
+msgstr "Base32 secret encrypted with the server master key."
 
 #: arcamitte/models.py:200
-#, fuzzy
 #| msgid "¿Activo?"
 msgid "¿2FA activo?"
-msgstr "Active?"
+msgstr "2FA active?"
 
 #: arcamitte/models.py:202
-#, fuzzy
 #| msgid "Indica si el usuario tiene acceso operativo actual a esta UO."
 msgid ""
 "Indica si el usuario tiene activo el segundo factor de autenticación TOTP."
-msgstr "Indicates whether user currently has operational access to this OU."
+msgstr "Indicates whether the user has TOTP two-factor authentication enabled."
 
 #: arcamitte/models.py:207
 msgid "¿Exigir 2FA obligatorio?"
-msgstr ""
+msgstr "Enforce mandatory 2FA?"
 
 #: arcamitte/models.py:209
 msgid ""
 "Obliga al usuario a configurar y usar 2FA aunque no pertenezca al personal "
 "administrativo."
-msgstr ""
+msgstr "Requires the user to configure and use 2FA even if they do not belong to administrative staff."
 
 #: arcamitte/models.py:215
 msgid "Hashes de códigos de rescate"
-msgstr ""
+msgstr "Recovery code hashes"
 
 #: arcamitte/models.py:216
 msgid "Hashes SHA-256 de los códigos de recuperación de emergencia."
-msgstr ""
+msgstr "SHA-256 hashes of emergency recovery codes."
 
 #: arcamitte/models.py:222
 msgid "Clave de sesión activa"
-msgstr ""
+msgstr "Active session key"
 
 #: arcamitte/models.py:224
 msgid ""
 "Identificador de la última sesión activa del usuario para control de "
 "concurrencia."
-msgstr ""
+msgstr "Identifier of the user's last active session for concurrency control."
 
 #: arcamitte/models.py:229 arcamitte/models.py:762 arcamitte/models.py:1237
 msgid "Fecha de creación"
@@ -1545,25 +1497,22 @@ msgstr "User Profiles"
 
 #: arcamitte/models.py:377
 msgid "Hash de contraseña previa"
-msgstr ""
+msgstr "Previous password hash"
 
 #: arcamitte/models.py:381
-#, fuzzy
 #| msgid "Fecha de asignación"
 msgid "Fecha de fijación"
-msgstr "Assignment date"
+msgstr "Timestamp date"
 
 #: arcamitte/models.py:385
-#, fuzzy
 #| msgid "Restablecer Contraseña"
 msgid "Historial de Contraseña"
-msgstr "Reset Password"
+msgstr "Password History"
 
 #: arcamitte/models.py:386
-#, fuzzy
 #| msgid "Restablecer Contraseña"
 msgid "Historiales de Contraseñas"
-msgstr "Reset Password"
+msgstr "Password Histories"
 
 #: arcamitte/models.py:406 arcamitte/models.py:933
 #: arcamitte/templates/arcamitte/audit_logs.html:113
@@ -1574,47 +1523,45 @@ msgstr "IP Address"
 
 #: arcamitte/models.py:407
 msgid "Dirección IPv4 o IPv6 sujeta a bloqueo perimetral."
-msgstr ""
+msgstr "IPv4 or IPv6 address subject to perimeter blocking."
 
 #: arcamitte/models.py:412
 msgid "Motivo del baneo"
-msgstr ""
+msgstr "Ban reason"
 
 #: arcamitte/models.py:417
-#, fuzzy
 #| msgid "¿Activo?"
 msgid "¿Baneo activo?"
-msgstr "Active?"
+msgstr "Ban active?"
 
 #: arcamitte/models.py:419
 msgid "Permite desactivar o reactivar el bloqueo sin borrar el registro."
-msgstr ""
+msgstr "Allows disabling or reactivating the block without deleting the record."
 
 #: arcamitte/models.py:426
 msgid "Baneada hasta"
-msgstr ""
+msgstr "Banned until"
 
 #: arcamitte/models.py:427
 msgid "Dejar en blanco para baneo permanente o indefinido."
-msgstr ""
+msgstr "Leave blank for a permanent or indefinite ban."
 
 #: arcamitte/models.py:431
-#, fuzzy
 #| msgid "Fecha de alta"
 msgid "Fecha de alta en lista negra"
-msgstr "Creation date"
+msgstr "Blacklist registration date"
 
 #: arcamitte/models.py:439
 msgid "Baneada por"
-msgstr ""
+msgstr "Banned by"
 
 #: arcamitte/models.py:443
 msgid "IP Bloqueada / Lista Negra"
-msgstr ""
+msgstr "Blocked IP / Blacklist"
 
 #: arcamitte/models.py:444
 msgid "IPs Bloqueadas / Lista Negra"
-msgstr ""
+msgstr "Blocked IPs / Blacklist"
 
 #: arcamitte/models.py:500
 msgid "Descarga única (primer acceso)"
@@ -1732,20 +1679,20 @@ msgstr ""
 
 #: arcamitte/models.py:617 arcamitte/models.py:1074
 msgid "Token de Sello de Tiempo RFC 3161"
-msgstr ""
+msgstr "RFC 3161 Timestamp Token"
 
 #: arcamitte/models.py:619 arcamitte/models.py:1076
 msgid ""
 "Token DER en Base64 emitido por una Autoridad de Sellado de Tiempo (TSA)."
-msgstr ""
+msgstr "Base64 DER token issued by a Time Stamping Authority (TSA)."
 
 #: arcamitte/models.py:626 arcamitte/models.py:1083
 msgid "Autoridad de Sellado de Tiempo (TSA)"
-msgstr ""
+msgstr "Time Stamping Authority (TSA)"
 
 #: arcamitte/models.py:627 arcamitte/models.py:1084
 msgid "URL o entidad emisora del sello cualificado de tiempo."
-msgstr ""
+msgstr "URL or issuing authority of the qualified timestamp."
 
 #: arcamitte/models.py:632
 msgid "Marca temporal de creación del registro."
@@ -1846,7 +1793,7 @@ msgstr "Document reactivation"
 
 #: arcamitte/models.py:841
 msgid "Finalización manual del asiento (destrucción física)"
-msgstr "Manual termination of record (physical shredding)"
+msgstr "Manual entry closure (physical destruction)"
 
 #: arcamitte/models.py:844
 msgid "Caducidad automática del asiento por vencimiento"
@@ -1861,55 +1808,52 @@ msgid "Código bloqueado por intentos fallidos"
 msgstr "Code locked due to failed attempts"
 
 #: arcamitte/models.py:856
-#, fuzzy
 #| msgid "No se encontraron registros de auditoría"
 msgid "Exportación certificada de registros de auditoría"
-msgstr "No audit records found"
+msgstr "Certified audit log export"
 
 #: arcamitte/models.py:859
-#, fuzzy
 #| msgid ""
 #| "Protegido por seguridad: No puede desactivar su propia cuenta de usuario."
 msgid "Bloqueo de seguridad de cuenta de usuario"
-msgstr "Protected by security: You cannot deactivate your own user account."
+msgstr "User account security lockout"
 
 #: arcamitte/models.py:861
 msgid "Baneo de dirección IP en lista negra"
-msgstr ""
+msgstr "IP address blacklisted"
 
 #: arcamitte/models.py:863
 msgid "Rotación de clave maestra de cifrado"
-msgstr ""
+msgstr "Master encryption key rotation"
 
 #: arcamitte/models.py:866
 msgid "Detección de posible secuestro de sesión (discrepancia IP)"
-msgstr ""
+msgstr "Possible session hijacking detected (IP discrepancy)"
 
 #: arcamitte/models.py:869
 msgid "Sesión concurrente anterior cerrada"
-msgstr ""
+msgstr "Previous concurrent session closed"
 
 #: arcamitte/models.py:872
 msgid "Autenticación 2FA configurada/modificada"
-msgstr ""
+msgstr "2FA authentication configured/modified"
 
 #: arcamitte/models.py:875
-#, fuzzy
 #| msgid "Código de verificación enviado"
 msgid "Código de recuperación 2FA consumido"
-msgstr "Verification code sent"
+msgstr "2FA recovery code consumed"
 
 #: arcamitte/models.py:878
 msgid "Amenaza de malware bloqueada por antivirus"
-msgstr ""
+msgstr "Malware threat blocked by antivirus"
 
 #: arcamitte/models.py:881
 msgid "Sello de tiempo RFC 3161 generado"
-msgstr ""
+msgstr "RFC 3161 timestamp generated"
 
 #: arcamitte/models.py:884
 msgid "Marca de agua forense aplicada a PDF"
-msgstr ""
+msgstr "Forensic watermark applied to PDF"
 
 #: arcamitte/models.py:886
 msgid "Token API M2M generado"
@@ -1944,22 +1888,21 @@ msgstr "User-Agent"
 
 #: arcamitte/models.py:945
 msgid "Hash del registro anterior"
-msgstr ""
+msgstr "Previous record hash"
 
 #: arcamitte/models.py:947
 msgid "Hash criptográfico del registro inmediatamente anterior en la cadena."
-msgstr ""
+msgstr "Cryptographic hash of the immediately preceding record in the chain."
 
 #: arcamitte/models.py:955
-#, fuzzy
 #| msgid "Dashboard Criptográfico"
 msgid "Hash criptográfico del registro"
-msgstr "Cryptographic Dashboard"
+msgstr "Record cryptographic hash"
 
 #: arcamitte/models.py:957
 msgid ""
 "Hash SHA-256 del contenido de este registro vinculado al bloque anterior."
-msgstr ""
+msgstr "SHA-256 hash of this record's content linked to the previous block."
 
 #: arcamitte/models.py:962
 msgid "Fecha y hora"
@@ -1982,97 +1925,84 @@ msgstr ""
 "system."
 
 #: arcamitte/models.py:1035
-#, fuzzy
 #| msgid "Identificador del documento:"
 msgid "Identificador del recibo"
-msgstr "Document identifier:"
+msgstr "Receipt identifier"
 
 #: arcamitte/models.py:1036
 msgid "Código único del recibo oficial (ej. ARCA-EXP-YYYYMMDD-...)"
-msgstr ""
+msgstr "Unique official receipt code (e.g., ARCA-EXP-YYYYMMDD-...)"
 
 #: arcamitte/models.py:1042
-#, fuzzy
 #| msgid "Hash SHA-256 del token"
 msgid "Hash SHA-256 del archivo exportado"
-msgstr "SHA-256 token hash"
+msgstr "Exported file SHA-256 hash"
 
 #: arcamitte/models.py:1044
 msgid ""
 "Huella digital del archivo CSV generado para verificación de no repudio."
-msgstr ""
+msgstr "Digital fingerprint of the generated CSV file for non-repudiation verification."
 
 #: arcamitte/models.py:1051
-#, fuzzy
 #| msgid "Emitido por"
 msgid "Exportado por"
-msgstr "Issued by"
+msgstr "Exported by"
 
 #: arcamitte/models.py:1054
-#, fuzzy
 #| msgid "Tokens Registrados"
 msgid "Total de registros volcados"
-msgstr "Registered Tokens"
+msgstr "Total exported records"
 
 #: arcamitte/models.py:1059
 msgid "Criterios de filtrado aplicados"
-msgstr ""
+msgstr "Applied filter criteria"
 
 #: arcamitte/models.py:1064
-#, fuzzy
 #| msgid "Correo del solicitante"
 msgid "Dirección IP del solicitante"
-msgstr "Applicant email"
+msgstr "Requester IP address"
 
 #: arcamitte/models.py:1069
 msgid "Justificación / Motivo legal de la exportación"
-msgstr ""
+msgstr "Legal justification / reason for export"
 
 #: arcamitte/models.py:1089
-#, fuzzy
 #| msgid "Fecha y hora del canje"
 msgid "Fecha y hora de emisión"
-msgstr "Redemption date and time"
+msgstr "Issue date and time"
 
 #: arcamitte/models.py:1093
-#, fuzzy
 #| msgid "Descarga de Auditoría"
 msgid "Recibo de Exportación de Auditoría"
-msgstr "Audit Download"
+msgstr "Audit Export Receipt"
 
 #: arcamitte/models.py:1094
-#, fuzzy
 #| msgid "Inspección de trazas de auditoría"
 msgid "Recibos de Exportación de Auditoría"
-msgstr "Audit trail inspection"
+msgstr "Audit Export Receipts"
 
 #: arcamitte/models.py:1111
-#, fuzzy
 #| msgid ""
 #| "Los registros de auditoría legal son estrictamente inmutables y no pueden "
 #| "eliminarse del sistema."
 msgid ""
 "Los recibos de auditoría de exportación son estrictamente inmutables y no "
 "pueden eliminarse."
-msgstr ""
-"Legal audit logs are strictly immutable and cannot be deleted from the "
-"system."
+msgstr "Audit export receipts are strictly immutable and cannot be deleted."
 
 #: arcamitte/models.py:1128
 msgid "Subir y registrar documentos cifrados"
 msgstr "Upload and register encrypted documents."
 
 #: arcamitte/models.py:1131
-#, fuzzy
 #| msgid "Consultar estado de documentos"
 msgid "Consultar estado y metadatos de documentos"
-msgstr "Check document status"
+msgstr "Query document status and metadata"
 
 #: arcamitte/models.py:1133
-#, fuzzy
 #| msgid "Malla de Unidades Organizativas"
 msgid "Consultar directorio de Unidades Organizativas"
-msgstr "Organizational Units Mesh"
+msgstr "Query Organizational Units directory"
 
 #: arcamitte/models.py:1137
 msgid "Nombre descriptivo del servicio / cliente"
@@ -2160,23 +2090,20 @@ msgid ""
 msgstr "Allows instant revocation without deleting historical records."
 
 #: arcamitte/models.py:1219
-#, fuzzy
 #| msgid "Fecha de creación"
 msgid "Fecha de revocación"
-msgstr "Creation date"
+msgstr "Revocation date"
 
 #: arcamitte/models.py:1227
 #: arcamitte/templates/arcamitte/api_token_detail.html:116
-#, fuzzy
 #| msgid "Revocado"
 msgid "Revocado por"
-msgstr "Revoked"
+msgstr "Revoked by"
 
 #: arcamitte/models.py:1233
-#, fuzzy
 #| msgid "Fecha de creación"
 msgid "Motivo de revocación"
-msgstr "Creation date"
+msgstr "Revocation reason"
 
 #: arcamitte/models.py:1241
 msgid "Token de API"
@@ -2242,14 +2169,14 @@ msgstr "The file exceeds the maximum allowed size of %(max_size)s MB."
 msgid ""
 "Amenaza de malware detectada por el motor antivirus: %(threat)s. La subida "
 "ha sido bloqueada y registrada para auditoría legal."
-msgstr ""
+msgstr "Malware threat detected by antivirus engine: %(threat)s. Upload has been blocked and logged for legal audit."
 
 #: arcamitte/services.py:654
 msgid ""
 "El motor antivirus ClamAV no está disponible para inspeccionar el archivo. "
 "Por política de seguridad estricta (Fail-Secure), la subida ha sido "
 "bloqueada."
-msgstr ""
+msgstr "The ClamAV antivirus engine is unavailable to inspect the file. By strict security policy (Fail-Secure), the upload has been blocked."
 
 #: arcamitte/services.py:675
 msgid "El usuario no pertenece a la UO emisora seleccionada."
@@ -2388,22 +2315,19 @@ msgid "Error al descifrar el documento para auditoría."
 msgstr "Error decrypting document for audit."
 
 #: arcamitte/services.py:1584
-#, fuzzy
 #| msgid "No tiene autorización para inspeccionar este documento."
 msgid "No tiene autorización para clausurar este asiento documental."
-msgstr "You do not have authorization to inspect this document."
+msgstr "You are not authorized to close this document entry."
 
 #: arcamitte/services.py:1653
-#, fuzzy
 #| msgid "Documento descifrado con éxito."
 msgid "Asiento documental clausurado y archivo descargado con éxito."
-msgstr "Document decrypted successfully."
+msgstr "Document entry closed and file downloaded successfully."
 
 #: arcamitte/services.py:1660
-#, fuzzy
 #| msgid "Se produjo un error al procesar el descifrado del documento."
 msgid "Error al procesar la clausura y descarga del documento."
-msgstr "An error occurred while processing document decryption."
+msgstr "Error processing document closure and download."
 
 #: arcamitte/services.py:1775
 msgid "El contenido JSON debe ser un objeto/diccionario raíz."
@@ -2621,7 +2545,7 @@ msgid ""
 "Control de enrolamiento y cumplimiento de autenticación multifactor según "
 "RFC 6238 (ENS ALTO). Permite supervisar la adopción, exigir 2FA a usuarios "
 "específicos y resetear credenciales extraviadas."
-msgstr ""
+msgstr "Enrollment and compliance control for multi-factor authentication per RFC 6238 (ENS HIGH). Enables monitoring adoption, enforcing 2FA on specific users, and resetting lost credentials."
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:20
 msgid "Configurar Mi Propio 2FA"
@@ -2632,17 +2556,15 @@ msgid "Tasa de Adopción"
 msgstr "Adoption Rate"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:37
-#, fuzzy
 #| msgid "Miembros activos"
 msgid "usuarios activos"
-msgstr "Active members"
+msgstr "active users"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:46
 #: arcamitte/templates/arcamitte/2fa_governance.html:190
-#, fuzzy
 #| msgid "Activo"
 msgid "2FA Activo"
-msgstr "Active"
+msgstr "2FA Active"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:52
 msgid "Dispositivos móviles vinculados"
@@ -2663,23 +2585,21 @@ msgstr "Privileged Accounts"
 #: arcamitte/templates/arcamitte/2fa_governance.html:81
 #, python-format
 msgid "100%% Mandatorio"
-msgstr ""
+msgstr "100%% Mandatory"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:82
 msgid "Superusers, Staff y Admins UO"
-msgstr "Superusers, Staff and UO Admins"
+msgstr "Superusers, Staff and OU Admins"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:94
-#, fuzzy
 #| msgid "Todos los estados"
 msgid "Todos los Usuarios"
-msgstr "All statuses"
+msgstr "All Users"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:99
-#, fuzzy
 #| msgid "Activo"
 msgid "Con 2FA Activo"
-msgstr "Active"
+msgstr "With Active 2FA"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:104
 #: arcamitte/templates/arcamitte/2fa_governance.html:195
@@ -2689,23 +2609,20 @@ msgstr "Mandatory (Pending)"
 #: arcamitte/templates/arcamitte/2fa_governance.html:109
 #: arcamitte/templates/arcamitte/2fa_governance.html:199
 #: arcamitte/templates/arcamitte/user_list.html:93
-#, fuzzy
 #| msgid "Operaciones"
 msgid "Opcional"
-msgstr "Operations"
+msgstr "Optional"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:132
 #: arcamitte/templates/arcamitte/locked_users_list.html:42
-#, fuzzy
 #| msgid "Buscar por IP, hash, correo o detalles..."
 msgid "Buscar por usuario, correo o nombre..."
-msgstr "Search by IP, hash, email, or details..."
+msgstr "Search by username, email or name..."
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:148
-#, fuzzy
 #| msgid "Nombre Completo"
 msgid "Nombre / Correo"
-msgstr "Full Name"
+msgstr "Name / Email"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:149
 #: arcamitte/templates/arcamitte/user_list.html:30
@@ -2713,26 +2630,23 @@ msgid "Unidades Organizativas (Roles)"
 msgstr "Organizational Units (Roles)"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:150
-#, fuzzy
 #| msgid "Nivel de Privilegios y Gobernanza del Sistema"
 msgid "Nivel de Privilegios"
-msgstr "Privilege Level and System Governance"
+msgstr "Privilege Level"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:151
-#, fuzzy
 #| msgid "Estado"
 msgid "Estado 2FA"
-msgstr "Status"
+msgstr "2FA Status"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:152
 msgid "Exigencia Individual"
 msgstr "Individual Enforcement"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:153
-#, fuzzy
 #| msgid "Personal Administrativo"
 msgid "Acciones Administrativas"
-msgstr "Administrative Staff"
+msgstr "Administrative Actions"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:174
 #: arcamitte/templates/arcamitte/user_list.html:68
@@ -2786,34 +2700,32 @@ msgstr "Enforce 2FA"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:229
 msgid "Resetear credenciales 2FA"
-msgstr ""
+msgstr "Reset 2FA credentials"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:231
 msgid "Resetear 2FA"
 msgstr "Reset 2FA"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:244
-#, fuzzy
 #| msgid "Acceso Administrativo Departamental"
 msgid "Reseteo Administrativo de Segundo Factor"
-msgstr "Departmental Administrative Access"
+msgstr "Administrative Two-Factor Reset"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:250
 msgid "¿Confirma el reseteo del autenticador 2FA para"
-msgstr ""
+msgstr "Do you confirm resetting the 2FA authenticator for"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:254
 msgid ""
 "Se desvinculará de inmediato el dispositivo móvil actual y se destruirán sus "
 "códigos de recuperación. En su siguiente acceso, si el 2FA le es "
 "obligatorio, se le requerirá vincular un nuevo autenticador."
-msgstr ""
+msgstr "The current mobile device will be unlinked immediately and its recovery codes destroyed. On their next login, if 2FA is mandatory, they will be required to link a new authenticator."
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:258
-#, fuzzy
 #| msgid "Registro de Documento"
 msgid "Motivo o Registro del Incidente"
-msgstr "Document Registration"
+msgstr "Incident Record / Reason"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:260
 msgid "Ej: Dispositivo móvil extraviado o restaurado de fábrica..."
@@ -2824,10 +2736,9 @@ msgid "Confirmar Reseteo"
 msgstr "Confirm Reset"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:283
-#, fuzzy
 #| msgid "No se encontraron asientos"
 msgid "No se encontraron usuarios"
-msgstr "No records found"
+msgstr "No users found"
 
 #: arcamitte/templates/arcamitte/2fa_governance.html:284
 msgid "No hay usuarios que coincidan con el filtro seleccionado."
@@ -2836,112 +2747,103 @@ msgstr "No users match the selected filter."
 #: arcamitte/templates/arcamitte/analytics.html:4
 #: arcamitte/templates/arcamitte/base.html:64
 msgid "Analítica y Métricas"
-msgstr ""
+msgstr "Analytics & Metrics"
 
 #: arcamitte/templates/arcamitte/analytics.html:64
 msgid "Analítica y Métricas de Custodia"
-msgstr ""
+msgstr "Custody Analytics & Metrics"
 
 #: arcamitte/templates/arcamitte/analytics.html:71
-#, fuzzy
 #| msgid "Nivel Departamental"
 msgid "Mis Departamentos"
-msgstr "Departmental Level"
+msgstr "My Departments"
 
 #: arcamitte/templates/arcamitte/analytics.html:76
 msgid ""
 "Explotación visual de datos, ciclo de vida de asientos, canjes irreversibles "
 "(BAR) y sondas de seguridad. Pinche en cualquier tarjeta o gráfico para "
 "consultar los nominales."
-msgstr ""
+msgstr "Visual data analytics, record lifecycle, irreversible redemptions (BAR), and security probes. Click on any card or chart to inspect nominal records."
 
 #: arcamitte/templates/arcamitte/analytics.html:88
 msgid "Filtros de Explotación"
-msgstr ""
+msgstr "Analytics Filters"
 
 #: arcamitte/templates/arcamitte/analytics.html:95
 msgid "Restablecer todos los filtros a valores por defecto"
-msgstr ""
+msgstr "Reset all filters to default values"
 
 #: arcamitte/templates/arcamitte/analytics.html:97
-#, fuzzy
 #| msgid "Limpiar"
 msgid "Limpiar Filtros"
-msgstr "Clear"
+msgstr "Clear Filters"
 
 #: arcamitte/templates/arcamitte/analytics.html:99
 msgid "Recargar métricas con los filtros activos"
-msgstr ""
+msgstr "Reload metrics with active filters"
 
 #: arcamitte/templates/arcamitte/analytics.html:101
-#, fuzzy
 #| msgid "Actualizar Contraseña"
 msgid "Actualizar"
-msgstr "Update Password"
+msgstr "Update"
 
 #: arcamitte/templates/arcamitte/analytics.html:109
 msgid "Período"
-msgstr ""
+msgstr "Period"
 
 #: arcamitte/templates/arcamitte/analytics.html:118
 msgid "Todo"
-msgstr ""
+msgstr "All Time"
 
 #: arcamitte/templates/arcamitte/analytics.html:120
 msgid "Rango Manual"
-msgstr ""
+msgstr "Custom Range"
 
 #: arcamitte/templates/arcamitte/analytics.html:130
 msgid "Aplicar Rango"
-msgstr ""
+msgstr "Apply Range"
 
 #: arcamitte/templates/arcamitte/analytics.html:145
 msgid "Toda la Organización (Global)"
-msgstr ""
+msgstr "Entire Organization (Global)"
 
 #: arcamitte/templates/arcamitte/analytics.html:149
-#, fuzzy
 #| msgid "Todos los destinatarios autorizados"
 msgid "Todas mis UOs autorizadas"
-msgstr "All authorized recipients"
+msgstr "All my authorized OUs"
 
 #: arcamitte/templates/arcamitte/analytics.html:163
 msgid "Intervención UO"
-msgstr ""
+msgstr "OU Role Scope"
 
 #: arcamitte/templates/arcamitte/analytics.html:166
-#, fuzzy
 #| msgid "Destino"
 msgid "Origen o Destino"
-msgstr "Destination"
+msgstr "Source or Destination"
 
 #: arcamitte/templates/arcamitte/analytics.html:167
 msgid "Solo Emisora (Origen)"
-msgstr ""
+msgstr "Issuing Only (Source)"
 
 #: arcamitte/templates/arcamitte/analytics.html:168
-#, fuzzy
 #| msgid "UO Receptora (Destino)"
 msgid "Solo Receptora (Destino)"
-msgstr "Receiving OU (Destination)"
+msgstr "Receiving Only (Destination)"
 
 #: arcamitte/templates/arcamitte/analytics.html:175
-#, fuzzy
 #| msgid "Política Destrucción:"
 msgid "Política Destrucción (BAR)"
-msgstr "Burn Policy:"
+msgstr "Destruction Policy (BAR)"
 
 #: arcamitte/templates/arcamitte/analytics.html:178
-#, fuzzy
 #| msgid "Todas las acciones"
 msgid "Todas las políticas"
-msgstr "All actions"
+msgstr "All policies"
 
 #: arcamitte/templates/arcamitte/analytics.html:188
-#, fuzzy
 #| msgid "El asiento documental"
 msgid "Estado Documental"
-msgstr "The document record"
+msgstr "Document Status"
 
 #: arcamitte/templates/arcamitte/analytics.html:191
 #: arcamitte/templates/arcamitte/document_list.html:30
@@ -2950,62 +2852,55 @@ msgid "Todos los estados"
 msgstr "All statuses"
 
 #: arcamitte/templates/arcamitte/analytics.html:193
-#, fuzzy
 #| msgid "Correos Autorizados para Canje (OTP)"
 msgid "Destruidos por Canje (BAR)"
-msgstr "Authorized Redemption Emails (OTP)"
+msgstr "Destroyed upon Redemption (BAR)"
 
 #: arcamitte/templates/arcamitte/analytics.html:194
-#, fuzzy
 #| msgid "Usuarios y Accesos"
 msgid "Caducados sin Acceso"
-msgstr "Users and Access"
+msgstr "Expired without Access"
 
 #: arcamitte/templates/arcamitte/analytics.html:204
 msgid "Pincha para ver el listado nominal de todos los trámites"
-msgstr ""
+msgstr "Click to view the nominal list of all records"
 
 #: arcamitte/templates/arcamitte/analytics.html:207
-#, fuzzy
 #| msgid "Trámites en custodia"
 msgid "Trámites Totales"
-msgstr "Records in custody"
+msgstr "Total Records"
 
 #: arcamitte/templates/arcamitte/analytics.html:210
-#, fuzzy
 #| msgid "Trámites en custodia"
 msgid "activos en custodia"
-msgstr "Records in custody"
+msgstr "active in custody"
 
 #: arcamitte/templates/arcamitte/analytics.html:219
-#, fuzzy
 #| msgid "Volver al listado"
 msgid "Ver listado nominal"
-msgstr "Back to list"
+msgstr "View nominal list"
 
 #: arcamitte/templates/arcamitte/analytics.html:225
 msgid "Pincha para ver los documentos incinerados / canjeados (BAR)"
-msgstr ""
+msgstr "Click to view burned / redeemed documents (BAR)"
 
 #: arcamitte/templates/arcamitte/analytics.html:228
-#, fuzzy
 #| msgid "Política de Destrucción"
 msgid "Tasa de Destrucción (BAR)"
-msgstr "Destruction Policy"
+msgstr "Destruction Rate (BAR)"
 
 #: arcamitte/templates/arcamitte/analytics.html:231
 msgid "canjeados e incinerados"
-msgstr ""
+msgstr "redeemed and burned"
 
 #: arcamitte/templates/arcamitte/analytics.html:243
-#, fuzzy
 #| msgid "Asientos Activos"
 msgid "Ver asientos destruidos"
-msgstr "Active Records"
+msgstr "View destroyed records"
 
 #: arcamitte/templates/arcamitte/analytics.html:249
 msgid "Pincha para ver los documentos actualmente en custodia activa"
-msgstr ""
+msgstr "Click to view documents currently in active custody"
 
 #: arcamitte/templates/arcamitte/analytics.html:255
 #: arcamitte/templates/arcamitte/dashboard.html:41
@@ -3013,144 +2908,133 @@ msgid "Disponibles para canje"
 msgstr "Available for redemption"
 
 #: arcamitte/templates/arcamitte/analytics.html:264
-#, fuzzy
 #| msgid "Asientos Activos"
 msgid "Ver asientos activos"
-msgstr "Active Records"
+msgstr "View active records"
 
 #: arcamitte/templates/arcamitte/analytics.html:270
 msgid "Pincha para ver las incidencias forenses y accesos bloqueados"
-msgstr ""
+msgstr "Click to view forensic incidents and blocked accesses"
 
 #: arcamitte/templates/arcamitte/analytics.html:273
-#, fuzzy
 #| msgid "Caducados / Bloqueados"
 msgid "Incidencias y Bloqueos"
-msgstr "Expired / Blocked"
+msgstr "Incidents & Blocks"
 
 #: arcamitte/templates/arcamitte/analytics.html:276
 msgid "Intentos post-consumo / OTPs"
-msgstr ""
+msgstr "Post-consumption attempts / OTPs"
 
 #: arcamitte/templates/arcamitte/analytics.html:285
-#, fuzzy
 #| msgid "Avisos de seguridad:"
 msgid "Ver incidencias de seguridad"
-msgstr "Security notices:"
+msgstr "View security incidents"
 
 #: arcamitte/templates/arcamitte/analytics.html:299
-#, fuzzy
 #| msgid "Ciclo de Vida y Reactivación"
 msgid "Ciclo de Vida Documental"
-msgstr "Lifecycle and Reactivation"
+msgstr "Document Lifecycle"
 
 #: arcamitte/templates/arcamitte/analytics.html:301
 msgid ""
 "Evolución de altas frente a canjes definitivos (BAR). Pinche en una fecha "
 "para ver los asientos nominales."
-msgstr ""
+msgstr "Evolution of registrations vs. permanent redemptions (BAR). Click on a date to view nominal records."
 
 #: arcamitte/templates/arcamitte/analytics.html:315
-#, fuzzy
 #| msgid "Custodia Criptográfica"
 msgid "Estado de Custodia Criptográfica"
-msgstr "Cryptographic Custody"
+msgstr "Cryptographic Custody Status"
 
 #: arcamitte/templates/arcamitte/analytics.html:317
 msgid "Pinche en cualquier sector para ver el listado nominal correspondiente"
-msgstr ""
+msgstr "Click on any sector to view the corresponding nominal list"
 
 #: arcamitte/templates/arcamitte/analytics.html:333
 msgid "Malla de Tráfico Interdepartamental"
-msgstr ""
+msgstr "Interdepartmental Traffic Mesh"
 
 #: arcamitte/templates/arcamitte/analytics.html:335
 msgid ""
 "Pinche en la barra de una UO para inspeccionar los documentos emitidos o "
 "recibidos"
-msgstr ""
+msgstr "Click on an OU bar to inspect issued or received documents"
 
 #: arcamitte/templates/arcamitte/analytics.html:348
 msgid "Incidencias de Seguridad y Verificación"
-msgstr ""
+msgstr "Security & Verification Incidents"
 
 #: arcamitte/templates/arcamitte/analytics.html:350
 msgid ""
 "Intentos sobre archivos ya quemados (BAR), bloqueos OTP y canjes legítimos"
-msgstr ""
+msgstr "Attempts on burned files (BAR), OTP blocks, and legitimate redemptions"
 
 #: arcamitte/templates/arcamitte/analytics.html:368
-#, fuzzy
 #| msgid "Registro de Documento"
 msgid "Registros Nominales"
-msgstr "Document Registration"
+msgstr "Nominal Records"
 
 #: arcamitte/templates/arcamitte/analytics.html:375
 msgid "Exportar los registros de esta tabla a un archivo CSV (Excel)"
-msgstr ""
+msgstr "Export the records in this table to a CSV (Excel) file"
 
 #: arcamitte/templates/arcamitte/analytics.html:377
 msgid "Exportar CSV"
-msgstr ""
+msgstr "Export CSV"
 
 #: arcamitte/templates/arcamitte/analytics.html:389
 msgid ""
 "Filtrar rápidamente en estos registros por nombre, hash, departamento, IP..."
-msgstr ""
+msgstr "Quickly filter these records by name, hash, department, IP..."
 
 #: arcamitte/templates/arcamitte/analytics.html:398
 msgid "Cargando..."
-msgstr ""
+msgstr "Loading..."
 
 #: arcamitte/templates/arcamitte/analytics.html:400
 msgid "Obteniendo registros nominales..."
-msgstr ""
+msgstr "Fetching nominal records..."
 
 #: arcamitte/templates/arcamitte/analytics.html:406
-#, fuzzy
 #| msgid "No se encontraron registros de auditoría"
 msgid "No se encontraron registros nominales para este criterio."
-msgstr "No audit records found"
+msgstr "No nominal records were found for this criterion."
 
 #: arcamitte/templates/arcamitte/analytics.html:407
 msgid ""
 "No existen asientos o eventos forenses en el perímetro y filtros "
 "seleccionados."
-msgstr ""
+msgstr "No records or forensic events exist in the selected perimeter and filters."
 
 #: arcamitte/templates/arcamitte/analytics.html:414
 msgid ""
 "Mostrando los asientos o eventos coincidentes bajo el perímetro de "
 "gobernanza autorizado."
-msgstr ""
+msgstr "Showing matching records or events under the authorized governance perimeter."
 
 #: arcamitte/templates/arcamitte/analytics.html:418
-#, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Cerrar"
-msgstr "Log out"
+msgstr "Close"
 
 #: arcamitte/templates/arcamitte/analytics.html:930
-#, fuzzy
 #| msgid "Documento"
 msgid "Documento / Trámite"
-msgstr "Document"
+msgstr "Document / Record"
 
 #: arcamitte/templates/arcamitte/analytics.html:932
 msgid "Flujo UO"
-msgstr ""
+msgstr "OU Flow"
 
 #: arcamitte/templates/arcamitte/analytics.html:934
-#, fuzzy
 #| msgid "Fecha de alta"
 msgid "Fecha Alta"
-msgstr "Creation date"
+msgstr "Created Date"
 
 #: arcamitte/templates/arcamitte/analytics.html:966
-#, fuzzy
 #| msgid "Cifrar Asiento"
 msgid "Ver Asiento"
-msgstr "Encrypt Record"
+msgstr "View Record"
 
 #: arcamitte/templates/arcamitte/analytics.html:981
 #: arcamitte/templates/arcamitte/audit_logs.html:110
@@ -3160,37 +3044,32 @@ msgstr "Date and Time"
 
 #: arcamitte/templates/arcamitte/analytics.html:982
 msgid "Incidencia / Evento"
-msgstr ""
+msgstr "Incident / Event"
 
 #: arcamitte/templates/arcamitte/analytics.html:983
-#, fuzzy
 #| msgid "Asientos Activos"
 msgid "Asiento Afectado"
-msgstr "Active Records"
+msgstr "Affected Record"
 
 #: arcamitte/templates/arcamitte/analytics.html:984
-#, fuzzy
 #| msgid "Correo del solicitante"
 msgid "IP / Solicitante"
-msgstr "Applicant email"
+msgstr "IP / Requester"
 
 #: arcamitte/templates/arcamitte/analytics.html:985
-#, fuzzy
 #| msgid "Detalles"
 msgid "Detalles Forenses"
-msgstr "Details"
+msgstr "Forensic Details"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:4
-#, fuzzy
 #| msgid "Detalle del Asiento"
 msgid "Detalles de API Token"
-msgstr "Record Detail"
+msgstr "API Token Details"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:12
-#, fuzzy
 #| msgid "Volver al listado"
 msgid "Volver a la lista de Tokens"
-msgstr "Back to list"
+msgstr "Back to Tokens list"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:19
 #: arcamitte/templates/arcamitte/api_tokens.html:92
@@ -3225,50 +3104,43 @@ msgid "Nombre / Servicio"
 msgstr "Name / Service"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:50
-#, fuzzy
 #| msgid "Prefijo público visible"
 msgid "Prefijo Público"
-msgstr "Visible public prefix"
+msgstr "Public Prefix"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:53
-#, fuzzy
 #| msgid "Consumido por"
 msgid "Creado por"
-msgstr "Consumed by"
+msgstr "Created by"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:56
-#, fuzzy
 #| msgid "Fecha de creación"
 msgid "Fecha de Creación"
-msgstr "Creation date"
+msgstr "Creation Date"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:59
-#, fuzzy
 #| msgid "Documento"
 msgid "Vencimiento"
-msgstr "Document"
+msgstr "Expiration"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:64
-#, fuzzy
 #| msgid "desconocido"
 msgid "Vencido"
-msgstr "unknown"
+msgstr "Expired"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:67
 msgid "Sin caducidad (Permanente)"
 msgstr "No expiration (Permanent)"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:71
-#, fuzzy
 #| msgid "Límite"
 msgid "Límite de Tasa"
-msgstr "Limit"
+msgstr "Rate Limit"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:72
-#, fuzzy
 #| msgid "Límite de peticiones por minuto"
 msgid "peticiones / minuto"
-msgstr "Rate limit (requests/min)"
+msgstr "requests / minute"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:74
 #: arcamitte/templates/arcamitte/api_tokens.html:50
@@ -3282,23 +3154,21 @@ msgstr "Telemetry and Revocation Status"
 #: arcamitte/templates/arcamitte/api_token_detail.html:96
 #: arcamitte/templates/arcamitte/api_tokens.html:52
 msgid "Último Uso"
-msgstr "Last Use"
+msgstr "Last Used"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:101
-#, fuzzy
 #| msgid "un usuario autorizado"
 msgid "Nunca ha sido utilizado"
-msgstr "an authorized user"
+msgstr "Never used"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:105
 msgid "Última IP Cliente"
 msgstr "Last Client IP"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:111
-#, fuzzy
 #| msgid "Fecha de creación"
 msgid "Fecha de Revocación"
-msgstr "Creation date"
+msgstr "Revocation Date"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:121
 msgid "Motivo Legal"
@@ -3306,10 +3176,9 @@ msgstr "Legal Reason"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:126
 #: arcamitte/templates/arcamitte/locked_users_list.html:68
-#, fuzzy
 #| msgid "Rol Operativo"
 msgid "Estado Operativo"
-msgstr "Operational Role"
+msgstr "Operational Status"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:128
 msgid "Habilitado para consumo M2M"
@@ -3320,60 +3189,52 @@ msgid "Trazabilidad Criptográfica del Token (Cadena de Custodia)"
 msgstr "Cryptographic Token Traceability (Chain of Custody)"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:144
-#, fuzzy
 #| msgid "Asientos Cifrados"
 msgid "asientos registrados"
-msgstr "Encrypted Records"
+msgstr "registered entries"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:150
-#, fuzzy
 #| msgid "Fecha y Hora"
 msgid "Fecha / Hora"
-msgstr "Date and Time"
+msgstr "Date / Time"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:152
-#, fuzzy
 #| msgid "Operador de UO"
 msgid "Operador / Actor"
-msgstr "OU Operator"
+msgstr "Operator / Actor"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:153
-#, fuzzy
 #| msgid "Pendiente"
 msgid "IP Cliente"
-msgstr "Pending"
+msgstr "Client IP"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:154
-#, fuzzy
 #| msgid "Metadatos Criptográficos"
 msgid "Detalles Criptográficos"
-msgstr "Cryptographic Metadata"
+msgstr "Cryptographic Details"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:188
-#, fuzzy
 #| msgid "Activo"
 msgid "Motivo:"
-msgstr "Active"
+msgstr "Reason:"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:191
 msgid "Scopes:"
-msgstr ""
+msgstr "Scopes:"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:203
-#, fuzzy
 #| msgid "No hay registros de auditoría para este asiento."
 msgid "No hay eventos de auditoría previos para este identificador."
-msgstr "No audit logs for this record."
+msgstr "There are no prior audit events for this identifier."
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:222
 msgid "Revocar Token API de Forma Inmediata"
-msgstr ""
+msgstr "Revoke API Token Immediately"
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:228
-#, fuzzy
 #| msgid "¡Esta acción es irreversible!"
 msgid "¡Atención! Esta acción es irreversible."
-msgstr "This action is irreversible!"
+msgstr "Warning! This action is irreversible."
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:231
 msgid ""
@@ -3392,10 +3253,9 @@ msgid ""
 msgstr "e.g., Decommissioned external service, credential rotation, suspected compromise..."
 
 #: arcamitte/templates/arcamitte/api_token_detail.html:244
-#, fuzzy
 #| msgid "Confirmar Nueva Contraseña"
 msgid "Confirmar y Revocar"
-msgstr "Confirm New Password"
+msgstr "Confirm and Revoke"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:4
 #: arcamitte/templates/arcamitte/base.html:95
@@ -3464,7 +3324,7 @@ msgstr "Expires:"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:66
 msgid "Por:"
-msgstr ""
+msgstr "By:"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:87
 msgid "Sin uso registrado"
@@ -3513,35 +3373,31 @@ msgid "Identificador descriptivo de la aplicación cliente."
 msgstr "Descriptive identifier for the client application."
 
 #: arcamitte/templates/arcamitte/api_tokens.html:148
-#, fuzzy
 #| msgid "Permisos de Acceso (Scopes)"
 msgid "Permisos de Acceso Operativos (Scopes M2M)"
-msgstr "Access Permissions (Scopes)"
+msgstr "Operational Access Permissions (M2M Scopes)"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:152
-#, fuzzy
 #| msgid "Cifrado y registro de documentos"
 msgid "Cifrado, pre-flight check y registro de documentos"
-msgstr "Document encryption and registration"
+msgstr "Encryption, pre-flight check, and document registration"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:158
-#, fuzzy
 #| msgid "Consulta de estado y canje"
 msgid "Consulta de estado y metadatos de trámite"
-msgstr "Status check and redemption"
+msgstr "Record status and metadata inquiry"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:164
-#, fuzzy
 #| msgid "Importación Masiva de Unidades Organizativas y Usuarios"
 msgid "Consulta de Unidades Organizativas y buzones autorizados"
-msgstr "Bulk Import of Organizational Units and Users"
+msgstr "Query Organizational Units and authorized inboxes"
 
 #: arcamitte/templates/arcamitte/api_tokens.html:168
 msgid ""
 "Por directiva Zero Trust, las acciones críticas (borrado físico, descifrado "
 "pericial y auditoría forense) quedan restringidas exclusivamente al panel "
 "web interactivo."
-msgstr ""
+msgstr "By Zero Trust policy, critical actions (physical deletion, forensic decryption, and forensic auditing) are restricted exclusively to the interactive web panel."
 
 #: arcamitte/templates/arcamitte/api_tokens.html:174
 msgid "Tasa (req/min)"
@@ -3575,69 +3431,63 @@ msgid "Trazabilidad Forense y Auditoría Legal"
 msgstr "Forensic Traceability and Legal Audit"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:11
-#, fuzzy
 #| msgid ""
 #| "Registro inmutable de accesos, operaciones criptográficas, canjes y "
 #| "vicisitudes del sistema."
 msgid ""
 "Registro inmutable de accesos, operaciones criptográficas, canjes y "
 "vicisitudes con encadenamiento Hash Chaining."
-msgstr ""
-"Immutable record of accesses, cryptographic operations, redemptions, and "
-"system vicissitudes."
+msgstr "Immutable record of accesses, cryptographic operations, redemptions, and system events with Hash Chaining."
 
 #: arcamitte/templates/arcamitte/audit_logs.html:17
 msgid "Exportar Certificado (No Repudio)"
-msgstr ""
+msgstr "Certified Export (Non-Repudiation)"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:21
-#, fuzzy
 #| msgid "Modificar cuenta"
 msgid "Verificar Cadena"
-msgstr "Modify account"
+msgstr "Verify Chain"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:25
 msgid "Recibos Oficiales"
-msgstr ""
+msgstr "Official Receipts"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:29
 msgid "Verificar CSV"
-msgstr ""
+msgstr "Verify CSV"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:45
-#, fuzzy
 #| msgid "Inspección de trazas de auditoría"
 msgid "Exportación Certificada de Auditoría"
-msgstr "Audit trail inspection"
+msgstr "Certified Audit Export"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:51
 msgid ""
 "Esta acción generará un archivo CSV oficial firmado con hash SHA-256 "
 "inalterable y registrará una vicisitud permanente en la cadena de auditoría "
 "(eIDAS / ENS)."
-msgstr ""
+msgstr "This action will generate an official CSV file signed with an immutable SHA-256 hash and record a permanent event in the audit chain (eIDAS / ENS)."
 
 #: arcamitte/templates/arcamitte/audit_logs.html:54
-#, fuzzy
 #| msgid "Motivo Justificado de Revocación / Destrucción"
 msgid "Motivo Legal / Justificación de la Exportación"
-msgstr "Justified Revocation / Destruction Reason"
+msgstr "Legal Reason / Export Justification"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:55
 msgid ""
 "Ej. Auditoría de seguridad trimestral, requerimiento judicial o inspección "
 "interna..."
-msgstr ""
+msgstr "e.g., Quarterly security audit, court order, or internal inspection..."
 
 #: arcamitte/templates/arcamitte/audit_logs.html:59
 msgid ""
 "El CSV incluirá sanitización anti-CSV Injection y el recibo oficial quedará "
 "archivado permanentemente."
-msgstr ""
+msgstr "The CSV will include anti-CSV Injection sanitization and the official receipt will be permanently archived."
 
 #: arcamitte/templates/arcamitte/audit_logs.html:66
 msgid "Generar y Descargar Recibo Oficial"
-msgstr ""
+msgstr "Generate & Download Official Receipt"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:80
 msgid "Buscar por IP, hash, correo o detalles..."
@@ -3668,7 +3518,7 @@ msgstr "Requester / Actor"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:116
 msgid "Integridad (Hash)"
-msgstr ""
+msgstr "Integrity (Hash)"
 
 #: arcamitte/templates/arcamitte/audit_logs.html:137
 msgid "Sin asiento vinculado"
@@ -3693,54 +3543,49 @@ msgid "de"
 msgstr "of"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:4
-#, fuzzy
 #| msgid "Descarga de Auditoría"
 msgid "Recibos Oficiales de Auditoría"
-msgstr "Audit Download"
+msgstr "Official Audit Receipts"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:9
 msgid "Recibos Oficiales de Exportación (No Repudio)"
-msgstr ""
+msgstr "Official Export Receipts (Non-Repudiation)"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:11
 msgid ""
 "Archivo permanente e inmutable de exportaciones forenses certificadas "
 "mediante huella digital SHA-256."
-msgstr ""
+msgstr "Permanent and immutable archive of forensic exports certified via SHA-256 fingerprint."
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:17
 msgid "Verificar un Archivo CSV"
-msgstr ""
+msgstr "Verify a CSV File"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:21
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:16
-#, fuzzy
 #| msgid "Volver al listado"
 msgid "Volver a Trazabilidad"
-msgstr "Back to list"
+msgstr "Back to Traceability"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:32
-#, fuzzy
 #| msgid "Buscar por nombre, hash SHA-256 o descripción..."
 msgid ""
 "Buscar por código de recibo, hash SHA-256, operador o justificación legal..."
-msgstr "Search by filename, SHA-256 hash, or description..."
+msgstr "Search by receipt code, SHA-256 hash, operator, or legal justification..."
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:36
 msgid "Buscar"
-msgstr ""
+msgstr "Search"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:48
-#, fuzzy
 #| msgid "Código de verificación enviado"
 msgid "Código de Recibo"
-msgstr "Verification code sent"
+msgstr "Receipt Code"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:49
-#, fuzzy
 #| msgid "Fecha y Hora"
 msgid "Fecha y Hora (UTC)"
-msgstr "Date and Time"
+msgstr "Date and Time (UTC)"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:50
 #: arcamitte/templates/arcamitte/base.html:231
@@ -3749,303 +3594,287 @@ msgid "Operador"
 msgstr "Operator"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:51
-#, fuzzy
 #| msgid "Tokens Registrados"
 msgid "Registros"
-msgstr "Registered Tokens"
+msgstr "Records"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:52
-#, fuzzy
 #| msgid "Hash SHA-256 del token"
 msgid "Hash SHA-256 del Archivo Exportado"
-msgstr "SHA-256 token hash"
+msgstr "Exported File SHA-256 Hash"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:53
 msgid "Justificación / Motivo Legal"
-msgstr ""
+msgstr "Legal Justification / Reason"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:86
 msgid "Descargar evidencia criptográfica DER (.tsr)"
-msgstr ""
+msgstr "Download DER cryptographic evidence (.tsr)"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:91
 msgid "Comprobar autenticidad del recibo"
-msgstr ""
+msgstr "Verify receipt authenticity"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:93
 msgid "Verificar"
-msgstr ""
+msgstr "Verify"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:101
 msgid "No se han emitido recibos oficiales de exportación"
-msgstr ""
+msgstr "No official export receipts have been issued"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:117
 #: arcamitte/templates/arcamitte/ip_ban_list.html:176
 msgid "Anterior"
-msgstr ""
+msgstr "Previous"
 
 #: arcamitte/templates/arcamitte/audit_receipt_list.html:121
 #: arcamitte/templates/arcamitte/ip_ban_list.html:180
 msgid "Siguiente"
-msgstr ""
+msgstr "Next"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:4
-#, fuzzy
 #| msgid "Custodia Criptográfica"
 msgid "Auditoría de Cadena Criptográfica"
-msgstr "Cryptographic Custody"
+msgstr "Cryptographic Chain Audit"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:9
 msgid "Auditoría Criptográfica de la Cadena de Logs"
-msgstr ""
+msgstr "Cryptographic Audit of the Log Chain"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:11
 msgid ""
 "Verificación secuencial SHA-256 (Hash Chaining) para detección de "
 "manipulaciones y garantía de no repudio legal (ENS / eIDAS)."
-msgstr ""
+msgstr "Sequential SHA-256 verification (Hash Chaining) for tamper detection and legal non-repudiation guarantee (ENS / eIDAS)."
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:30
-#, fuzzy, python-format
+#, python-format
 #| msgid "Custodia Criptográfica Descentralizada"
 msgid "Cadena Criptográfica 100%% Íntegra"
-msgstr "Decentralized Cryptographic Custody"
+msgstr "100%% Intact Cryptographic Chain"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:32
 msgid ""
 "Todos los bloques de auditoría han sido verificados criptográficamente sin "
 "detectar anomalías ni alteraciones."
-msgstr ""
+msgstr "All audit blocks have been cryptographically verified with no anomalies or tampering detected."
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:40
 msgid "¡Alerta de Manipulación o Corrupción Detectada!"
-msgstr ""
+msgstr "Tampering or Corruption Alert Detected!"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:42
 msgid ""
 "Se ha detectado una ruptura o discrepancia en el hash de los registros de "
 "auditoría almacenados."
-msgstr ""
+msgstr "A break or discrepancy has been detected in the hash of the stored audit records."
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:53
-#, fuzzy
 #| msgid "Tokens Registrados"
 msgid "Total de Registros Verificados"
-msgstr "Registered Tokens"
+msgstr "Total Verified Records"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:59
 msgid "Estado del Enlace Génesis"
-msgstr ""
+msgstr "Genesis Link Status"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:61
 msgid "Conectado (Genesis Root)"
-msgstr ""
+msgstr "Connected (Genesis Root)"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:67
 msgid "Hash de Cabecera Actual (Head Hash)"
-msgstr ""
+msgstr "Current Head Hash"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:74
-#, fuzzy
 #| msgid "Metadatos Criptográficos"
 msgid "Detalle del Fallo Criptográfico:"
-msgstr "Cryptographic Metadata"
+msgstr "Cryptographic Failure Detail:"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:77
-#, fuzzy
 #| msgid "Registro de Documento"
 msgid "Registro Afectado ID:"
-msgstr "Document Registration"
+msgstr "Affected Record ID:"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:92
-#, fuzzy
 #| msgid "Avisos de seguridad:"
 msgid "Garantías de Seguridad"
-msgstr "Security notices:"
+msgstr "Security Guarantees"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:98
 msgid "Encadenamiento Append-Only"
-msgstr ""
+msgstr "Append-Only Hash Chaining"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:99
 msgid ""
 "Cada entrada incorpora el hash SHA-256 del registro anterior. Cualquier "
 "inserción, alteración o borrado rompe la correlación."
-msgstr ""
+msgstr "Each entry incorporates the SHA-256 hash of the previous record. Any insertion, alteration, or deletion breaks the correlation."
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:105
 msgid "No Repudio Jurídico"
-msgstr ""
+msgstr "Legal Non-Repudiation"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:106
 msgid ""
 "Alineado con el Esquema Nacional de Seguridad (ENS) y el Reglamento eIDAS "
 "para evidencias electrónicas válidas en juicio."
-msgstr ""
+msgstr "Aligned with the National Security Framework (ENS) and the eIDAS Regulation for court-admissible electronic evidence."
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:112
 msgid "Inmutabilidad a Nivel de ORM"
-msgstr ""
+msgstr "ORM-Level Immutability"
 
 #: arcamitte/templates/arcamitte/audit_verify_chain.html:113
 msgid ""
 "Las operaciones directas de eliminación sobre la base de datos están "
 "interceptadas y restringidas por excepción PermissionDenied."
-msgstr ""
+msgstr "Direct database deletion operations are intercepted and restricted via PermissionDenied exception."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:4
 msgid "Verificación de No Repudio de Exportación"
-msgstr ""
+msgstr "Export Non-Repudiation Verification"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:9
 msgid "Verificación de No Repudio de Archivos de Auditoría"
-msgstr ""
+msgstr "Audit File Non-Repudiation Verification"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:11
 msgid ""
 "Compruebe la autenticidad e inalterabilidad de un archivo CSV de auditoría "
 "contrastándolo contra el registro oficial inmutable."
-msgstr ""
+msgstr "Verify the authenticity and immutability of an audit CSV file by checking it against the official immutable registry."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:16
-#, fuzzy
 #| msgid "Todos los estados"
 msgid "Ver Todos los Recibos"
-msgstr "All statuses"
+msgstr "View All Receipts"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:26
-#, fuzzy
 #| msgid "Consultar estado de documentos"
 msgid "Consultar y Contrastar Documento"
-msgstr "Check document status"
+msgstr "Query & Verify Document"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:33
-#, fuzzy
 #| msgid "Identificador del Documento (Hash SHA-256)"
 msgid "Identificador de Recibo o Hash SHA-256"
-msgstr "Document Identifier (SHA-256 Hash)"
+msgstr "Receipt Identifier or SHA-256 Hash"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:35
 msgid ""
 "Puede encontrar este código en la cabecera del archivo CSV o en el resguardo "
 "de entrega."
-msgstr ""
+msgstr "You can find this code in the header of the CSV file or on the delivery receipt."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:39
 msgid "Subir Archivo CSV Original para Verificación Criptográfica (Opcional)"
-msgstr ""
+msgstr "Upload Original CSV File for Cryptographic Verification (Optional)"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:41
 msgid ""
 "Si sube el archivo, Arcamitte calculará su huella SHA-256 en memoria para "
 "certificar que no ha sido alterado ni una sola coma."
-msgstr ""
+msgstr "If you upload the file, Arcamitte will compute its SHA-256 fingerprint in memory to certify that not a single byte has been altered."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:46
 msgid "Verificar Autenticidad y No Repudio"
-msgstr ""
+msgstr "Verify Authenticity & Non-Repudiation"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:58
-#, fuzzy
 #| msgid "Datos del Asiento Criptográfico"
 msgid "Resultado del Dictamen Criptográfico"
-msgstr "Cryptographic Record Data"
+msgstr "Cryptographic Verdict Result"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:68
 msgid "Recibo Auténtico y Válido"
-msgstr ""
+msgstr "Authentic & Valid Receipt"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:71
 #, python-format
 msgid ""
 "El archivo CSV subido coincide al 100%% con la huella digital registrada "
 "oficialmente. Integridad certificada sin repudio."
-msgstr ""
+msgstr "The uploaded CSV file matches 100%% with the officially registered fingerprint. Certified integrity with non-repudiation."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:73
 msgid ""
 "El recibo oficial consta en los libros inmutables del sistema con la huella "
 "registrada."
-msgstr ""
+msgstr "The official receipt is recorded in the system's immutable ledger with the registered fingerprint."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:82
 msgid "¡Alerta: El Archivo Ha Sido Manipulado!"
-msgstr ""
+msgstr "Alert: The File Has Been Tampered With!"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:84
 msgid ""
 "La huella digital del archivo CSV subido NO coincide con la huella "
 "registrada en el recibo oficial. El archivo ha sido modificado o alterado."
-msgstr ""
+msgstr "The fingerprint of the uploaded CSV file DOES NOT match the fingerprint recorded in the official receipt. The file has been modified or tampered with."
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:93
-#, fuzzy
 #| msgid "Código de verificación enviado"
 msgid "Código de Recibo:"
-msgstr "Verification code sent"
+msgstr "Receipt Code:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:97
-#, fuzzy
 #| msgid "Fecha de asignación"
 msgid "Fecha de Emisión:"
-msgstr "Assignment date"
+msgstr "Issue Date:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:101
 msgid "Operador Responsable:"
-msgstr ""
+msgstr "Responsible Operator:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:105
-#, fuzzy
 #| msgid "Asientos Cifrados"
 msgid "Registros Certificados:"
-msgstr "Encrypted Records"
+msgstr "Certified Records:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:109
 msgid "Motivo Legal Declarado:"
-msgstr ""
+msgstr "Declared Legal Reason:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:113
 msgid "Hash Oficial Registrado:"
-msgstr ""
+msgstr "Officially Registered Hash:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:118
 msgid "Hash del Archivo Subido:"
-msgstr ""
+msgstr "Uploaded File Hash:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:128
 msgid "Sello de Tiempo RFC 3161:"
-msgstr ""
+msgstr "RFC 3161 Timestamp:"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:133
 msgid "Cualificado (TSA Verificada)"
-msgstr ""
+msgstr "Qualified (Verified TSA)"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:138
-#, fuzzy
 #| msgid "Metadatos Criptográficos"
 msgid "Descargar Acuse Criptográfico (.tsr)"
-msgstr "Cryptographic Metadata"
+msgstr "Download Cryptographic Receipt (.tsr)"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:142
 msgid "Sello Inválido / Discrepancia"
-msgstr ""
+msgstr "Invalid Seal / Discrepancy"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:155
-#, fuzzy
 #| msgid "Documento no encontrado."
 msgid "Recibo No Encontrado"
-msgstr "Document not found."
+msgstr "Receipt Not Found"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:163
 msgid "Esperando consulta"
-msgstr ""
+msgstr "Awaiting query"
 
 #: arcamitte/templates/arcamitte/audit_verify_receipt.html:164
 msgid ""
 "Introduzca un código de recibo o suba un archivo CSV para emitir el dictamen "
 "forense."
-msgstr ""
+msgstr "Enter a receipt code or upload a CSV file to issue the forensic verdict."
 
 #: arcamitte/templates/arcamitte/base.html:16
 msgid "Panel de Control"
@@ -4069,22 +3898,19 @@ msgid "Seguridad y Auditoría"
 msgstr "Security and Audit"
 
 #: arcamitte/templates/arcamitte/base.html:76
-#, fuzzy
 #| msgid "Seguridad y Auditoría"
 msgid "Seguridad & Perímetro"
-msgstr "Security and Audit"
+msgstr "Security & Perimeter"
 
 #: arcamitte/templates/arcamitte/base.html:80
-#, fuzzy
 #| msgid "Caducados / Bloqueados"
 msgid "Usuarios Bloqueados"
-msgstr "Expired / Blocked"
+msgstr "Locked Users"
 
 #: arcamitte/templates/arcamitte/base.html:85
-#, fuzzy
 #| msgid "Gobernanza"
 msgid "Gobernanza 2FA"
-msgstr "Governance"
+msgstr "2FA Governance"
 
 #: arcamitte/templates/arcamitte/base.html:90
 msgid "Lista Negra IPs"
@@ -4186,7 +4012,7 @@ msgstr "Change Password"
 
 #: arcamitte/templates/arcamitte/base.html:281
 msgid "Seguridad 2FA (TOTP)"
-msgstr ""
+msgstr "2FA Security (TOTP)"
 
 #: arcamitte/templates/arcamitte/base.html:287
 msgid "Cambiar Modo de Inicio"
@@ -4300,16 +4126,14 @@ msgid "Volver al listado"
 msgstr "Back to list"
 
 #: arcamitte/templates/arcamitte/document_detail.html:31
-#, fuzzy
 #| msgid "Descarga de Auditoría"
 msgid "Descarga de Auditoría (Preservada)"
-msgstr "Audit Download"
+msgstr "Audit Download (Preserved)"
 
 #: arcamitte/templates/arcamitte/document_detail.html:37
-#, fuzzy
 #| msgid "Cifrar y Registrar Asiento"
 msgid "Descargar y Clausurar Asiento"
-msgstr "Encrypt and Register Record"
+msgstr "Download & Close Entry"
 
 #: arcamitte/templates/arcamitte/document_detail.html:42
 #: arcamitte/templates/arcamitte/document_list.html:114
@@ -4736,159 +4560,151 @@ msgstr "No members with registered email in this OU."
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:4
 msgid "Lista Negra de IPs"
-msgstr ""
+msgstr "IP Blacklist"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:9
 msgid "Lista Negra Perimetral de IPs"
-msgstr ""
+msgstr "Perimeter IP Blacklist"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:11
 msgid ""
 "Control de direcciones IP bloqueadas por actividad maliciosa, ataques de "
 "fuerza bruta o sanción manual."
-msgstr ""
+msgstr "Control of IP addresses blocked due to malicious activity, brute-force attacks, or manual sanction."
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:16
 msgid "Bloquear Nueva IP"
-msgstr ""
+msgstr "Block New IP"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:29
 msgid "Bloquear Dirección IP en Lista Negra"
-msgstr ""
+msgstr "Block IP Address in Blacklist"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:35
-#, fuzzy
 #| msgid "Dirección IP"
 msgid "Dirección IP (IPv4 o IPv6)"
-msgstr "IP Address"
+msgstr "IP Address (IPv4 or IPv6)"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:39
 msgid "Motivo del Bloqueo"
-msgstr ""
+msgstr "Block Reason"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:40
 msgid "Ej. Fuerza bruta repetida, escaneo no autorizado..."
-msgstr ""
+msgstr "e.g., Repeated brute force, unauthorized scanning..."
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:43
 msgid "Vigencia del Bloqueo"
-msgstr ""
+msgstr "Block Expiration"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:45
 msgid "1 hora"
-msgstr ""
+msgstr "1 hour"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:46
 msgid "6 horas"
-msgstr ""
+msgstr "6 hours"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:47
 msgid "24 horas (Recomendado)"
-msgstr ""
+msgstr "24 hours (Recommended)"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:48
 msgid "3 días (72 horas)"
-msgstr ""
+msgstr "3 days (72 hours)"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:49
 msgid "1 semana"
-msgstr ""
+msgstr "1 week"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:50
 msgid "1 mes (30 días)"
-msgstr ""
+msgstr "1 month (30 days)"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:51
 msgid "Permanente / Indefinido"
-msgstr ""
+msgstr "Permanent / Indefinite"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:56
 msgid ""
 "El bloqueo entrará en vigor inmediatamente en el middleware con cero "
 "latencia mediante caché."
-msgstr ""
+msgstr "The block will take effect immediately in the middleware with zero latency via cache."
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:63
 msgid "Confirmar Bloqueo"
-msgstr ""
+msgstr "Confirm Block"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:77
-#, fuzzy
 #| msgid "Buscar por IP, hash, correo o detalles..."
 msgid "Buscar por IP o motivo..."
-msgstr "Search by IP, hash, email, or details..."
+msgstr "Search by IP or reason..."
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:83
-#, fuzzy
 #| msgid "Asientos Activos"
 msgid "Bloqueo Activo"
-msgstr "Active Records"
+msgstr "Active Block"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:84
-#, fuzzy
 #| msgid "desactivada"
 msgid "Desactivado / Expirado"
-msgstr "deactivated"
+msgstr "Disabled / Expired"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:102
 msgid "Motivo del Baneo"
-msgstr ""
+msgstr "Ban Reason"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:103
-#, fuzzy
 #| msgid "Fecha de último uso"
 msgid "Fecha de Bloqueo"
-msgstr "Last used date"
+msgstr "Block Date"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:104
 msgid "Baneada Hasta"
-msgstr ""
+msgstr "Banned Until"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:118
 msgid "Bloqueada (403)"
-msgstr ""
+msgstr "Blocked (403)"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:120
-#, fuzzy
 #| msgid "Expira:"
 msgid "Expirada"
-msgstr "Expires:"
+msgstr "Expired"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:122
 msgid "Desbaneada"
-msgstr ""
+msgstr "Unbanned"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:135
-#, fuzzy
 #| msgid "Pendiente"
 msgid "Permanente"
-msgstr "Pending"
+msgstr "Permanent"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:143
 msgid "¿Desea levantar el bloqueo para la IP "
-msgstr ""
+msgstr "Do you want to lift the block for IP "
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:145
 msgid "Desbloquear IP"
-msgstr ""
+msgstr "Unblock IP"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:147
 msgid "Desbanear"
-msgstr ""
+msgstr "Unban"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:159
 msgid "No hay direcciones IP en la lista negra"
-msgstr ""
+msgstr "No IP addresses in the blacklist"
 
 #: arcamitte/templates/arcamitte/ip_ban_list.html:160
 msgid "La pasarela perimetral no registra bloqueos activos actualmente."
-msgstr ""
+msgstr "The perimeter gateway currently has no active blocks."
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:4
-#, fuzzy
 #| msgid "Gestión de Usuarios y Accesos"
 msgid "Gestión de Cuentas Bloqueadas"
-msgstr "User and Access Governance"
+msgstr "Locked Accounts Management"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:11
 msgid "Cuentas de Usuario Bloqueadas y en Riesgo"
@@ -4902,10 +4718,9 @@ msgid ""
 msgstr "Perimeter panel exclusive for Superusers. Enables monitoring and 1-click unlocking of accounts affected by brute-force attacks or manual suspension."
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:20
-#, fuzzy
 #| msgid "Todos los estados"
 msgid "Ver Todos los Usuarios"
-msgstr "All statuses"
+msgstr "View All Users"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:50
 msgid "cuentas bloqueadas o con alertas"
@@ -4917,10 +4732,9 @@ msgid "Nombre Completo"
 msgstr "Full Name"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:66
-#, fuzzy
 #| msgid "Intentos fallidos"
 msgid "Intentos Fallidos"
-msgstr "Failed attempts"
+msgstr "Failed Attempts"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:67
 msgid "Bloqueado Hasta"
@@ -4931,30 +4745,27 @@ msgid "Acciones de Remediación"
 msgstr "Remediation Actions"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:79
-#, fuzzy
 #| msgid "Superusuario"
 msgid "Superuser"
 msgstr "Superuser"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:83
 msgid "Staff"
-msgstr ""
+msgstr "Staff"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:96
-#, fuzzy
 #| msgid "eventos"
 msgid "intentos"
-msgstr "events"
+msgstr "attempts"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:109
 msgid "Indefinido"
 msgstr "Indefinite"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:117
-#, fuzzy
 #| msgid "Cuenta Inactiva"
 msgid "Suspendido / Inactivo"
-msgstr "Inactive Account"
+msgstr "Suspended / Inactive"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:119
 #: arcamitte/templates/arcamitte/user_list.html:100
@@ -4966,7 +4777,6 @@ msgid "Alertado"
 msgstr "Alerted"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:127
-#, fuzzy
 #| msgid ""
 #| "¿Desea generar una contraseña temporal y enviarla al correo de este "
 #| "usuario?"
@@ -4985,20 +4795,18 @@ msgid "Desbloquear"
 msgstr "Unlock"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:139
-#, fuzzy
 #| msgid "Tipo de Cuenta"
 msgid "Suspender cuenta"
-msgstr "Account Type"
+msgstr "Suspend account"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:141
 msgid "Suspender"
 msgstr "Suspend"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:153
-#, fuzzy
 #| msgid "Acceso Administrativo Departamental"
 msgid "Suspensión Administrativa de Cuenta"
-msgstr "Departmental Administrative Access"
+msgstr "Administrative Account Suspension"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:159
 msgid "¿Está seguro de suspender la cuenta del usuario"
@@ -5021,26 +4829,23 @@ msgid ""
 msgstr "State the legal or security reason (e.g., Staff departure, anomalous behavior)..."
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:176
-#, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Confirmar Suspensión"
-msgstr "Log out"
+msgstr "Confirm Suspension"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:184
 msgid "Reactivar en formulario de usuario"
 msgstr "Reactivate in user form"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:186
-#, fuzzy
 #| msgid "activada"
 msgid "Reactivar"
-msgstr "activated"
+msgstr "Reactivate"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:195
-#, fuzzy
 #| msgid "Caducados / Bloqueados"
 msgid "No hay usuarios bloqueados"
-msgstr "Expired / Blocked"
+msgstr "No locked users"
 
 #: arcamitte/templates/arcamitte/locked_users_list.html:196
 msgid ""
@@ -5175,56 +4980,53 @@ msgstr ""
 #: arcamitte/templates/arcamitte/password_change.html:87
 #: arcamitte/templates/arcamitte/password_change.html:97
 #: arcamitte/templates/arcamitte/password_change.html:147
-#, fuzzy
 #| msgid "Confirmar Nueva Contraseña"
 msgid "Mostrar u ocultar contraseña"
-msgstr "Confirm New Password"
+msgstr "Show or hide password"
 
 #: arcamitte/templates/arcamitte/password_change.html:107
-#, fuzzy
 #| msgid "Fecha de alta:"
 msgid "Fortaleza de la clave:"
-msgstr "Creation date:"
+msgstr "Password strength:"
 
 #: arcamitte/templates/arcamitte/password_change.html:108
 #: arcamitte/templates/arcamitte/password_change.html:253
-#, fuzzy
 #| msgid "Sin email"
 msgid "Sin evaluar"
-msgstr "No email"
+msgstr "Not evaluated"
 
 #: arcamitte/templates/arcamitte/password_change.html:116
 msgid "Política de seguridad (NIST / ENS):"
-msgstr ""
+msgstr "Security policy (NIST / ENS):"
 
 #: arcamitte/templates/arcamitte/password_change.html:119
 msgid "Mínimo 10 caracteres"
-msgstr ""
+msgstr "Minimum 10 characters"
 
 #: arcamitte/templates/arcamitte/password_change.html:122
 msgid "Al menos una letra mayúscula (A-Z)"
-msgstr ""
+msgstr "At least one uppercase letter (A-Z)"
 
 #: arcamitte/templates/arcamitte/password_change.html:125
 msgid "Al menos una letra minúscula (a-z)"
-msgstr ""
+msgstr "At least one lowercase letter (a-z)"
 
 #: arcamitte/templates/arcamitte/password_change.html:128
 msgid "Al menos un dígito numérico (0-9)"
-msgstr ""
+msgstr "At least one numeric digit (0-9)"
 
 #: arcamitte/templates/arcamitte/password_change.html:131
 #, python-format
 msgid "Al menos un símbolo especial (!@#$%%&*+-_=)"
-msgstr ""
+msgstr "At least one special symbol (!@#$%%&*+-_=)"
 
 #: arcamitte/templates/arcamitte/password_change.html:134
 msgid "Distinta de la contraseña actual"
-msgstr ""
+msgstr "Different from current password"
 
 #: arcamitte/templates/arcamitte/password_change.html:137
 msgid "Coincide con la confirmación"
-msgstr ""
+msgstr "Matches confirmation"
 
 #: arcamitte/templates/arcamitte/password_change.html:156
 msgid "Guardar Nueva Contraseña"
@@ -5232,7 +5034,7 @@ msgstr "Save New Password"
 
 #: arcamitte/templates/arcamitte/password_change.html:168
 msgid "Gestionar Autenticación en Dos Pasos (2FA)"
-msgstr ""
+msgstr "Manage Two-Factor Authentication (2FA)"
 
 #: arcamitte/templates/arcamitte/password_change.html:176
 msgid "Cancelar y cerrar sesión"
@@ -5240,15 +5042,15 @@ msgstr "Cancel and log out"
 
 #: arcamitte/templates/arcamitte/password_change.html:258
 msgid "Débil"
-msgstr ""
+msgstr "Weak"
 
 #: arcamitte/templates/arcamitte/password_change.html:263
 msgid "Media (Incompleta)"
-msgstr ""
+msgstr "Medium (Incomplete)"
 
 #: arcamitte/templates/arcamitte/password_change.html:268
 msgid "Robusta (Cumple política)"
-msgstr ""
+msgstr "Strong (Compliant)"
 
 #: arcamitte/templates/arcamitte/password_reset_request.html:8
 msgid "Recuperar Contraseña"
@@ -5366,23 +5168,22 @@ msgstr "Two-Factor Authentication (2FA)"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:11
 msgid "Autenticación Multifactor (2FA / TOTP)"
-msgstr ""
+msgstr "Multi-Factor Authentication (2FA / TOTP)"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:12
 msgid ""
 "Protección criptográfica de acceso conforme a ENS Categoría ALTA y NIST SP "
 "800-63B AAL2."
-msgstr ""
+msgstr "Cryptographic access protection compliant with ENS HIGH Category and NIST SP 800-63B AAL2."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:34
 msgid "¡IMPORTANTE: Guarde sus Códigos de Rescate de Emergencia!"
-msgstr ""
+msgstr "IMPORTANT: Save Your Emergency Recovery Codes!"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:37
-#, fuzzy
 #| msgid "Código"
 msgid "Copiar Códigos"
-msgstr "Code"
+msgstr "Copy Codes"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:42
 msgid ""
@@ -5390,210 +5191,197 @@ msgid ""
 "utilizando cualquiera de estos códigos de rescate únicos. Solo se muestran "
 "en esta ocasión y están almacenados en el servidor exclusivamente como "
 "hashes criptográficos SHA-256."
-msgstr ""
+msgstr "If you lose access to your authenticator device, you can sign in using any of these single-use recovery codes. They are only shown once and are stored on the server exclusively as SHA-256 cryptographic hashes."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:55
-#, fuzzy
 #| msgid "Descargar copia de auditoría"
 msgid "Descargar archivo de texto"
-msgstr "Download audit copy"
+msgstr "Download text file"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:71
 msgid "Autenticación en Dos Pasos Activada"
-msgstr ""
+msgstr "Two-Factor Authentication Enabled"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:73
 msgid ""
 "Su cuenta requiere un código de 6 dígitos generado por su app autenticadora "
 "en cada inicio de sesión."
-msgstr ""
+msgstr "Your account requires a 6-digit code generated by your authenticator app at every login."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:77
 msgid "RFC 6238 TOTP (SHA-1 / 30s)"
-msgstr ""
+msgstr "RFC 6238 TOTP (SHA-1 / 30s)"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:80
 msgid "Códigos de rescate disponibles:"
-msgstr ""
+msgstr "Available recovery codes:"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:87
 #: arcamitte/templates/arcamitte/totp_setup.html:105
 msgid "Regenerar Códigos de Rescate"
-msgstr ""
+msgstr "Regenerate Recovery Codes"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:90
-#, fuzzy
 #| msgid "desactivada"
 msgid "Desactivar 2FA"
-msgstr "deactivated"
+msgstr "Disable 2FA"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:110
 msgid ""
 "Al generar un nuevo juego de códigos de rescate, los códigos anteriores "
 "quedarán invalidados inmediatamente."
-msgstr ""
+msgstr "Generating a new set of recovery codes will immediately invalidate your previous codes."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:113
 msgid "Código TOTP o Contraseña actual"
-msgstr ""
+msgstr "TOTP Code or Current Password"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:114
-#, fuzzy
 #| msgid "Introduzca el código de 6 dígitos recibido en su correo electrónico."
 msgid "Introduzca código de 6 dígitos o su clave"
-msgstr "Enter the 6-digit code received in your email."
+msgstr "Enter 6-digit code or your password"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:119
-#, fuzzy
 #| msgid "Cancelar y regresar"
 msgid "Confirmar y Regenerar"
-msgstr "Cancel and return"
+msgstr "Confirm & Regenerate"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:133
 msgid "Desactivar Autenticación en Dos Pasos"
-msgstr ""
+msgstr "Disable Two-Factor Authentication"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:139
 msgid ""
 "Desactivar 2FA reduce la protección de su cuenta frente a ataques de fuerza "
 "bruta y phishing de credenciales."
-msgstr ""
+msgstr "Disabling 2FA reduces your account protection against brute-force attacks and credential phishing."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:142
 msgid "Código TOTP vigente o Contraseña actual"
-msgstr ""
+msgstr "Active TOTP Code or Current Password"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:143
-#, fuzzy
 #| msgid "Introduzca su contraseña"
 msgid "Introduzca código o contraseña"
-msgstr "Enter your password"
+msgstr "Enter code or password"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:148
 msgid "Desactivar Definitivamente"
-msgstr ""
+msgstr "Disable Permanently"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:160
 msgid "Paso 1: Vincular Aplicación Autenticadora"
-msgstr ""
+msgstr "Step 1: Link Authenticator App"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:164
 msgid ""
 "Abra su aplicación autenticadora en su dispositivo móvil (Google "
 "Authenticator, Microsoft Authenticator, Aegis, FreeOTP, Bitwarden o "
 "1Password) y escanee el código QR que se muestra a continuación."
-msgstr ""
+msgstr "Open your authenticator app on your mobile device (Google Authenticator, Microsoft Authenticator, Aegis, FreeOTP, Bitwarden, or 1Password) and scan the QR code shown below."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:172
 msgid "¿No puede escanear el código QR? Introduzca la clave manualmente:"
-msgstr ""
+msgstr "Cannot scan the QR code? Enter the key manually:"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:183
 msgid "Paso 2: Confirmar Activación"
-msgstr ""
+msgstr "Step 2: Confirm Activation"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:187
 msgid ""
 "Introduzca el código de 6 dígitos que muestra su aplicación autenticadora "
 "para verificar la sincronización y activar la protección."
-msgstr ""
+msgstr "Enter the 6-digit code displayed by your authenticator app to verify synchronization and enable protection."
 
 #: arcamitte/templates/arcamitte/totp_setup.html:193
-#, fuzzy
 #| msgid "Código de Verificación (6 dígitos)"
 msgid "Código de verificación de 6 dígitos"
-msgstr "Verification Code (6 digits)"
+msgstr "6-digit verification code"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:208
 msgid "Verificar y Activar 2FA"
-msgstr ""
+msgstr "Verify & Enable 2FA"
 
 #: arcamitte/templates/arcamitte/totp_setup.html:228
-#, fuzzy
 #| msgid "¡Copiado al portapapeles!"
 msgid "Códigos de rescate copiados al portapapeles."
-msgstr "Copied to clipboard!"
+msgstr "Recovery codes copied to clipboard."
 
 #: arcamitte/templates/arcamitte/totp_verify.html:8
 msgid "Verificación en Dos Pasos (2FA)"
-msgstr ""
+msgstr "Two-Factor Verification (2FA)"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:48
 msgid "Activación de 2FA Requerida"
-msgstr ""
+msgstr "2FA Activation Required"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:50
-#, fuzzy
 #| msgid "Error de autenticación:"
 msgid "Segundo Factor de Autenticación"
-msgstr "Authentication error:"
+msgstr "Two-Factor Authentication"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:55
 msgid "La política de seguridad corporativa exige activar 2FA para el usuario:"
-msgstr ""
+msgstr "Corporate security policy requires enabling 2FA for user:"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:57
-#, fuzzy
 #| msgid "Verificación y Descarga de Documento"
 msgid "Verificación de identidad para el usuario:"
-msgstr "Document Verification and Download"
+msgstr "Identity verification for user:"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:68
-#, fuzzy
 #| msgid "Error de autenticación:"
 msgid "Error de verificación:"
-msgstr "Authentication error:"
+msgstr "Verification error:"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:78
 msgid ""
 "Escanee el código QR con su aplicación autenticadora (Google Authenticator, "
 "Microsoft Authenticator, Aegis, FreeOTP) e introduzca el código de 6 dígitos "
 "para vincular su cuenta."
-msgstr ""
+msgstr "Scan the QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, Aegis, FreeOTP) and enter the 6-digit code to link your account."
 
 #: arcamitte/templates/arcamitte/totp_verify.html:85
 msgid "O introduzca la clave manualmente:"
-msgstr ""
+msgstr "Or enter the key manually:"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:97
-#, fuzzy
 #| msgid "Código de Verificación (6 dígitos)"
 msgid "Código de confirmación de 6 dígitos"
-msgstr "Verification Code (6 digits)"
+msgstr "6-digit confirmation code"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:99
 msgid "Código TOTP (6 dígitos) o Código de Rescate"
-msgstr ""
+msgstr "TOTP Code (6 digits) or Recovery Code"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:112
 msgid "Generado por su aplicación autenticadora."
-msgstr ""
+msgstr "Generated by your authenticator app."
 
 #: arcamitte/templates/arcamitte/totp_verify.html:114
 msgid ""
 "Abra su aplicación autenticadora o utilice uno de sus códigos de rescate de "
 "emergencia."
-msgstr ""
+msgstr "Open your authenticator app or use one of your emergency recovery codes."
 
 #: arcamitte/templates/arcamitte/totp_verify.html:122
 msgid "Confirmar y Activar 2FA"
-msgstr ""
+msgstr "Confirm & Enable 2FA"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:124
-#, fuzzy
 #| msgid "Iniciar Sesión"
 msgid "Verificar e Iniciar Sesión"
-msgstr "Log In"
+msgstr "Verify & Sign In"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:128
-#, fuzzy
 #| msgid "Volver a iniciar sesión"
 msgid "Volver a Inicio de Sesión"
-msgstr "Return to login"
+msgstr "Back to Sign In"
 
 #: arcamitte/templates/arcamitte/totp_verify.html:136
 msgid "Conforme a ENS ALTA & NIST SP 800-63B AAL2"
-msgstr ""
+msgstr "Compliant with ENS HIGH & NIST SP 800-63B AAL2"
 
 #: arcamitte/templates/arcamitte/uo_form.html:5
 #: arcamitte/templates/arcamitte/uo_list.html:17
@@ -6049,31 +5837,26 @@ msgid "Clave temporal"
 msgstr "Temporary key"
 
 #: arcamitte/templates/arcamitte/user_list.html:87
-#, fuzzy
 #| msgid "Cambio obligatorio de contraseña requerido en su primer acceso."
 msgid "Obligatorio: Se requerirá configuración en su próximo acceso"
-msgstr "Mandatory password change required on your first login."
+msgstr "Mandatory: Configuration required on next login"
 
 #: arcamitte/templates/arcamitte/user_list.html:99
-#, fuzzy
 #| msgid "Código bloqueado por intentos fallidos"
 msgid "Bloqueado por intentos fallidos hasta:"
-msgstr "Code locked due to failed attempts"
+msgstr "Locked due to failed attempts until:"
 
 #: arcamitte/templates/arcamitte/user_list.html:116
-#, fuzzy
 #| msgid ""
 #| "¿Desea generar una contraseña temporal y enviarla al correo de este "
 #| "usuario?"
 msgid "¿Desea desbloquear inmediatamente la cuenta de este usuario?"
-msgstr ""
-"Do you want to generate a temporary password and email it to this user?"
+msgstr "Do you want to immediately unlock this user's account?"
 
 #: arcamitte/templates/arcamitte/user_list.html:119
-#, fuzzy
 #| msgid "Modificar Cuenta de Usuario"
 msgid "Desbloquear cuenta de usuario"
-msgstr "Modify User Account"
+msgstr "Unlock user account"
 
 #: arcamitte/templates/arcamitte/user_list.html:126
 msgid "Modificar cuenta"
@@ -6083,17 +5866,16 @@ msgstr "Modify account"
 msgid ""
 "¿Confirma el reseteo del segundo factor (2FA) para este usuario? Perderá el "
 "acceso de su dispositivo móvil actual."
-msgstr ""
+msgstr "Do you confirm resetting two-factor authentication (2FA) for this user? They will lose access from their current mobile device."
 
 #: arcamitte/templates/arcamitte/user_list.html:135
 msgid "Resetear segundo factor (2FA)"
-msgstr ""
+msgstr "Reset two-factor authentication (2FA)"
 
 #: arcamitte/templates/arcamitte/user_list.html:137
-#, fuzzy
 #| msgid "Reset"
 msgid "Reset 2FA"
-msgstr "Reset"
+msgstr "Reset 2FA"
 
 #: arcamitte/templates/arcamitte/user_list.html:142
 msgid ""
@@ -6116,41 +5898,41 @@ msgstr "No manageable users found."
 #: arcamitte/validators.py:296
 #, python-format
 msgid "La contraseña debe contener al menos %(min_length)d caracteres."
-msgstr ""
+msgstr "Password must contain at least %(min_length)d characters."
 
 #: arcamitte/validators.py:305
 msgid "Debe incluir al menos una letra mayúscula (A-Z)."
-msgstr ""
+msgstr "Must include at least one uppercase letter (A-Z)."
 
 #: arcamitte/validators.py:312
 msgid "Debe incluir al menos una letra minúscula (a-z)."
-msgstr ""
+msgstr "Must include at least one lowercase letter (a-z)."
 
 #: arcamitte/validators.py:319
 msgid "Debe incluir al menos un dígito numérico (0-9)."
-msgstr ""
+msgstr "Must include at least one numeric digit (0-9)."
 
 #: arcamitte/validators.py:327
 msgid "Debe incluir al menos un carácter especial o símbolo (ej. !@#$%&*+-_=)."
-msgstr ""
+msgstr "Must include at least one special character or symbol (e.g., !@#$%&*+-_=)."
 
 #: arcamitte/validators.py:339
 #, python-format
 msgid ""
 "Su contraseña debe contener al menos %(min_length)d caracteres e incluir "
 "mayúsculas, minúsculas, números y símbolos especiales."
-msgstr ""
+msgstr "Your password must contain at least %(min_length)d characters and include uppercase, lowercase, numbers, and special symbols."
 
 #: arcamitte/validators.py:365
 msgid "La nueva contraseña no puede ser idéntica a su contraseña actual."
-msgstr ""
+msgstr "The new password cannot be identical to your current password."
 
 #: arcamitte/validators.py:377 arcamitte/validators.py:386
 #, python-format
 msgid ""
 "No puede reutilizar ninguna de sus últimas %(history_limit)d contraseñas "
 "previas."
-msgstr ""
+msgstr "You cannot reuse any of your last %(history_limit)d previous passwords."
 
 #: arcamitte/views.py:216
 msgid ""
@@ -6167,14 +5949,13 @@ msgstr ""
 "verification code."
 
 #: arcamitte/views.py:333
-#, fuzzy
 #| msgid ""
 #| "Ha superado el límite de solicitudes permitidas. Por favor, espere un "
 #| "minuto antes de reintentar."
 msgid ""
 "Ha superado el límite de intentos por minuto. Por favor, espere antes de "
 "reintentar."
-msgstr "Request limit exceeded. Please wait a minute before trying again."
+msgstr "You have exceeded the attempts per minute limit. Please wait before trying again."
 
 #: arcamitte/views.py:614 arcamitte/views.py:724 arcamitte/views.py:759
 msgid "No se encontró ningún documento con el hash especificado."
@@ -6188,7 +5969,6 @@ msgstr ""
 "Unit."
 
 #: arcamitte/views.py:673
-#, fuzzy
 #| msgid ""
 #| "Ya existe un documento registrado con este mismo hash pero pertenece a "
 #| "otra Unidad Organizativa (%(alias)s). No tiene autorización para "
@@ -6196,13 +5976,11 @@ msgstr ""
 msgid ""
 "El documento existe pero pertenece a otra Unidad Organizativa fuera de su "
 "perímetro."
-msgstr ""
-"A document is already registered with this hash but belongs to another "
-"Organizational Unit (%(alias)s). You are not authorized to reactivate it."
+msgstr "The document exists but belongs to another Organizational Unit outside your perimeter."
 
 #: arcamitte/views.py:700
 msgid "Huella SHA-256 no registrada. Asiento documental libre para su alta."
-msgstr ""
+msgstr "SHA-256 fingerprint not registered. Document record available for registration."
 
 #~ msgid "Eliminar"
 #~ msgstr "Delete"
@@ -6222,7 +6000,6 @@ msgstr ""
 #~ msgid "Revocación anticipada de asientos"
 #~ msgstr "Early record revocation"
 
-#, fuzzy
 #~| msgid "Acceso administrativo (is_staff)"
 #~ msgid "Acceso Administrativo / Personal del Servicio (is_staff)"
 #~ msgstr "Staff access (is_staff)"
@@ -6283,3 +6060,368 @@ msgstr ""
 #~ "Once delivery is complete, the document will no longer be available on "
 #~ "the platform according to established security policies."
 
+msgid "0 encontrados"
+msgstr "0 found"
+
+#, python-format
+msgid "API Token '%(name)s' generado correctamente."
+msgstr "API Token '%(name)s' generated successfully."
+
+msgid "ARCAMITTE - CÓDIGOS DE RESCATE DE EMERGENCIA (2FA)"
+msgstr "ARCAMITTE - EMERGENCY RECOVERY CODES (2FA)"
+
+msgid "Acceso a la plataforma criptográfica Arcamitte"
+msgstr "Access to the Arcamitte cryptographic platform"
+
+msgid "Activos"
+msgstr "Active"
+
+msgid "Actualizado por"
+msgstr "Updated by"
+
+msgid "Admin Global"
+msgstr "Global Admin"
+
+msgid "Administrador"
+msgstr "Administrator"
+
+msgid "Administrador Global"
+msgstr "Global Administrator"
+
+msgid "Administrador Global de Seguridad"
+msgstr "Global Security Administrator"
+
+msgid "Arcamitte - Pasarela Criptográfica de Custodia y Entrega Segura"
+msgstr "Arcamitte - Cryptographic Custody and Secure Delivery Gateway"
+
+msgid "Arcamitte - Plataforma Autónoma de Custodia Criptográfica y Trámite Confidencial"
+msgstr "Arcamitte - Autonomous Cryptographic Custody and Confidential Processing Platform"
+
+#, python-format
+msgid "Asiento terminado con éxito: %(msg)s"
+msgstr "Record terminated successfully: %(msg)s"
+
+msgid "Asientos Cifrados (Altas)"
+msgstr "Encrypted Records (Registered)"
+
+msgid "Auditores de UO"
+msgstr "OU Auditors"
+
+msgid "Auditoría Legal"
+msgstr "Legal Audit"
+
+msgid "Auditorías Periciales"
+msgstr "Forensic Audits"
+
+msgid "Bloqueo automático por sospecha de fuerza bruta"
+msgstr "Automatic block due to suspected brute-force attack"
+
+#, python-format
+msgid "Cada UO debe incluir obligatoriamente 'numeric_code', 'alias', 'name' y 'email'. Entrada inválida: %(data)s"
+msgstr "Each OU must include 'numeric_code', 'alias', 'name', and 'email'. Invalid entry: %(data)s"
+
+#, python-format
+msgid "Cada usuario debe incluir obligatoriamente 'username' y 'email'. Entrada inválida: %(data)s"
+msgstr "Each user must include 'username' and 'email'. Invalid entry: %(data)s"
+
+msgid "Canjes Efectivos (BAR)"
+msgstr "Effective Redemptions (BAR)"
+
+msgid "Cargando métricas..."
+msgstr "Loading metrics..."
+
+msgid "Cargando registros..."
+msgstr "Loading records..."
+
+msgid "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global."
+msgstr "Grants unrestricted sovereignty and full control over the entire platform: management of all OUs, all users, M2M API credentials, and global forensic auditing."
+
+msgid "Configure la obligatoriedad institucional del segundo factor (2FA) para los roles de la Malla de UOs. Para los roles de Superusuario Global y Administrador de UO, el segundo factor es estrictamente obligatorio por diseño criptográfico y no puede desactivarse."
+msgstr "Configure institutional mandatory two-factor authentication (2FA) for OU Mesh roles. For Global Superuser and OU Administrator roles, two-factor authentication is strictly mandatory by cryptographic design and cannot be disabled."
+
+msgid "Consultando base de datos criptográfica"
+msgstr "Querying cryptographic database"
+
+msgid "Custodia"
+msgstr "Custody"
+
+msgid "Código QR TOTP"
+msgstr "TOTP QR Code"
+
+msgid "Código:"
+msgstr "Code:"
+
+msgid "Códigos OTP Bloqueados"
+msgstr "Blocked OTP Codes"
+
+msgid "Defina si este usuario ostenta la máxima autoridad del sistema como Administrador Global de Seguridad:"
+msgstr "Define whether this user holds the highest system authority as Global Security Administrator:"
+
+msgid "Descargas OK"
+msgstr "Successful Downloads"
+
+msgid "Descargas preservadas"
+msgstr "Preserved downloads"
+
+msgid "Desde"
+msgstr "From"
+
+msgid "Destruidos (BAR)"
+msgstr "Destroyed (BAR)"
+
+msgid "Directiva de Seguridad de Plataforma"
+msgstr "Platform Security Policy"
+
+msgid "Directivas Institucionales de Exigencia de 2FA por Rol"
+msgstr "Institutional Role-Based 2FA Enforcement Policies"
+
+msgid "Directivas de Seguridad de Plataforma"
+msgstr "Platform Security Policies"
+
+msgid "Directivas de obligatoriedad de 2FA por rol actualizadas con éxito."
+msgstr "Role-based 2FA enforcement policies updated successfully."
+
+msgid "ENS Nivel ALTO"
+msgstr "ENS HIGH Level"
+
+#, python-format
+msgid "El API Token '%(name)s' ha sido revocado inmediatamente."
+msgstr "API Token '%(name)s' has been revoked immediately."
+
+#, python-format
+msgid "El baneo sobre la dirección IP %(ip)s ha sido revocado."
+msgstr "The ban on IP address %(ip)s has been revoked."
+
+#, python-format
+msgid "El campo 'numeric_code' en UO '%(alias)s' debe ser un número entero válido: %(code)s"
+msgstr "Field 'numeric_code' in OU '%(alias)s' must be a valid integer: %(code)s"
+
+#, python-format
+msgid "El segundo factor (2FA) de '%(username)s' ha sido reseteado. Deberá enrolar un nuevo autenticador en su próximo acceso."
+msgstr "Two-factor authentication (2FA) for '%(username)s' has been reset. They must enroll a new authenticator on their next login."
+
+msgid "Eliminar correo"
+msgstr "Remove email"
+
+msgid "Emitidos (Salientes)"
+msgstr "Issued (Outbound)"
+
+#, python-format
+msgid "Error al terminar el asiento: %(msg)s"
+msgstr "Error terminating record: %(msg)s"
+
+msgid "Error de consulta"
+msgstr "Query error"
+
+#, python-format
+msgid "Esta cuenta de usuario se encuentra temporalmente bloqueada por reiterados intentos fallidos de acceso. Podrá reintentarlo automáticamente a las %(time)s o contactar a un administrador para su desbloqueo inmediato."
+msgstr "This user account is temporarily locked due to repeated failed login attempts. You may try again automatically at %(time)s or contact an administrator for immediate unlocking."
+
+msgid "Estado:"
+msgstr "Status:"
+
+msgid "Exigir 2FA Obligatorio para Auditores de UO"
+msgstr "Enforce Mandatory 2FA for OU Auditors"
+
+msgid "Exigir 2FA Obligatorio para Operadores de UO"
+msgstr "Enforce Mandatory 2FA for OU Operators"
+
+msgid "Fecha Fin"
+msgstr "End Date"
+
+msgid "Fecha Inicio"
+msgstr "Start Date"
+
+msgid "Fecha:"
+msgstr "Date:"
+
+msgid "Gestión UO y Cierre"
+msgstr "OU Management & Closure"
+
+msgid "Gobernanza perimetral y directivas corporativas de seguridad."
+msgstr "Perimeter governance and corporate security policies."
+
+msgid "Guardar Directivas de Rol"
+msgstr "Save Role Policies"
+
+msgid "Guarde este fichero en un almacén seguro cifrado."
+msgstr "Store this file in an encrypted secure vault."
+
+#, python-format
+msgid "Ha accedido utilizando un código de rescate de emergencia. Le quedan %(count)s códigos disponibles."
+msgstr "You logged in using an emergency recovery code. You have %(count)s codes remaining."
+
+msgid "Hasta"
+msgstr "To"
+
+msgid "ID;Fecha y Hora;Acción / Evento;Documento;Hash;IP Solicitante;Correo;Detalles Forenses;UO"
+msgstr "ID;Date and Time;Action / Event;Document;Hash;Client IP;Email;Forensic Details;OU"
+
+msgid "ID;Nombre de Archivo;Hash SHA-256;UO Origen;UO Destino;Estado;Política BAR;Fecha Alta;Fecha Expiración;Fecha Canje"
+msgstr "ID;Filename;SHA-256 Hash;Source OU;Destination OU;Status;BAR Policy;Created Date;Expiration Date;Redemption Date"
+
+msgid "Incidencias de Seguridad"
+msgstr "Security Incidents"
+
+msgid "Incidencias y Accesos"
+msgstr "Incidents & Accesses"
+
+msgid "Innegociable"
+msgstr "Non-negotiable"
+
+msgid "Intentos Post-Consumo"
+msgstr "Post-Consumption Attempts"
+
+#, python-format
+msgid "La cuenta del usuario '%(username)s' ha sido desbloqueada con éxito."
+msgstr "User account '%(username)s' has been unlocked successfully."
+
+#, python-format
+msgid "La cuenta del usuario '%(username)s' ha sido suspendida administrativamente y sus sesiones activas revocadas."
+msgstr "User account '%(username)s' has been administratively suspended and its active sessions revoked."
+
+#, python-format
+msgid "La dirección IP %(ip)s ha sido bloqueada correctamente."
+msgstr "IP address %(ip)s has been blocked successfully."
+
+msgid "La directiva de seguridad corporativa exige 2FA obligatorio para su perfil institucional. No tiene permisos para desactivar este control."
+msgstr "Corporate security policy requires mandatory 2FA for your institutional profile. You do not have permission to disable this control."
+
+msgid "Mis UOs"
+msgstr "My OUs"
+
+msgid "Mostrando"
+msgstr "Showing"
+
+msgid "Métricas de Seguridad"
+msgstr "Security Metrics"
+
+#, python-format
+msgid "No existe ninguna Unidad Organizativa activa con alias o código '%(val)s'."
+msgstr "No active Organizational Unit exists with alias or code '%(val)s'."
+
+#, python-format
+msgid "No existe ninguna Unidad Organizativa activa identificada como '%(val)s'."
+msgstr "No active Organizational Unit exists identified as '%(val)s'."
+
+msgid "No hay registros nominales para exportar."
+msgstr "There are no nominal records to export."
+
+#, python-format
+msgid "No se encontró la UO '%(uo)s' asociada al usuario '%(username)s'. Debe definirse previamente."
+msgstr "OU '%(uo)s' associated with user '%(username)s' was not found. It must be defined first."
+
+msgid "No se encontró ningún recibo oficial con el identificador o hash indicado."
+msgstr "No official receipt was found with the specified identifier or hash."
+
+msgid "No se pudieron obtener los registros nominales."
+msgstr "Could not retrieve nominal records."
+
+msgid "OTP Bloqueados"
+msgstr "Blocked OTPs"
+
+msgid "OTP Enviados"
+msgstr "Sent OTPs"
+
+msgid "Obliga a todos los usuarios con rol de Auditor en cualquier Unidad Organizativa a enrolar y validar un segundo factor TOTP."
+msgstr "Requires all users with the Auditor role in any Organizational Unit to enroll and validate a TOTP second factor."
+
+msgid "Obliga a todos los usuarios con rol de Operador en cualquier Unidad Organizativa a enrolar y validar un segundo factor TOTP."
+msgstr "Requires all users with the Operator role in any Organizational Unit to enroll and validate a TOTP second factor."
+
+msgid "Obligatorio por directiva de rol institucional"
+msgstr "Mandatory by institutional role policy"
+
+msgid "Operadores de UO"
+msgstr "OU Operators"
+
+msgid "Otorga el máximo privilegio de gobierno criptográfico, perimetral y organizativo sobre toda la plataforma Arcamitte."
+msgstr "Grants the highest cryptographic, perimeter, and organizational governance privilege over the entire Arcamitte platform."
+
+msgid "Personal de UO"
+msgstr "OU Personnel"
+
+msgid "Pinche para ver el detalle forense"
+msgstr "Click to view forensic details"
+
+msgid "Pinche para ver registros nominales"
+msgstr "Click to view nominal records"
+
+msgid "Política:"
+msgstr "Policy:"
+
+msgid "Por favor, seleccione ambas fechas (Desde y Hasta)."
+msgstr "Please select both dates (From and To)."
+
+msgid "Por motivos de seguridad, no puede revocar sus propios privilegios de administrador global."
+msgstr "For security reasons, you cannot revoke your own global administrator privileges."
+
+msgid "Post-Consumo (BAR)"
+msgstr "Post-Consumption (BAR)"
+
+msgid "Protegido por seguridad: No puede revocar sus propios privilegios de administrador global."
+msgstr "Protected by security: You cannot revoke your own global administrator privileges."
+
+msgid "Recibidos (Entrantes)"
+msgstr "Received (Inbound)"
+
+msgid "Se requieren privilegios de Administrador Global de Seguridad para gestionar la gobernanza de 2FA."
+msgstr "Global Security Administrator privileges are required to manage 2FA governance."
+
+msgid "Se requieren privilegios de Administrador Global de Seguridad para resetear credenciales 2FA."
+msgstr "Global Security Administrator privileges are required to reset 2FA credentials."
+
+#, python-format
+msgid "Segundo factor (2FA) %(action)s para el usuario '%(username)s'."
+msgstr "Two-factor authentication (2FA) %(action)s for user '%(username)s'."
+
+msgid "Sello Cualificado RFC 3161"
+msgstr "Qualified RFC 3161 Timestamp"
+
+msgid "Sin actividad"
+msgstr "No activity"
+
+msgid "Sin filtros activos"
+msgstr "No active filters"
+
+msgid "Sistema"
+msgstr "System"
+
+msgid "Sistema (Auto)"
+msgstr "System (Auto)"
+
+msgid "Soberanía total"
+msgstr "Full sovereignty"
+
+msgid "Superusuarios y Admins UO"
+msgstr "Superusers & OU Admins"
+
+msgid "Trámite documental"
+msgstr "Document record"
+
+msgid "Usuario:"
+msgstr "User:"
+
+msgid "destinatario"
+msgstr "recipient"
+
+msgid "destinatario@empresa.com"
+msgstr "recipient@company.com"
+
+msgid "destinatarios"
+msgstr "recipients"
+
+msgid "ej. Microservicio RRHH"
+msgstr "e.g., HR Microservice"
+
+msgid "exigido"
+msgstr "enforced"
+
+msgid "liberado de exigencia individual"
+msgstr "released from individual enforcement"
+
+msgid "miembro"
+msgstr "member"
+
+msgid "registros"
+msgstr "records"

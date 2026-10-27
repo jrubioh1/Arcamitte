@@ -114,7 +114,7 @@
 							<label class="form-label fw-semibold mb-0">
 								{% trans "Correos Autorizados para Canje (OTP)" %} <span class="text-danger">*</span>
 							</label>
-							<span class="badge bg-secondary-subtle text-secondary small" id="emails_counter_badge">1 destinatario</span>
+							<span class="badge bg-secondary-subtle text-secondary small" id="emails_counter_badge">1 {% trans "destinatario" %}</span>
 						</div>
 						<div class="form-text small text-muted mb-2">
 							{% trans "Solo estas direcciones de correo podrán solicitar y recibir el código OTP para canjear el documento." %}
@@ -252,6 +252,15 @@ document.addEventListener("DOMContentLoaded", function() {
 		return (str || "").replace(/"/g, '&quot;');
 	}
 
+	const I18N_UPLOAD = {
+		recipientSingular: "{% trans 'destinatario' %}",
+		recipientPlural: "{% trans 'destinatarios' %}",
+		memberSingular: "{% trans 'miembro' %}",
+		memberPlural: "{% trans 'miembros' %}",
+		emailPlaceholder: "{% trans 'destinatario@empresa.com' %}",
+		removeEmailTitle: "{% trans 'Eliminar correo' %}"
+	};
+
 	function updateCountBadge() {
 		const inputs = emailContainer.querySelectorAll('input[name="allowed_emails"]');
 		let count = 0;
@@ -259,7 +268,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			if (inp.value.trim()) count++;
 		});
 		const displayCount = count > 0 ? count : inputs.length;
-		counterBadge.textContent = `${displayCount} destinatario${displayCount === 1 ? '' : 's'}`;
+		counterBadge.textContent = `${displayCount} ${displayCount === 1 ? I18N_UPLOAD.recipientSingular : I18N_UPLOAD.recipientPlural}`;
 	}
 
 	function syncStaffCheckboxes() {
@@ -279,8 +288,8 @@ document.addEventListener("DOMContentLoaded", function() {
 		row.className = "input-group email-input-row";
 		row.innerHTML = `
 			<span class="input-group-text bg-light text-muted"><i data-feather="mail" style="width:14px;height:14px;"></i></span>
-			<input type="email" name="allowed_emails" class="form-control" placeholder="destinatario@empresa.com" required value="${escapeHtml(emailValue)}">
-			<button type="button" class="btn btn-outline-danger btn-remove-row" title="Eliminar correo">
+			<input type="email" name="allowed_emails" class="form-control" placeholder="${I18N_UPLOAD.emailPlaceholder}" required value="${escapeHtml(emailValue)}">
+			<button type="button" class="btn btn-outline-danger btn-remove-row" title="${I18N_UPLOAD.removeEmailTitle}">
 				<i data-feather="trash-2" style="width:14px;height:14px;"></i>
 			</button>
 		`;
@@ -412,7 +421,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			currentMailboxEmail = data.uo_email || "";
 
 			staffTitle.textContent = `${uoRoleLabel} ${data.uo_name} (${data.uo_alias})`;
-			staffCount.textContent = `${currentStaffMembers.length} miembro${currentStaffMembers.length === 1 ? '' : 's'}`;
+			staffCount.textContent = `${currentStaffMembers.length} ${currentStaffMembers.length === 1 ? I18N_UPLOAD.memberSingular : I18N_UPLOAD.memberPlural}`;
 
 			staffList.innerHTML = "";
 			if (currentStaffMembers.length === 0) {

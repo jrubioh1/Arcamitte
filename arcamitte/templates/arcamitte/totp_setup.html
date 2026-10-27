@@ -166,7 +166,7 @@
 
 						<div class="text-center p-3 bg-light rounded border my-3">
 							{% if qr_data_uri %}
-								<img src="{{ qr_data_uri }}" alt="Código QR TOTP" class="img-fluid rounded" style="max-width: 220px;" />
+								<img src="{{ qr_data_uri }}" alt="{% trans 'Código QR TOTP' %}" class="img-fluid rounded" style="max-width: 220px;" />
 							{% endif %}
 							<div class="mt-3">
 								<span class="text-muted small">{% trans "¿No puede escanear el código QR? Introduzca la clave manualmente:" %}</span>
@@ -231,10 +231,10 @@ function copyScratchCodes() {
 
 function downloadScratchCodes() {
 	const codes = [
-		"# ARCAMITTE - CÓDIGOS DE RESCATE DE EMERGENCIA (2FA)",
-		"# Usuario: {{ request.user.username }}",
-		"# Fecha: " + new Date().toISOString(),
-		"# Guarde este fichero en un almacén seguro cifrado.",
+		"# {% trans 'ARCAMITTE - CÓDIGOS DE RESCATE DE EMERGENCIA (2FA)' %}",
+		"# {% trans 'Usuario:' %} {{ request.user.username }}",
+		"# {% trans 'Fecha:' %} " + new Date().toISOString(),
+		"# {% trans 'Guarde este fichero en un almacén seguro cifrado.' %}",
 		"",
 		{% for sc in just_generated_scratch_codes %}"{{ sc }}",{% endfor %}
 	].join("\n");

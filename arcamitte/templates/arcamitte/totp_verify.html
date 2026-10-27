@@ -80,7 +80,7 @@
 
 								{% if setup_qr_data_uri %}
 									<div class="text-center my-3 p-3 bg-white rounded border">
-										<img src="{{ setup_qr_data_uri }}" alt="Código QR TOTP" class="img-fluid" style="max-width: 190px;" />
+										<img src="{{ setup_qr_data_uri }}" alt="{% trans 'Código QR TOTP' %}" class="img-fluid" style="max-width: 190px;" />
 										<div class="mt-2 text-muted small">
 											{% trans "O introduzca la clave manualmente:" %}
 											<code class="d-block mt-1 user-select-all fw-bold text-dark fs-6">{{ setup_secret }}</code>

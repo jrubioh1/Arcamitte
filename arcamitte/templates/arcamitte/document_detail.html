@@ -87,24 +87,6 @@
 							</td>
 						</tr>
 						<tr>
-							<th>{% trans "Canal de Alta / Emisor:" %}</th>
-							<td>
-								{% if doc.uploaded_by_token %}
-									<a href="{% url 'dashboard:api_token_detail' doc.uploaded_by_token.id %}" class="badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none">
-										<i data-feather="key" style="width:11px;height:11px;" class="me-1"></i>
-										API Token: {{ doc.uploaded_by_token.name }} ({{ doc.uploaded_by_token.prefix }}...)
-									</a>
-								{% endif %}
-								{% if doc.uploaded_by %}
-									<span class="small text-muted {% if doc.uploaded_by_token %}ms-1{% endif %}">
-										{% trans "Usuario:" %} <strong>{{ doc.uploaded_by.username }}</strong>
-									</span>
-								{% elif not doc.uploaded_by_token %}
-									<span class="text-muted small">{% trans "Alta desatendida / CLI" %}</span>
-								{% endif %}
-							</td>
-						</tr>
-						<tr>
 							<th>{% trans "Política Destrucción:" %}</th>
 							<td>
 								<strong>{{ doc.get_burn_policy_display }}</strong>
@@ -246,7 +228,7 @@
 						</td>
 						<td class="font-mono small">{{ log.ip_address|default:"-" }}</td>
 						<td class="small">
-							<strong>{{ log.email|default:"Sistema" }}</strong>
+							<strong>{% if log.email %}{{ log.email }}{% else %}{% trans "Sistema" %}{% endif %}</strong>
 						</td>
 						<td class="small text-muted">{{ log.details }}</td>
 					</tr>

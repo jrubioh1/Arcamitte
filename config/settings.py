@@ -20,7 +20,7 @@ elif (BASE_DIR / "arcamitte.ini.template").is_file():
 else:
     config_file = None
 
-config = configparser.ConfigParser(interpolation=None)
+config = configparser.ConfigParser()
 if config_file and config_file.exists():
     config.read(config_file, encoding="utf-8")
 
