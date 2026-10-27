@@ -215,7 +215,7 @@
 					</div>
 
 					<div class="dropdown ms-1">
-						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 rounded-lg px-2.5 py-1.5" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
+						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 rounded-lg px-2.5 py-1.5" type="button" id="userMenuBtn" data-arca-toggle="dropdown" aria-expanded="false">
 							<span class="badge bg-primary text-white rounded-circle p-1 d-inline-flex align-items-center justify-content-center" style="width:24px;height:24px;">
 								{{ request.user.username|make_list|first|upper }}
 							</span>
@@ -311,7 +311,7 @@
 					{% for message in messages %}
 						<div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}primary{% endif %} alert-dismissible fade show" role="alert">
 							{{ message }}
-							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+							<button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
 						</div>
 					{% endfor %}
 				{% endif %}

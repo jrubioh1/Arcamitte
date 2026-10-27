@@ -387,7 +387,7 @@
 						<i data-feather="download" style="width:13px;height:13px;"></i>
 						<span class="d-none d-sm-inline">{% trans "Exportar CSV" %}</span>
 					</button>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					<button type="button" class="btn-close" data-arca-dismiss="modal" aria-label="Close"></button>
 				</div>
 			</div>
 
@@ -425,7 +425,7 @@
 					{% trans "Mostrando los asientos o eventos coincidentes bajo el perímetro de gobernanza autorizado." %}
 				</span>
 				<div class="d-flex gap-2">
-					<button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">
+					<button type="button" class="btn btn-sm btn-secondary" data-arca-dismiss="modal">
 						{% trans "Cerrar" %}
 					</button>
 				</div>
@@ -471,8 +471,9 @@ document.addEventListener("DOMContentLoaded", function() {
 	// Modal de Drilldown
 	const drilldownModalEl = document.getElementById("drilldownModal");
 	let drilldownModal = null;
-	if (drilldownModalEl && window.bootstrap) {
-		drilldownModal = new bootstrap.Modal(drilldownModalEl);
+	if (drilldownModalEl && (window.ArcaModal || (window.Arcamitte && window.Arcamitte.Modal))) {
+		const ModalClass = window.ArcaModal || window.Arcamitte.Modal;
+		drilldownModal = ModalClass.getOrCreateInstance(drilldownModalEl);
 	}
 
 	// Estado activo de los filtros

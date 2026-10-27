@@ -15,9 +15,9 @@ function arcaNormalizeText(str) {
 }
 
 /**
- * Controlador ligero de Modales, Dropdowns, Alertas y Collapse (Sustituto nativo de Bootstrap JS)
+ * Controlador nativo de Modales, Dropdowns, Alertas y Collapse de Arcamitte (Design System)
  */
-(function initTailwindDialogShim() {
+(function initArcamitteDialog() {
   class ArcaModal {
     constructor(el) {
       this.el = el;
@@ -29,7 +29,7 @@ function arcaNormalizeText(str) {
       this.el.removeAttribute("aria-hidden");
       this.el.setAttribute("aria-modal", "true");
       document.body.classList.add("modal-open");
-      this.el.dispatchEvent(new CustomEvent("shown.bs.modal", { bubbles: true }));
+      this.el.dispatchEvent(new CustomEvent("shown.arca.modal", { bubbles: true }));
     }
     hide() {
       if (!this.el) return;
@@ -43,7 +43,7 @@ function arcaNormalizeText(str) {
       document.body.classList.remove("modal-open");
       document.body.style.removeProperty("overflow");
       document.body.style.removeProperty("padding-right");
-      this.el.dispatchEvent(new CustomEvent("hidden.bs.modal", { bubbles: true }));
+      this.el.dispatchEvent(new CustomEvent("hidden.arca.modal", { bubbles: true }));
     }
     static getOrCreateInstance(el) {
       if (!el) return new ArcaModal(null);
@@ -57,30 +57,33 @@ function arcaNormalizeText(str) {
     }
   }
 
-  // Exponer shim compatible para código que invoque bootstrap.Modal
-  window.bootstrap = window.bootstrap || {};
-  window.bootstrap.Modal = ArcaModal;
+  // Exponer API oficial de Arcamitte sin dependencias de librerías externas
+  window.ArcaModal = ArcaModal;
+  window.Arcamitte = Object.assign(window.Arcamitte || {}, { Modal: ArcaModal });
 
   // Delegación global de clics para Modales, Dropdowns, Alertas y Collapse
   document.addEventListener("click", function (e) {
-    // 1. Abrir Modal: [data-bs-toggle="modal"]
-    const modalTrigger = e.target.closest("[data-bs-toggle='modal']");
+    // 1. Abrir Modal: [data-arca-toggle="modal"] o [data-modal-target]
+    const modalTrigger = e.target.closest("[data-arca-toggle='modal'], [data-modal-target]");
     if (modalTrigger) {
       e.preventDefault();
       const targetSel =
-        modalTrigger.getAttribute("data-bs-target") || modalTrigger.getAttribute("href");
+        modalTrigger.getAttribute("data-arca-target") ||
+        modalTrigger.getAttribute("data-modal-target") ||
+        modalTrigger.getAttribute("href");
       if (targetSel) {
-        const modalEl = document.querySelector(targetSel);
+        const modalEl = targetSel.startsWith("#") ? document.querySelector(targetSel) : document.getElementById(targetSel);
         if (modalEl) ArcaModal.getOrCreateInstance(modalEl).show();
       }
       return;
     }
 
-    // 2. Cerrar Modal: [data-bs-dismiss="modal"] o clic en el fondo oscuro (.modal)
-    const modalDismiss = e.target.closest("[data-bs-dismiss='modal']");
+    // 2. Cerrar Modal: [data-arca-dismiss="modal"] o [data-modal-hide] o clic en el fondo oscuro (.modal)
+    const modalDismiss = e.target.closest("[data-arca-dismiss='modal'], [data-modal-hide]");
     if (modalDismiss) {
       e.preventDefault();
-      const modalEl = modalDismiss.closest(".modal");
+      const modalTargetId = modalDismiss.getAttribute("data-modal-hide");
+      const modalEl = modalTargetId ? document.getElementById(modalTargetId) : modalDismiss.closest(".modal");
       if (modalEl) ArcaModal.getOrCreateInstance(modalEl).hide();
       return;
     }
@@ -89,22 +92,24 @@ function arcaNormalizeText(str) {
       return;
     }
 
-    // 3. Cerrar Alerta: [data-bs-dismiss="alert"]
-    const alertDismiss = e.target.closest("[data-bs-dismiss='alert']");
+    // 3. Cerrar Alerta: [data-arca-dismiss="alert"] o [data-dismiss-target]
+    const alertDismiss = e.target.closest("[data-arca-dismiss='alert'], [data-dismiss-target]");
     if (alertDismiss) {
       e.preventDefault();
-      const alertEl = alertDismiss.closest(".alert");
+      const alertTargetId = alertDismiss.getAttribute("data-dismiss-target");
+      const alertEl = alertTargetId ? document.querySelector(alertTargetId) : alertDismiss.closest(".alert");
       if (alertEl) alertEl.remove();
       return;
     }
 
-    // 4. Toggle Dropdown: [data-bs-toggle="dropdown"]
-    const dropdownTrigger = e.target.closest("[data-bs-toggle='dropdown']");
+    // 4. Toggle Dropdown: [data-arca-toggle="dropdown"] o [data-dropdown-toggle]
+    const dropdownTrigger = e.target.closest("[data-arca-toggle='dropdown'], [data-dropdown-toggle]");
     if (dropdownTrigger) {
       e.preventDefault();
       e.stopPropagation();
+      const dropdownTargetId = dropdownTrigger.getAttribute("data-dropdown-toggle");
       const parent = dropdownTrigger.closest(".dropdown") || dropdownTrigger.parentElement;
-      const menu = parent ? parent.querySelector(".dropdown-menu") : null;
+      const menu = dropdownTargetId ? document.getElementById(dropdownTargetId) : (parent ? parent.querySelector(".dropdown-menu") : null);
       const wasOpen = menu && menu.classList.contains("show");
       document.querySelectorAll(".dropdown-menu.show").forEach(function (m) {
         m.classList.remove("show");
@@ -122,12 +127,13 @@ function arcaNormalizeText(str) {
       });
     }
 
-    // 5. Toggle Collapse: [data-bs-toggle="collapse"]
-    const collapseTrigger = e.target.closest("[data-bs-toggle='collapse']");
+    // 5. Toggle Collapse: [data-arca-toggle="collapse"]
+    const collapseTrigger = e.target.closest("[data-arca-toggle='collapse']");
     if (collapseTrigger) {
       e.preventDefault();
       const targetSel =
-        collapseTrigger.getAttribute("data-bs-target") || collapseTrigger.getAttribute("href");
+        collapseTrigger.getAttribute("data-arca-target") ||
+        collapseTrigger.getAttribute("href");
       if (targetSel) {
         const targetEl = document.querySelector(targetSel);
         if (targetEl) {
@@ -326,8 +332,8 @@ function arcaInitInteractiveComponents() {
       const actionUrl = form.getAttribute("action") || window.location.href;
 
       // Cerrar inmediatamente el modal
-      if (modalEl && window.bootstrap && window.bootstrap.Modal) {
-        window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      if (modalEl && window.ArcaModal) {
+        window.ArcaModal.getOrCreateInstance(modalEl).hide();
       }
 
       fetch(actionUrl, {

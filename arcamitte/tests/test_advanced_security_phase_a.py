@@ -4,7 +4,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 from cryptography.fernet import Fernet
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -15,17 +14,13 @@ from arcamitte.models import (
     DocumentAccessLog,
     EncryptedDocument,
     OrganizationalUnit,
-    UserProfile,
     UserUOMembership,
     get_or_create_user_profile,
 )
 from arcamitte.services import (
-    ban_ip,
     upload_and_encrypt_document,
     dispatch_siem_event,
-    record_failed_login,
     rotate_master_keys,
-    verify_user_totp_or_scratch,
 )
 from arcamitte.totp import (
     generate_qr_svg_data_uri,

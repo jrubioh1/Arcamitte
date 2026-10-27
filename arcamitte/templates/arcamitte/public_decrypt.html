@@ -35,7 +35,7 @@
                         <strong>{% trans "Aviso:" %}</strong> {{ error_message }}
                     </div>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endif %}
 
@@ -44,7 +44,7 @@
                 {% for error in form.non_field_errors %}
                     <div class="small">{{ error }}</div>
                 {% endfor %}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endif %}
 

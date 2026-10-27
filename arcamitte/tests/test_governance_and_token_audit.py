@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import datetime
-from io import BytesIO
-from typing import Any
 
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
@@ -15,15 +13,12 @@ from arcamitte.forms import UserManagementForm
 from arcamitte.models import (
     APIToken,
     DocumentAccessLog,
-    EncryptedDocument,
     OrganizationalUnit,
-    UserProfile,
     UserUOMembership,
     get_or_create_user_profile,
 )
 from arcamitte.services import (
     is_totp_required_for_user,
-    reset_user_totp,
     upload_and_encrypt_document,
 )
 

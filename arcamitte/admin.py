@@ -31,7 +31,6 @@ from arcamitte.services import (
     admin_decrypt_document,
     calculate_file_sha256,
     generate_corporate_email_text,
-    process_batch_import_json,
     reactivate_document,
     terminate_document_manually,
     upload_and_encrypt_document,

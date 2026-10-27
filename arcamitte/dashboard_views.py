@@ -11,11 +11,10 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -45,15 +44,10 @@ from arcamitte.models import (
     get_or_create_user_profile,
 )
 from arcamitte.permissions import (
-    can_audit_download,
-    can_burn_download,
     can_manage_api_tokens,
     can_manage_security_perimeter,
-    can_manage_uo_members,
     is_global_admin,
     is_uo_admin,
-    is_uo_auditor,
-    is_uo_operator,
 )
 from arcamitte.services import (
     admin_download_and_burn_document,
@@ -62,7 +56,6 @@ from arcamitte.services import (
     dispatch_siem_event,
     get_user_administered_uos,
     is_totp_required_for_user,
-    is_uo_admin,
     process_batch_import_json,
     record_audit_log,
     reset_user_password_and_notify,
@@ -141,7 +134,6 @@ class DashboardLoginView(auth_views.LoginView):
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         username = (request.POST.get("username") or "").strip()
-        client_ip = get_client_ip(request)
 
         # 1. Comprobación preventiva de cuenta bloqueada
         if username:
@@ -603,7 +595,12 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest, file_hash: str) -> HttpResponse:
         user = request.user
-        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        doc = get_object_or_404(
+            EncryptedDocument.objects.select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            ),
+            file_hash=file_hash,
+        )
 
         # Verificar autorización de acceso departamental o de autor
         if not is_global_admin(user):
@@ -627,7 +624,11 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
             user_agent=user_agent,
         )
 
-        logs = DocumentAccessLog.objects.filter(document=doc).order_by("-created_at")
+        logs = (
+            DocumentAccessLog.objects.filter(document=doc)
+            .select_related("origin_uo", "target_uo")
+            .order_by("-created_at")
+        )
 
         # Mapear estado de consumo por destinatario de forma totalmente defensiva
         consumed_raw = doc.consumed_recipients or []
@@ -782,7 +783,12 @@ class DashboardDocumentAuditDownloadView(LoginRequiredMixin, View):
     login_url = "dashboard:login"
 
     def get(self, request: HttpRequest, file_hash: str) -> HttpResponse:
-        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        doc = get_object_or_404(
+            EncryptedDocument.objects.select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            ),
+            file_hash=file_hash,
+        )
 
         client_ip = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
@@ -830,7 +836,12 @@ class DashboardDocumentDownloadAndBurnView(LoginRequiredMixin, View):
     login_url = "dashboard:login"
 
     def post(self, request: HttpRequest, file_hash: str) -> HttpResponse:
-        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        doc = get_object_or_404(
+            EncryptedDocument.objects.select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            ),
+            file_hash=file_hash,
+        )
         reason = request.POST.get("reason", "").strip() or _(
             "Descarga y clausura definitiva de trámite"
         )
@@ -886,7 +897,12 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest, file_hash: str) -> HttpResponse:
         user = request.user
-        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        doc = get_object_or_404(
+            EncryptedDocument.objects.select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            ),
+            file_hash=file_hash,
+        )
 
         if not is_global_admin(user):
             is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
@@ -918,7 +934,12 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest, file_hash: str) -> HttpResponse:
         user = request.user
-        doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
+        doc = get_object_or_404(
+            EncryptedDocument.objects.select_related(
+                "origin_uo", "target_uo", "uploaded_by"
+            ),
+            file_hash=file_hash,
+        )
 
         if not is_global_admin(user):
             is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
@@ -1074,7 +1095,11 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
                 _("Se requieren privilegios administrativos para gestionar API Tokens.")
             )
 
-        tokens = APIToken.objects.all().order_by("-created_at")
+        tokens = (
+            APIToken.objects.all()
+            .select_related("created_by", "uo")
+            .order_by("-created_at")
+        )
         new_token = request.session.pop("new_raw_token", None)
 
         context = {
@@ -1236,13 +1261,17 @@ class DashboardApiTokenDetailView(LoginRequiredMixin, View):
                 _("Se requieren privilegios administrativos para auditar API Tokens.")
             )
 
-        token = get_object_or_404(APIToken, id=token_id)
+        token = get_object_or_404(
+            APIToken.objects.select_related("created_by", "uo", "revoked_by"),
+            id=token_id,
+        )
 
         raw_events = DocumentAccessLog.objects.filter(
             action__in=[
                 DocumentAccessLog.Action.TOKEN_API_CREADO,
                 DocumentAccessLog.Action.TOKEN_API_REVOCADO,
-            ]
+            ],
+            details__icontains=f'"token_id": {token.id}',
         ).order_by("-created_at")
         token_events = []
         for e in raw_events:
@@ -1250,7 +1279,7 @@ class DashboardApiTokenDetailView(LoginRequiredMixin, View):
             if isinstance(det, str):
                 try:
                     det = json.loads(det)
-                except Exception:
+                except (json.JSONDecodeError, ValueError):
                     det = {}
             if isinstance(det, dict) and det.get("token_id") == token.id:
                 e.details = det

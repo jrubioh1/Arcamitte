@@ -616,7 +616,6 @@ def upload_and_encrypt_document(
         from arcamitte.antivirus import (
             scan_file_stream,
             AntivirusError,
-            AntivirusConnectionError,
         )
 
         try:
@@ -2258,7 +2257,6 @@ def get_scoped_documents_for_request(
                 "origin_uo", "target_uo", "uploaded_by"
             )
 
-        from arcamitte.models import UserUOMembership
 
         user_uos = OrganizationalUnit.objects.filter(
             memberships__user=user,
@@ -2809,13 +2807,13 @@ def create_certified_audit_export(
 
     # Cabecera Institucional Oficial
     buffer.write(
-        f"# ==============================================================================\n"
+        "# ==============================================================================\n"
     )
     buffer.write(
-        f"# ARCAMITTE - INFORME OFICIAL CERTIFICADO DE AUDITORÍA Y NO REPUDIO\n"
+        "# ARCAMITTE - INFORME OFICIAL CERTIFICADO DE AUDITORÍA Y NO REPUDIO\n"
     )
     buffer.write(
-        f"# ==============================================================================\n"
+        "# ==============================================================================\n"
     )
     buffer.write(f"# Identificador de Recibo : {receipt_code}\n")
     buffer.write(f"# Fecha de Generación     : {timestamp_str}\n")
@@ -2826,7 +2824,7 @@ def create_certified_audit_export(
     )
     buffer.write(f"# Total de Registros      : {count}\n")
     buffer.write(
-        f"# ==============================================================================\n"
+        "# ==============================================================================\n"
     )
 
     # Columnas CSV

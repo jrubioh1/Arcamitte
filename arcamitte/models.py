@@ -1280,10 +1280,10 @@ class APIToken(models.Model):
     def generate_token(
         cls,
         name: str,
-        uo: Optional[OrganizationalUnit] = None,
+        uo: OrganizationalUnit | None = None,
         created_by: Any = None,
-        scopes: Optional[List[str]] = None,
-        expires_at: Optional[Any] = None,
+        scopes: list[str] | None = None,
+        expires_at: Any | None = None,
         rate_limit: int = 60,
     ) -> tuple[APIToken, str]:
         """
@@ -1331,7 +1331,7 @@ class APIToken(models.Model):
             return False
         return "*" in self.scopes or required_scope in self.scopes
 
-    def record_usage(self, ip_address: Optional[str] = None) -> None:
+    def record_usage(self, ip_address: str | None = None) -> None:
         """Actualiza la marca temporal de uso y la IP de origen."""
         update_fields = ["last_used_at"]
         self.last_used_at = timezone.now()

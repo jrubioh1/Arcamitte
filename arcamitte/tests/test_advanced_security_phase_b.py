@@ -11,9 +11,7 @@ Cumplimiento Normativo:
 from __future__ import annotations
 
 import io
-import socket
 from unittest.mock import MagicMock, patch
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,7 +22,6 @@ import pypdf
 
 from arcamitte.antivirus import (
     AntivirusConnectionError,
-    AntivirusError,
     ping_clamav,
     scan_file_stream,
 )
@@ -32,7 +29,6 @@ from arcamitte.models import (
     AccessVerificationToken,
     AuditExportReceipt,
     DocumentAccessLog,
-    EncryptedDocument,
     OrganizationalUnit,
     UserUOMembership,
 )
@@ -45,11 +41,8 @@ from arcamitte.services import (
 )
 from arcamitte.timestamping import (
     build_rfc3161_request,
-    request_rfc3161_timestamp,
-    token_from_base64,
     token_to_base64,
     verify_rfc3161_timestamp,
-    TimestampingError,
 )
 from arcamitte.watermark import (
     WatermarkError,
@@ -63,8 +56,8 @@ User = get_user_model()
 def _create_minimal_pdf_bytes(title: str = "Documento Confidencial", pages: int = 1) -> bytes:
     """Genera un archivo PDF válido en memoria para testing con pypdf."""
     writer = pypdf.PdfWriter()
-    for i in range(pages):
-        page = writer.add_blank_page(width=595.0, height=842.0)
+    for _ in range(pages):
+        writer.add_blank_page(width=595.0, height=842.0)
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
@@ -178,7 +171,7 @@ class AdvancedSecurityPhaseBTests(TestCase):
             uploaded_by=self.user,
         )
 
-        token = AccessVerificationToken.objects.create(
+        AccessVerificationToken.objects.create(
             document=doc,
             email="receptor@gob.es",
             otp_code="123456",

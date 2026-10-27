@@ -126,7 +126,7 @@ Arcamitte proporciona tres interfaces diseñadas para distintos propósitos oper
 
 | Interfaz | Ruta | Descripción |
 | :--- | :--- | :--- |
-| **Bespoke Cyber-Ops Dashboard** | `/dashboard/` | Panel de control moderno en tema oscuro (Bootstrap 5 nativo, sin dependencias de terceros), estadísticas de custodia, subida de documentos, gestión de UOs, auditoría y tokens de API. |
+| **Bespoke Cyber-Ops Dashboard** | `/dashboard/` | Panel de control moderno en tema oscuro (Tailwind CSS + Flowbite + Arcamitte Design System), estadísticas de custodia, subida de documentos, gestión de UOs, auditoría y tokens de API. |
 | **Django Admin Clásico** | `/admin/` | Panel administrativo oficial con validaciones avanzadas, importación masiva JSON, inspección de hashes e inmutabilidad garantizada. |
 | **Portal Público de Canje** | `/arcamitte/solicitar/` | Pasarela ligera y adaptada a móviles para que los destinatarios soliciten su OTP e introduzcan su código para descargar el archivo. |
 | **Machine-to-Machine REST API** | `/api/v1/` | Endpoints seguros para automatizaciones con autenticación por encabezado `X-API-Key: arca_live_...`. |

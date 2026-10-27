@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import io
 import logging
 from typing import Any, Optional, Tuple
@@ -13,7 +12,6 @@ from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRed
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import activate, check_for_language, gettext as _
 from django.views import View
@@ -28,7 +26,7 @@ from rest_framework.views import APIView
 
 from arcamitte.authentication import APITokenAuthentication
 from arcamitte.forms import RedeemOtpForm, RequestAccessForm
-from arcamitte.models import APIToken, DocumentAccessLog, EncryptedDocument, OrganizationalUnit
+from arcamitte.models import APIToken, EncryptedDocument, OrganizationalUnit
 from arcamitte.permissions import (
     HasDocumentsCreateScope,
     HasDocumentsReadScope,
@@ -49,7 +47,6 @@ from arcamitte.services import (
     consume_document_with_otp,
     generate_corporate_email_text,
     get_scoped_documents_for_request,
-    get_uo_recipient_emails,
     request_document_access,
     upload_and_encrypt_document,
 )
@@ -591,9 +588,6 @@ class APIDocumentRootView(APIView):
         )
 
 
-# Alias para retrocompatibilidad interna de nombres de vista
-APIDocumentUploadView = APIDocumentRootView
-APIDocumentListView = APIDocumentRootView
 
 
 class APIDocumentStatusView(APIView):
@@ -612,20 +606,18 @@ class APIDocumentStatusView(APIView):
     )
     def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
         clean_hash = (file_hash or "").strip().lower()
-        doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
+        scoped_qs = get_scoped_documents_for_request(request)
+        doc = scoped_qs.filter(file_hash=clean_hash).first()
         if not doc:
-            return Response(
-                {"error": _("No se encontró ningún documento con el hash especificado.")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        token = request.auth
-        if isinstance(token, APIToken) and token.uo:
-            if doc.origin_uo != token.uo and doc.target_uo != token.uo:
+            if EncryptedDocument.objects.filter(file_hash=clean_hash).exists():
                 return Response(
                     {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+            return Response(
+                {"error": _("No se encontró ningún documento con el hash especificado.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         return Response(
             {
@@ -722,22 +714,21 @@ class APIDocumentDetailView(APIView):
     )
     def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
         clean_hash = (file_hash or "").strip().lower()
-        doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
-        if not doc:
-            return Response(
-                {"error": _("No se encontró ningún documento con el hash especificado.")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
         scoped_qs = get_scoped_documents_for_request(request)
-        if not scoped_qs.filter(pk=doc.pk).exists():
+        doc = scoped_qs.filter(file_hash=clean_hash).first()
+        if doc:
+            serializer = APIDocumentDetailSerializer(doc)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        if EncryptedDocument.objects.filter(file_hash=clean_hash).exists():
             return Response(
                 {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        serializer = APIDocumentDetailSerializer(doc)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            {"error": _("No se encontró ningún documento con el hash especificado.")},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
 
 class APIDocumentEmailTemplateView(APIView):
@@ -757,18 +748,17 @@ class APIDocumentEmailTemplateView(APIView):
     )
     def get(self, request: HttpRequest, file_hash: str, *args: Any, **kwargs: Any) -> Response:
         clean_hash = (file_hash or "").strip().lower()
-        doc = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
+        scoped_qs = get_scoped_documents_for_request(request)
+        doc = scoped_qs.filter(file_hash=clean_hash).first()
         if not doc:
+            if EncryptedDocument.objects.filter(file_hash=clean_hash).exists():
+                return Response(
+                    {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             return Response(
                 {"error": _("No se encontró ningún documento con el hash especificado.")},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-
-        scoped_qs = get_scoped_documents_for_request(request)
-        if not scoped_qs.filter(pk=doc.pk).exists():
-            return Response(
-                {"error": _("No tiene permisos para acceder a documentos de otra Unidad Organizativa.")},
-                status=status.HTTP_403_FORBIDDEN,
             )
 
         base_url = request.build_absolute_uri("/").rstrip("/")

@@ -11,7 +11,7 @@
 			{% trans "Control de direcciones IP bloqueadas por actividad maliciosa, ataques de fuerza bruta o sanción manual." %}
 		</p>
 	</div>
-	<button type="button" class="btn btn-danger d-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#banIPModal">
+	<button type="button" class="btn btn-danger d-flex align-items-center gap-1 shadow-sm" data-arca-toggle="modal" data-arca-target="#banIPModal">
 		<i data-feather="slash" style="width:16px;height:16px;"></i>
 		<span>{% trans "Bloquear Nueva IP" %}</span>
 	</button>
@@ -28,7 +28,7 @@
 						<i data-feather="shield-off" class="me-1 text-danger" style="width:18px;height:18px;"></i>
 						{% trans "Bloquear Dirección IP en Lista Negra" %}
 					</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					<button type="button" class="btn-close" data-arca-dismiss="modal" aria-label="Close"></button>
 				</div>
 				<div class="modal-body">
 					<div class="mb-3">
@@ -57,7 +57,7 @@
 					</div>
 				</div>
 				<div class="modal-footer">
-					<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+					<button type="button" class="btn btn-outline-secondary" data-arca-dismiss="modal">{% trans "Cancelar" %}</button>
 					<button type="submit" class="btn btn-danger">
 						<i data-feather="slash" style="width:14px;height:14px;" class="me-1"></i>
 						{% trans "Confirmar Bloqueo" %}

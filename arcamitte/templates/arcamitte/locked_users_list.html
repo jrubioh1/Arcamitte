@@ -132,7 +132,7 @@
 
 							<!-- Botón de Suspensión Manual con Motivo -->
 							{% if u.is_active and u != request.user %}
-								<button type="button" class="btn btn-sm btn-outline-danger ms-1" data-bs-toggle="modal" data-bs-target="#suspendUserModal{{ u.id }}" title="{% trans 'Suspender cuenta' %}">
+								<button type="button" class="btn btn-sm btn-outline-danger ms-1" data-arca-toggle="modal" data-arca-target="#suspendUserModal{{ u.id }}" title="{% trans 'Suspender cuenta' %}">
 									<i data-feather="slash" style="width:14px;height:14px;"></i>
 									<span>{% trans "Suspender" %}</span>
 								</button>
@@ -148,7 +148,7 @@
 														<i data-feather="alert-triangle"></i>
 														{% trans "Suspensión Administrativa de Cuenta" %}
 													</h5>
-													<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+													<button type="button" class="btn-close btn-close-white" data-arca-dismiss="modal" aria-label="Close"></button>
 												</div>
 												<div class="modal-body">
 													<p class="mb-2">
@@ -166,7 +166,7 @@
 													</div>
 												</div>
 												<div class="modal-footer bg-light">
-													<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+													<button type="button" class="btn btn-light border" data-arca-dismiss="modal">{% trans "Cancelar" %}</button>
 													<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
 														<i data-feather="slash" style="width:14px;height:14px;"></i>
 														<span>{% trans "Confirmar Suspensión" %}</span>

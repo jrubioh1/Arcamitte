@@ -80,7 +80,7 @@ def _build_watermark_page_bytes(
             if idx == 0:
                 stream_lines.append(f"({safe}) Tj")
             else:
-                stream_lines.append(f"0 -20 Td")
+                stream_lines.append("0 -20 Td")
                 stream_lines.append(f"({safe}) Tj")
         # Resetear matriz de transformación
         stream_lines.append("1 0 0 1 0 0 cm")

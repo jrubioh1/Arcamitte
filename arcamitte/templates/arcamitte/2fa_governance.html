@@ -301,7 +301,7 @@
 						</td>
 						<td class="text-end text-nowrap">
 							{% if item.is_enabled %}
-								<button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#reset2faModal{{ item.user.id }}" title="{% trans 'Resetear credenciales 2FA' %}">
+								<button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" data-arca-toggle="modal" data-arca-target="#reset2faModal{{ item.user.id }}" title="{% trans 'Resetear credenciales 2FA' %}">
 									<i data-feather="refresh-cw" style="width:13px;height:13px;"></i>
 									<span>{% trans "Resetear 2FA" %}</span>
 								</button>
@@ -318,7 +318,7 @@
 														<i data-feather="refresh-cw"></i>
 														{% trans "Reseteo Administrativo de Segundo Factor" %}
 													</h5>
-													<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+													<button type="button" class="btn-close btn-close-white" data-arca-dismiss="modal" aria-label="Close"></button>
 												</div>
 												<div class="modal-body">
 													<p class="mb-2">
@@ -336,7 +336,7 @@
 													</div>
 												</div>
 												<div class="modal-footer bg-light">
-													<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+													<button type="button" class="btn btn-light border" data-arca-dismiss="modal">{% trans "Cancelar" %}</button>
 													<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
 														<i data-feather="refresh-cw" style="width:14px;height:14px;"></i>
 														<span>{% trans "Confirmar Reseteo" %}</span>

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import shutil
 import tempfile
-from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -18,20 +16,11 @@ from arcamitte.models import (
     AuditExportReceipt,
     BannedIP,
     DocumentAccessLog,
-    EncryptedDocument,
     OrganizationalUnit,
-    PasswordHistory,
     UserUOMembership,
-    get_or_create_user_profile,
 )
 from arcamitte.services import (
-    ban_ip,
-    create_certified_audit_export,
-    record_failed_login,
     record_password_change,
-    record_successful_login,
-    unban_ip,
-    unlock_user_account,
     verify_audit_log_chain,
     verify_export_receipt,
 )

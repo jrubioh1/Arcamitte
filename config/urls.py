@@ -89,7 +89,7 @@ urlpatterns = [
     path("api/v1/consume/", PublicConsumeView.as_view(), name="api-v1-consume"),
     # Panel de administración tradicional de Django (con salvaguardas e inmutabilidad de ModelAdmin)
     path("admin/", admin.site.urls),
-    # Panel de administración Arcamitte (Vistas Django con Bootstrap 5 para la administración del microservicio)
+    # Panel de administración Arcamitte (Vistas Django con Tailwind CSS + Flowbite para la administración del microservicio)
     path("dashboard/", include("arcamitte.dashboard_urls", namespace="dashboard")),
     # Espacio de nombres arcamitte
     path("arcamitte/", include("arcamitte.urls", namespace="arcamitte")),

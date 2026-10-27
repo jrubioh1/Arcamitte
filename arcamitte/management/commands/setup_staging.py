@@ -6,8 +6,6 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -19,14 +17,10 @@ from arcamitte.models import (
     DocumentAccessLog,
     EncryptedDocument,
     OrganizationalUnit,
-    UserUOMembership,
-    get_or_create_user_profile,
 )
 from arcamitte.services import (
     process_batch_import_json,
-    record_password_change,
     shred_and_delete_file,
-    sync_user_role_permissions,
     upload_and_encrypt_document,
 )
 

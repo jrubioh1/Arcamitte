@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import tempfile
 import shutil
-from datetime import timedelta
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile

@@ -26,7 +26,7 @@
 	</div>
 	<div>
 		{% if token.is_active and not token.is_expired %}
-			<button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#revokeTokenModal">
+			<button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-1" data-arca-toggle="modal" data-arca-target="#revokeTokenModal">
 				<i data-feather="slash" style="width:16px;height:16px;"></i>
 				<span>{% trans "Revocar Token" %}</span>
 			</button>
@@ -221,7 +221,7 @@
 						<i data-feather="alert-octagon"></i>
 						{% trans "Revocar Token API de Forma Inmediata" %}
 					</h5>
-					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+					<button type="button" class="btn-close btn-close-white" data-arca-dismiss="modal" aria-label="Close"></button>
 				</div>
 				<div class="modal-body">
 					<p class="text-danger fw-bold mb-2">
@@ -238,7 +238,7 @@
 					</div>
 				</div>
 				<div class="modal-footer bg-light">
-					<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+					<button type="button" class="btn btn-light border" data-arca-dismiss="modal">{% trans "Cancelar" %}</button>
 					<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
 						<i data-feather="slash" style="width:14px;height:14px;"></i>
 						<span>{% trans "Confirmar y Revocar" %}</span>

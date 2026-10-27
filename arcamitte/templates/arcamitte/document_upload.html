@@ -26,7 +26,7 @@
 								<li>{{ err }}</li>
 							{% endfor %}
 						</ul>
-						<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						<button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
 					</div>
 				{% endif %}
 
@@ -195,7 +195,7 @@
 					<i data-feather="user-check" style="width:18px;height:18px;" class="text-primary"></i>
 					{% trans "Confirmación: Asiento Personal Privado" %}
 				</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				<button type="button" class="btn-close" data-arca-dismiss="modal" aria-label="Close"></button>
 			</div>
 			<div class="modal-body p-4">
 				<div class="d-flex gap-3 align-items-start">
@@ -213,7 +213,7 @@
 				</div>
 			</div>
 			<div class="modal-footer bg-light border-top d-flex justify-content-between">
-				<button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+				<button type="button" class="btn btn-outline-secondary btn-sm" data-arca-dismiss="modal">
 					{% trans "Revisar y seleccionar UO" %}
 				</button>
 				<button type="button" class="btn btn-primary btn-sm px-3" id="btn_confirm_personal_seat">
@@ -510,15 +510,17 @@ document.addEventListener("DOMContentLoaded", function() {
 					return;
 				}
 				e.preventDefault();
-				const modalInstance = new bootstrap.Modal(personalModalEl);
-				modalInstance.show();
+				const ModalClass = window.ArcaModal || (window.Arcamitte && window.Arcamitte.Modal);
+				const modalInstance = ModalClass ? ModalClass.getOrCreateInstance(personalModalEl) : null;
+				if (modalInstance) modalInstance.show();
 				if (window.feather) feather.replace();
 			}
 		});
 
 		btnConfirmPersonal.addEventListener("click", function() {
 			personalConfirmed = true;
-			const modalInstance = bootstrap.Modal.getInstance(personalModalEl);
+			const ModalClass = window.ArcaModal || (window.Arcamitte && window.Arcamitte.Modal);
+			const modalInstance = ModalClass ? ModalClass.getInstance(personalModalEl) : null;
 			if (modalInstance) {
 				modalInstance.hide();
 			}
