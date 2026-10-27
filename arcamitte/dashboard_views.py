@@ -67,7 +67,6 @@ User = get_user_model()
 
 from arcamitte.security_utils import (
     redirect_to_next_or_default,
-    safe_redirect,
 )
 from arcamitte.utils import (
     apply_no_store_headers,
@@ -3480,10 +3479,8 @@ class DashboardUserReset2FAView(LoginRequiredMixin, View):
             )
             % {"username": target.username},
         )
-        return safe_redirect(
-            request,
-            target_url=request.POST.get("next"),
-            default_url=reverse("dashboard:2fa_governance"),
+        return redirect_to_next_or_default(
+            request, default_url=reverse("dashboard:2fa_governance")
         )
 
 

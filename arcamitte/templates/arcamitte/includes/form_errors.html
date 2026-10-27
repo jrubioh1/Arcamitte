@@ -1,0 +1,17 @@
+{% load i18n %}
+{% if form.errors %}
+	<div class="alert alert-danger alert-dismissible fade show" role="alert">
+		<div class="small">
+			{% if error_title %}<strong>{{ error_title }}</strong>{% endif %}
+			{% for error in form.non_field_errors %}
+				<div>{{ error }}</div>
+			{% endfor %}
+			{% for field in form %}
+				{% for error in field.errors %}
+					<div>{% if field.label %}{{ field.label }}: {% endif %}{{ error }}</div>
+				{% endfor %}
+			{% endfor %}
+		</div>
+		<button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
+	</div>
+{% endif %}

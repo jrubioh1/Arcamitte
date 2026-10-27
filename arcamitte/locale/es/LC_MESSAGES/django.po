@@ -6640,4 +6640,3 @@ msgstr "La lista de correos electrónicos autorizados no es válida o contiene f
 
 msgid "La lista de correos electrónicos no es válida o contiene formatos erróneos."
 msgstr "La lista de correos electrónicos no es válida o contiene formatos erróneos."
-

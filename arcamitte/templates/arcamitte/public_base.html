@@ -13,32 +13,7 @@
 
     <title>{% block title %}{% trans "Arcamitte - Microservicio Criptográfico de Entrega Segura" %}{% endblock %}</title>
 
-    <!-- Tailwind CSS + Flowbite + Tom Select (Sin Bootstrap) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            corePlugins: { preflight: false },
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-                    },
-                    colors: {
-                        arca: {
-                            primary: '#2563eb',
-                            dark: '#0f172a',
-                            surface: '#f8fafc',
-                        }
-                    }
-                }
-            }
-        };
-    </script>
-    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" integrity="sha384-+Bl0lf5p8/ohqkq+KZo/rczUOIZfQpTE+zDHmmjdpnuuLiXwLaTmgCPIYAho9GqV" crossorigin="anonymous" />
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.min.css" rel="stylesheet" integrity="sha384-FDrZpUYegOKtVDpAFIdtSJjjCvc43zuXIuUlWMLtIKg+cfdbhFwG/t67w5xYzDJM" crossorigin="anonymous" />
-    <!-- Sistema de Diseño Tailwind / Shadcn de Arcamitte -->
-    <link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
+    {% include "arcamitte/includes/head_assets.html" %}
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-slate-50 d-flex flex-column min-vh-100 text-slate-800 font-sans">

@@ -68,12 +68,7 @@ logger = logging.getLogger(__name__)
 def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
     """Cambia el idioma activo de la interfaz y redirige a la vista previa de forma segura."""
     lang_code = request.GET.get("lang") or request.POST.get("language")
-    try:
-        fallback_url = reverse("arcamitte:request-access")
-    except Exception:
-        fallback_url = "/arcamitte/solicitar/"
-
-    response = redirect_to_next_or_default(request, default_url=fallback_url)
+    response = redirect_to_next_or_default(request, default_url="/arcamitte/solicitar/")
 
     # Sanitización de cookie contra la lista estática y confiable de idiomas configurados
     valid_lang = None

@@ -26,22 +26,8 @@
 			</a>
 		</div>
 
-		{% if form.errors %}
-			<div class="alert alert-danger alert-dismissible fade show" role="alert">
-				<div class="small">
-					<strong>{% trans "Por favor corrija los siguientes errores:" %}</strong>
-					{% for error in form.non_field_errors %}
-						<div>{{ error }}</div>
-					{% endfor %}
-					{% for field in form %}
-						{% for error in field.errors %}
-							<div>{{ field.label }}: {{ error }}</div>
-						{% endfor %}
-					{% endfor %}
-				</div>
-				<button type="button" class="btn-close" data-arca-dismiss="alert" aria-label="Close"></button>
-			</div>
-		{% endif %}
+		{% trans "Por favor corrija los siguientes errores:" as uo_err_title %}
+		{% include "arcamitte/includes/form_errors.html" with error_title=uo_err_title %}
 
 		<div class="card shadow-sm border-0">
 			<div class="card-body p-4">
