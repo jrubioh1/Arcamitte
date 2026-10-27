@@ -1,0 +1,121 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Auditoría de Cadena Criptográfica" %} | Arcamitte{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<div>
+		<h1 class="h3 fw-bold mb-1">{% trans "Auditoría Criptográfica de la Cadena de Logs" %}</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Verificación secuencial SHA-256 (Hash Chaining) para detección de manipulaciones y garantía de no repudio legal (ENS / eIDAS)." %}
+		</p>
+	</div>
+	<a href="{% url 'dashboard:audit_logs' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1 shadow-sm">
+		<i data-feather="arrow-left" style="width:15px;height:15px;"></i>
+		<span>{% trans "Volver a Trazabilidad" %}</span>
+	</a>
+</div>
+
+<div class="row g-4 mb-4">
+	<div class="col-lg-8">
+		<div class="card shadow-sm border-0 h-100">
+			<div class="card-body p-4">
+				<div class="d-flex align-items-center gap-3 mb-4">
+					{% if result.is_valid %}
+						<div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width:54px;height:54px;">
+							<i data-feather="check-circle" style="width:28px;height:28px;"></i>
+						</div>
+						<div>
+							<h4 class="fw-bold text-success mb-1">{% trans "Cadena Criptográfica 100% Íntegra" %}</h4>
+							<p class="text-muted small mb-0">
+								{% trans "Todos los bloques de auditoría han sido verificados criptográficamente sin detectar anomalías ni alteraciones." %}
+							</p>
+						</div>
+					{% else %}
+						<div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center" style="width:54px;height:54px;">
+							<i data-feather="alert-triangle" style="width:28px;height:28px;"></i>
+						</div>
+						<div>
+							<h4 class="fw-bold text-danger mb-1">{% trans "¡Alerta de Manipulación o Corrupción Detectada!" %}</h4>
+							<p class="text-muted small mb-0">
+								{% trans "Se ha detectado una ruptura o discrepancia en el hash de los registros de auditoría almacenados." %}
+							</p>
+						</div>
+					{% endif %}
+				</div>
+
+				<hr class="opacity-10 my-4">
+
+				<div class="row g-3">
+					<div class="col-sm-6">
+						<div class="p-3 bg-light rounded border">
+							<small class="text-muted fw-bold d-block text-uppercase" style="font-size:0.7rem;">{% trans "Total de Registros Verificados" %}</small>
+							<div class="h3 fw-bold mb-0 text-dark font-mono">{{ result.total_verified }}</div>
+						</div>
+					</div>
+					<div class="col-sm-6">
+						<div class="p-3 bg-light rounded border">
+							<small class="text-muted fw-bold d-block text-uppercase" style="font-size:0.7rem;">{% trans "Estado del Enlace Génesis" %}</small>
+							<div class="h5 fw-bold mb-0 text-success font-mono">
+								<i data-feather="anchor" style="width:16px;height:16px;" class="me-1"></i>{% trans "Conectado (Genesis Root)" %}
+							</div>
+						</div>
+					</div>
+					<div class="col-12">
+						<div class="p-3 bg-light rounded border">
+							<small class="text-muted fw-bold d-block text-uppercase" style="font-size:0.7rem;">{% trans "Hash de Cabecera Actual (Head Hash)" %}</small>
+							<code class="font-mono text-primary text-break fw-bold" style="font-size:0.85rem;">{{ result.head_hash|default:"0000000000000000000000000000000000000000000000000000000000000000" }}</code>
+						</div>
+					</div>
+					{% if not result.is_valid %}
+						<div class="col-12">
+							<div class="alert alert-danger mb-0">
+								<h6 class="fw-bold mb-1">{% trans "Detalle del Fallo Criptográfico:" %}</h6>
+								<p class="mb-0 small font-mono">{{ result.error }}</p>
+								{% if result.corrupted_log_id %}
+									<span class="badge bg-danger mt-2">{% trans "Registro Afectado ID:" %} #{{ result.corrupted_log_id }}</span>
+								{% endif %}
+							</div>
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-4">
+		<div class="card shadow-sm border-0 h-100">
+			<div class="card-body p-4">
+				<h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+					<i data-feather="shield" class="text-primary" style="width:18px;height:18px;"></i>
+					<span>{% trans "Garantías de Seguridad" %}</span>
+				</h5>
+				<ul class="list-unstyled small text-muted d-flex flex-column gap-3 mb-0">
+					<li class="d-flex align-items-start gap-2">
+						<i data-feather="check" class="text-success mt-1" style="width:16px;height:16px;"></i>
+						<div>
+							<strong class="text-dark d-block">{% trans "Encadenamiento Append-Only" %}</strong>
+							{% trans "Cada entrada incorpora el hash SHA-256 del registro anterior. Cualquier inserción, alteración o borrado rompe la correlación." %}
+						</div>
+					</li>
+					<li class="d-flex align-items-start gap-2">
+						<i data-feather="check" class="text-success mt-1" style="width:16px;height:16px;"></i>
+						<div>
+							<strong class="text-dark d-block">{% trans "No Repudio Jurídico" %}</strong>
+							{% trans "Alineado con el Esquema Nacional de Seguridad (ENS) y el Reglamento eIDAS para evidencias electrónicas válidas en juicio." %}
+						</div>
+					</li>
+					<li class="d-flex align-items-start gap-2">
+						<i data-feather="check" class="text-success mt-1" style="width:16px;height:16px;"></i>
+						<div>
+							<strong class="text-dark d-block">{% trans "Inmutabilidad a Nivel de ORM" %}</strong>
+							{% trans "Las operaciones directas de eliminación sobre la base de datos están interceptadas y restringidas por excepción PermissionDenied." %}
+						</div>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

@@ -37,7 +37,9 @@ class RequestAccessForm(forms.Form):
                 "spellcheck": "false",
             }
         ),
-        help_text=_("Identificador de 64 caracteres facilitado para la descarga del documento."),
+        help_text=_(
+            "Identificador de 64 caracteres facilitado para la descarga del documento."
+        ),
     )
     email = forms.EmailField(
         label=_("Correo Electrónico"),
@@ -49,14 +51,18 @@ class RequestAccessForm(forms.Form):
                 "autocomplete": "off",
             }
         ),
-        help_text=_("Dirección de correo autorizada donde recibirá el código de verificación."),
+        help_text=_(
+            "Dirección de correo autorizada donde recibirá el código de verificación."
+        ),
     )
 
     def clean_file_hash(self) -> str:
         raw_hash = (self.cleaned_data.get("file_hash") or "").strip().lower()
         if not HASH_REGEX.match(raw_hash):
             raise ValidationError(
-                _("El identificador SHA-256 debe componerse de 64 caracteres hexadecimales [0-9a-f].")
+                _(
+                    "El identificador SHA-256 debe componerse de 64 caracteres hexadecimales [0-9a-f]."
+                )
             )
         return raw_hash
 
@@ -95,7 +101,9 @@ class RedeemOtpForm(forms.Form):
                 "autofocus": "autofocus",
             }
         ),
-        help_text=_("Introduzca el código de 6 dígitos recibido en su correo electrónico."),
+        help_text=_(
+            "Introduzca el código de 6 dígitos recibido en su correo electrónico."
+        ),
     )
 
     def clean_file_hash(self) -> str:
@@ -111,7 +119,9 @@ class RedeemOtpForm(forms.Form):
     def clean_otp_code(self) -> str:
         code = (self.cleaned_data.get("otp_code") or "").strip()
         if not code.isdigit() or len(code) != 6:
-            raise ValidationError(_("El código de verificación debe contener 6 dígitos numéricos."))
+            raise ValidationError(
+                _("El código de verificación debe contener 6 dígitos numéricos.")
+            )
         return code
 
 
@@ -125,10 +135,24 @@ class OrganizationalUnitForm(forms.ModelForm):
         model = OrganizationalUnit
         fields = ["numeric_code", "alias", "name", "email", "description", "is_active"]
         widgets = {
-            "numeric_code": forms.NumberInput(attrs={"class": "form-control", "placeholder": "1001"}),
-            "alias": forms.TextInput(attrs={"class": "form-control text-uppercase font-mono", "placeholder": "LEGAL"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Asesoría Jurídica y Cumplimiento")}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "legal@empresa.com"}),
+            "numeric_code": forms.NumberInput(
+                attrs={"class": "form-control", "placeholder": "1001"}
+            ),
+            "alias": forms.TextInput(
+                attrs={
+                    "class": "form-control text-uppercase font-mono",
+                    "placeholder": "LEGAL",
+                }
+            ),
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Asesoría Jurídica y Cumplimiento"),
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={"class": "form-control", "placeholder": "legal@empresa.com"}
+            ),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -148,7 +172,9 @@ class OrganizationalUnitForm(forms.ModelForm):
     def clean_alias(self) -> str:
         alias = (self.cleaned_data.get("alias") or "").strip().upper()
         if not re.match(r"^[A-Z0-9_\-]+$", alias):
-            raise ValidationError(_("El alias solo puede contener letras mayúsculas, números y guiones."))
+            raise ValidationError(
+                _("El alias solo puede contener letras mayúsculas, números y guiones.")
+            )
         return alias
 
 
@@ -187,6 +213,9 @@ class UserManagementForm(forms.ModelForm):
             and getattr(self.current_user, "pk", None) == self.instance.pk
         )
 
+        if "email" in self.fields:
+            self.fields["email"].required = True
+
         if "is_active" in self.fields:
             self.fields["is_active"].label = _("Cuenta Activa / Operativa")
             self.fields["is_active"].help_text = _(
@@ -199,43 +228,55 @@ class UserManagementForm(forms.ModelForm):
                 )
 
         if is_superuser:
-            self.fields["is_staff"] = forms.BooleanField(
+            initial_mfa = False
+            initial_global = False
+            if self.instance and getattr(self.instance, "pk", None):
+                profile = getattr(self.instance, "arcamitte_profile", None)
+                if profile:
+                    initial_mfa = getattr(profile, "is_mfa_enforced", False)
+                    initial_global = getattr(profile, "is_global_admin", False)
+                if getattr(self.instance, "is_superuser", False):
+                    initial_global = True
+
+            self.fields["is_mfa_enforced"] = forms.BooleanField(
                 required=False,
-                label=_("Acceso Administrativo Departamental"),
+                label=_("Exigir Segundo Factor (2FA / TOTP) Obligatorio"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-                initial=getattr(self.instance, "is_staff", False),
+                initial=initial_mfa,
                 help_text=_(
-                    "Permite acceder al panel de control. Los usuarios con este rol pueden gestionar las Unidades Organizativas donde tengan cargo asignado, tramitar documentos y administrar su personal. No otorga acceso a organizaciones ajenas."
+                    "Aplica una directiva estricta de seguridad individual que obliga a este usuario a enrolar y validar un segundo factor TOTP para acceder al sistema."
                 ),
             )
-            self.fields["is_superuser"] = forms.BooleanField(
+            self.fields["is_global_admin"] = forms.BooleanField(
                 required=False,
-                label=_("Superusuario Global del Sistema"),
+                label=_("Administrador Global de Seguridad"),
                 widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-                initial=getattr(self.instance, "is_superuser", False),
+                initial=initial_global,
                 help_text=_(
-                    "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global. Incluye automáticamente Acceso Administrativo."
+                    "Concede soberanía y control total sobre toda la plataforma sin restricciones: gestión de todas las UOs, todos los usuarios, credenciales API M2M y auditoría forense global."
                 ),
             )
             if self.is_self:
-                if getattr(self.instance, "is_staff", False):
-                    self.fields["is_staff"].disabled = True
-                    self.fields["is_staff"].help_text = _(
-                        "Protegido por seguridad: No puede revocar su propio acceso administrativo."
-                    )
-                if getattr(self.instance, "is_superuser", False):
-                    self.fields["is_superuser"].disabled = True
-                    self.fields["is_superuser"].help_text = _(
-                        "Protegido por seguridad: No puede revocar sus propios privilegios de superusuario global."
+                if initial_global:
+                    self.fields["is_global_admin"].disabled = True
+                    self.fields["is_global_admin"].help_text = _(
+                        "Protegido por seguridad: No puede revocar sus propios privilegios de administrador global."
                     )
 
     def clean_is_active(self) -> bool:
         is_active = self.cleaned_data.get("is_active", True)
         if self.is_self and not is_active:
             raise ValidationError(
-                _("Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario.")
+                _(
+                    "Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario."
+                )
             )
-        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_active:
+        if (
+            self.instance
+            and self.instance.pk
+            and getattr(self.instance, "is_superuser", False)
+            and not is_active
+        ):
             other_superusers = (
                 User.objects.filter(is_superuser=True, is_active=True)
                 .exclude(pk=self.instance.pk)
@@ -243,25 +284,39 @@ class UserManagementForm(forms.ModelForm):
             )
             if other_superusers == 0:
                 raise ValidationError(
-                    _("No es posible desactivar al único superusuario activo del sistema.")
+                    _(
+                        "No es posible desactivar al único superusuario activo del sistema."
+                    )
                 )
         return is_active
 
-    def clean_is_staff(self) -> bool:
-        is_staff = self.cleaned_data.get("is_staff", False)
-        if self.is_self and getattr(self.instance, "is_staff", False) and not is_staff:
-            raise ValidationError(
-                _("Por motivos de seguridad, no puede revocar su propio acceso administrativo.")
-            )
-        return is_staff
+    def clean_is_global_admin(self) -> bool:
+        is_global = self.cleaned_data.get("is_global_admin", False)
+        # Compatibilidad con envíos directos de 'is_superuser'
+        if not is_global and self.data.get("is_superuser") in (
+            True,
+            "True",
+            "true",
+            "1",
+            "on",
+        ):
+            is_global = True
 
-    def clean_is_superuser(self) -> bool:
-        is_superuser = self.cleaned_data.get("is_superuser", False)
-        if self.is_self and getattr(self.instance, "is_superuser", False) and not is_superuser:
-            raise ValidationError(
-                _("Por motivos de seguridad, no puede revocar sus propios privilegios de superusuario global.")
+        was_global = False
+        if self.instance and self.instance.pk:
+            profile = getattr(self.instance, "arcamitte_profile", None)
+            was_global = getattr(self.instance, "is_superuser", False) or getattr(
+                profile, "is_global_admin", False
             )
-        if self.instance and self.instance.pk and getattr(self.instance, "is_superuser", False) and not is_superuser:
+
+        if self.is_self and was_global and not is_global:
+            raise ValidationError(
+                _(
+                    "Por motivos de seguridad, no puede revocar sus propios privilegios de administrador global."
+                )
+            )
+
+        if self.instance and self.instance.pk and was_global and not is_global:
             other_superusers = (
                 User.objects.filter(is_superuser=True, is_active=True)
                 .exclude(pk=self.instance.pk)
@@ -269,38 +324,98 @@ class UserManagementForm(forms.ModelForm):
             )
             if other_superusers == 0:
                 raise ValidationError(
-                    _("No es posible revocar los privilegios al único superusuario activo del sistema.")
+                    _(
+                        "No es posible revocar los privilegios al único superusuario activo del sistema."
+                    )
                 )
-        return is_superuser
+        return is_global
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
-        # Restricción jerárquica estricta: Solo un superusuario puede otorgar is_superuser o is_staff
+        # Restricción jerárquica estricta: Solo un superusuario global puede conceder privilegios
         if not self.is_superuser:
             if (
-                self.data.get("is_superuser")
+                self.data.get("is_global_admin")
+                or self.data.get("is_superuser")
                 or self.data.get("is_staff")
+                or cleaned_data.get("is_global_admin")
                 or cleaned_data.get("is_superuser")
                 or cleaned_data.get("is_staff")
             ):
                 raise ValidationError(
-                    _("Solo un superusuario global puede conceder privilegios administrativos o de superusuario.")
+                    _(
+                        "Solo un superusuario global puede conceder privilegios administrativos o de superusuario."
+                    )
                 )
-        elif cleaned_data.get("is_superuser"):
-            cleaned_data["is_staff"] = True
+        else:
+            is_global = cleaned_data.get("is_global_admin", False)
+            if not is_global and self.data.get("is_superuser") in (
+                True,
+                "True",
+                "true",
+                "1",
+                "on",
+            ):
+                is_global = True
+            cleaned_data["is_global_admin"] = is_global
+            cleaned_data["is_superuser"] = is_global
+            cleaned_data["is_staff"] = is_global
         return cleaned_data
 
+    def clean_username(self) -> str:
+        username = (self.cleaned_data.get("username") or "").strip()
+        if len(username) < 3:
+            raise ValidationError(
+                _("El nombre de usuario debe tener al menos 3 caracteres.")
+            )
+
+        # Regla anti-colisión: el nombre de usuario no puede coincidir con el correo de otro usuario
+        qs_email_collision = User.objects.filter(email__iexact=username)
+        if self.instance and self.instance.pk:
+            qs_email_collision = qs_email_collision.exclude(pk=self.instance.pk)
+        if qs_email_collision.exists():
+            raise ValidationError(
+                _(
+                    "El nombre de usuario coincide con el correo electrónico registrado por otra cuenta."
+                )
+            )
+        return username
+
     def clean_email(self) -> str:
-        raw_email = self.cleaned_data.get("email", "")
-        return validate_safe_email(raw_email)
+        raw_email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not raw_email:
+            raise ValidationError(
+                _("El correo electrónico corporativo es estrictamente obligatorio.")
+            )
+        clean_email = validate_safe_email(raw_email)
+
+        # 1. Unicidad estricta e insensible a mayúsculas
+        qs_dup = User.objects.filter(email__iexact=clean_email)
+        if self.instance and self.instance.pk:
+            qs_dup = qs_dup.exclude(pk=self.instance.pk)
+        if qs_dup.exists():
+            raise ValidationError(
+                _("Ya existe otro usuario registrado con este correo electrónico.")
+            )
+
+        # 2. Regla anti-colisión: el correo no puede coincidir con el nombre de usuario de otra cuenta
+        qs_user_collision = User.objects.filter(username__iexact=clean_email)
+        if self.instance and self.instance.pk:
+            qs_user_collision = qs_user_collision.exclude(pk=self.instance.pk)
+        if qs_user_collision.exists():
+            raise ValidationError(
+                _(
+                    "El correo electrónico coincide con el nombre de usuario de otra cuenta registrada."
+                )
+            )
+        return clean_email
 
     def save(self, commit: bool = True) -> Any:
         user = super().save(commit=False)
         if self.is_superuser:
-            user.is_staff = self.cleaned_data.get("is_staff", False)
-            user.is_superuser = self.cleaned_data.get("is_superuser", False)
-            if user.is_superuser:
-                user.is_staff = True
+            is_global = self.cleaned_data.get("is_global_admin", False)
+            user.is_superuser = is_global
+            user.is_staff = is_global
         else:
             # Jerarquía: Si quien gestiona la cuenta no es superusuario, no puede elevar a staff ni superuser
             if not user.pk:
@@ -308,6 +423,17 @@ class UserManagementForm(forms.ModelForm):
                 user.is_superuser = False
         if commit:
             user.save()
+            from arcamitte.models import get_or_create_user_profile
+
+            profile = get_or_create_user_profile(user)
+            if self.is_superuser:
+                profile.is_global_admin = user.is_superuser
+                if "is_mfa_enforced" in self.cleaned_data:
+                    profile.is_mfa_enforced = self.cleaned_data.get(
+                        "is_mfa_enforced", False
+                    )
+                profile.save(update_fields=["is_global_admin", "is_mfa_enforced"])
+            user.arcamitte_profile = profile
         return user
 
 
@@ -326,7 +452,9 @@ class PasswordResetRequestForm(forms.Form):
                 "autofocus": "autofocus",
             }
         ),
-        help_text=_("Introduzca su nombre de usuario o la dirección de correo corporativa vinculada a su cuenta."),
+        help_text=_(
+            "Introduzca su nombre de usuario o la dirección de correo corporativa vinculada a su cuenta."
+        ),
     )
 
     def clean_identity(self) -> str:
@@ -361,7 +489,7 @@ class PasswordChangeCustomForm(forms.Form):
             }
         ),
         help_text=_(
-            "Debe contener al menos 10 caracteres e incluir mayúsculas, minúsculas, números y símbolos especiales."
+            "Debe contener al menos 12 caracteres e incluir mayúsculas, minúsculas, números y símbolos especiales, sin reutilizar sus últimas 5 contraseñas."
         ),
     )
     confirm_password = forms.CharField(
@@ -394,13 +522,17 @@ class PasswordChangeCustomForm(forms.Form):
 
         if new_password and confirm_password:
             if new_password != confirm_password:
-                self.add_error("confirm_password", _("Las nuevas contraseñas no coinciden."))
+                self.add_error(
+                    "confirm_password", _("Las nuevas contraseñas no coinciden.")
+                )
             elif (current_password and new_password == current_password) or (
                 self.user and self.user.check_password(new_password)
             ):
                 self.add_error(
                     "new_password",
-                    _("La nueva contraseña no puede ser idéntica a la contraseña actual o temporal."),
+                    _(
+                        "La nueva contraseña no puede ser idéntica a la contraseña actual o temporal."
+                    ),
                 )
             else:
                 try:
@@ -409,4 +541,3 @@ class PasswordChangeCustomForm(forms.Form):
                     self.add_error("new_password", exc)
 
         return cleaned_data
-

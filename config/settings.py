@@ -39,7 +39,9 @@ ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_str.split(",") if h.strip()]
 # Orígenes confiables para protección CSRF (OWASP A05 & Django 4+)
 csrf_trusted_origins_str = config.get("django", "csrf_trusted_origins", fallback="")
 if csrf_trusted_origins_str:
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_trusted_origins_str.split(",") if o.strip()]
+    CSRF_TRUSTED_ORIGINS = [
+        o.strip() for o in csrf_trusted_origins_str.split(",") if o.strip()
+    ]
 else:
     CSRF_TRUSTED_ORIGINS = [
         "http://localhost:8000",
@@ -72,11 +74,108 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
 # Control explícito de confianza en cabecera X-Forwarded-For (Anti-IP Spoofing CWE-348)
-ARCAMITTE_TRUST_X_FORWARDED_FOR = config.getboolean("security", "trust_x_forwarded_for", fallback=False)
+ARCAMITTE_TRUST_X_FORWARDED_FOR = config.getboolean(
+    "security", "trust_x_forwarded_for", fallback=False
+)
+
+# Control de Bloqueos, Baneo de IPs y Ciclo de Vida de Credenciales (ENS / NIST SP 800-63B / AC-7)
+ARCAMITTE_USER_MAX_FAILED_LOGINS = config.getint(
+    "security", "user_max_failed_logins", fallback=5
+)
+ARCAMITTE_USER_LOCKOUT_DURATION_MINUTES = config.getint(
+    "security", "user_lockout_duration_minutes", fallback=30
+)
+ARCAMITTE_IP_BAN_FAILED_ATTEMPTS_THRESHOLD = config.getint(
+    "security", "ip_ban_failed_attempts_threshold", fallback=10
+)
+ARCAMITTE_IP_BAN_WINDOW_MINUTES = config.getint(
+    "security", "ip_ban_window_minutes", fallback=10
+)
+ARCAMITTE_IP_BAN_DEFAULT_DURATION_HOURS = config.getint(
+    "security", "ip_ban_default_duration_hours", fallback=24
+)
+ARCAMITTE_PASSWORD_MIN_LENGTH = config.getint(
+    "security", "password_min_length", fallback=12
+)
+ARCAMITTE_PASSWORD_HISTORY_LIMIT = config.getint(
+    "security", "password_history_limit", fallback=5
+)
+ARCAMITTE_PASSWORD_EXPIRATION_DAYS = config.getint(
+    "security", "password_expiration_days", fallback=90
+)
+ARCAMITTE_SECURITY_ALERTS_EMAIL = config.get(
+    "security", "security_alerts_email", fallback=""
+).strip()
+ARCAMITTE_MFA_REQUIRED_FOR_STAFF = config.getboolean(
+    "security", "mfa_required_for_staff", fallback=True
+)
+ARCAMITTE_SINGLE_SESSION_PER_USER = config.getboolean(
+    "security", "single_session_per_user", fallback=True
+)
+ARCAMITTE_SESSION_IP_BINDING = config.getboolean(
+    "security", "session_ip_binding", fallback=True
+)
+ARCAMITTE_SIEM_WEBHOOK_URL = config.get(
+    "security", "siem_webhook_url", fallback=""
+).strip()
+ARCAMITTE_SIEM_WEBHOOK_TOKEN = config.get(
+    "security", "siem_webhook_token", fallback=""
+).strip()
+_raw_siem_events = config.get(
+    "security",
+    "siem_webhook_events",
+    fallback="ip_ban,user_lockout,log_tamper,audit_export,master_key_rotated",
+)
+ARCAMITTE_SIEM_WEBHOOK_EVENTS = [
+    e.strip().lower() for e in _raw_siem_events.split(",") if e.strip()
+]
+
+# Marca de Agua Forense Dinámica en Descargas PDF (ENS ALTO / NIST SP 800-53 AU-10)
+ARCAMITTE_WATERMARK_ENABLED = config.getboolean(
+    "security", "watermark_enabled", fallback=True
+)
+ARCAMITTE_WATERMARK_OPACITY = float(
+    config.get("security", "watermark_opacity", fallback="0.18")
+)
+
+# Motor Antivirus ClamAV en Memoria (Protocolo zINSTREAM - Zero Disk Footprint)
+ARCAMITTE_CLAMAV_ENABLED = config.getboolean(
+    "antivirus", "clamav_enabled", fallback=False
+)
+ARCAMITTE_CLAMAV_HOST = config.get(
+    "antivirus", "clamav_host", fallback="127.0.0.1"
+).strip()
+ARCAMITTE_CLAMAV_PORT = config.getint("antivirus", "clamav_port", fallback=3310)
+ARCAMITTE_CLAMAV_SOCKET_PATH = config.get(
+    "antivirus", "clamav_socket_path", fallback=""
+).strip()
+ARCAMITTE_CLAMAV_TIMEOUT = config.getint(
+    "antivirus", "clamav_timeout", fallback=10
+)
+ARCAMITTE_CLAMAV_FAIL_OPEN = config.getboolean(
+    "antivirus", "clamav_fail_open", fallback=False
+)
+
+# Sellado Criptográfico Cualificado de Tiempo (RFC 3161 / eIDAS)
+ARCAMITTE_RFC3161_ENABLED = config.getboolean(
+    "timestamping", "rfc3161_enabled", fallback=False
+)
+ARCAMITTE_RFC3161_TSA_URL = config.get(
+    "timestamping",
+    "rfc3161_tsa_url",
+    fallback="http://timestamp.digicert.com",
+).strip()
+ARCAMITTE_RFC3161_TIMEOUT = config.getint(
+    "timestamping", "rfc3161_timeout", fallback=10
+)
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = config.getboolean("django", "secure_ssl_redirect", fallback=True)
-    SECURE_HSTS_SECONDS = config.getint("django", "secure_hsts_seconds", fallback=31536000)
+    SECURE_SSL_REDIRECT = config.getboolean(
+        "django", "secure_ssl_redirect", fallback=True
+    )
+    SECURE_HSTS_SECONDS = config.getint(
+        "django", "secure_hsts_seconds", fallback=31536000
+    )
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
@@ -97,12 +196,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "arcamitte.middleware.IPBanMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "arcamitte.middleware.SessionSecurityMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "arcamitte.middleware.RequirePasswordChangeMiddleware",
 ]
@@ -165,7 +266,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": ARCAMITTE_PASSWORD_MIN_LENGTH},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -175,7 +276,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "arcamitte.validators.CorporatePasswordComplexityValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": ARCAMITTE_PASSWORD_MIN_LENGTH},
+    },
+    {
+        "NAME": "arcamitte.validators.PasswordHistoryValidator",
+        "OPTIONS": {"history_limit": ARCAMITTE_PASSWORD_HISTORY_LIMIT},
     },
 ]
 
@@ -207,30 +312,52 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CONFIGURACIÓN DE ARCAMITTE Y CRIPTOGRAFÍA
 # ==============================================================================
 
-# Clave maestra Fernet (32 bytes url-safe base64) para cifrar las claves de datos (DEK).
+# Claves maestras Fernet (Llavero MultiFernet para rotación sin downtime)
 raw_fernet = config.get(
     "security",
     "fernet_key",
     fallback="cambiame-cambiame-cambiame-cambiame-cambiame=",
-)
+).strip()
+raw_fernet_keys = config.get("security", "fernet_keys", fallback="").strip()
 
-try:
-    Fernet(raw_fernet.encode("utf-8"))
-    ARCAMITTE_FERNET_KEY = raw_fernet
-except Exception as exc:
-    if DEBUG:
-        ARCAMITTE_FERNET_KEY = Fernet.generate_key().decode()
-    else:
-        from django.core.exceptions import ImproperlyConfigured
+if raw_fernet_keys:
+    configured_keys = [k.strip() for k in raw_fernet_keys.split(",") if k.strip()]
+elif raw_fernet and raw_fernet != "cambiame-cambiame-cambiame-cambiame-cambiame=":
+    configured_keys = [raw_fernet]
+elif raw_fernet:
+    configured_keys = [raw_fernet]
+else:
+    configured_keys = []
 
-        raise ImproperlyConfigured(
-            f"[ARCAMITTE SECURITY CRITICAL] 'ARCAMITTE_FERNET_KEY' no es válida o mantiene el valor de plantilla ('cambiame...'): {exc}. "
-            "En entornos de producción (DEBUG=False) es obligatorio configurar una clave simétrica real de 32 bytes base64 url-safe."
-        ) from exc
+validated_keys: list[str] = []
+for idx, key_candidate in enumerate(configured_keys):
+    try:
+        Fernet(key_candidate.encode("utf-8"))
+        validated_keys.append(key_candidate)
+    except Exception as exc:
+        if DEBUG:
+            validated_keys.append(Fernet.generate_key().decode())
+        else:
+            from django.core.exceptions import ImproperlyConfigured
+
+            raise ImproperlyConfigured(
+                f"[ARCAMITTE SECURITY CRITICAL] Clave Fernet #{idx + 1} no es válida o mantiene el valor de plantilla: {exc}. "
+                "En entornos de producción (DEBUG=False) es obligatorio configurar claves simétricas reales de 32 bytes base64 url-safe."
+            ) from exc
+
+if not validated_keys:
+    validated_keys = [Fernet.generate_key().decode()]
+
+ARCAMITTE_FERNET_KEYS = validated_keys
+ARCAMITTE_FERNET_KEY = validated_keys[0]
 
 # Tamaño máximo de archivo permitido (50 MB)
-ARCAMITTE_MAX_FILE_SIZE = config.getint("security", "max_file_size", fallback=50 * 1024 * 1024)
-ARCAMITTE_TIMING_PBKDF2_ITERATIONS = config.getint("security", "timing_pbkdf2_iterations", fallback=20000)
+ARCAMITTE_MAX_FILE_SIZE = config.getint(
+    "security", "max_file_size", fallback=50 * 1024 * 1024
+)
+ARCAMITTE_TIMING_PBKDF2_ITERATIONS = config.getint(
+    "security", "timing_pbkdf2_iterations", fallback=20000
+)
 
 # ==============================================================================
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO (SMTP CORPORATIVO POR DEFECTO)
@@ -246,11 +373,15 @@ EMAIL_USE_TLS = config.getboolean("email", "use_tls", fallback=False)
 EMAIL_USE_SSL = config.getboolean("email", "use_ssl", fallback=False)
 EMAIL_HOST_USER = config.get("email", "host_user", fallback="")
 EMAIL_HOST_PASSWORD = config.get("email", "host_password", fallback="")
-DEFAULT_FROM_EMAIL = config.get("email", "default_from_email", fallback="no-reply@arcamitte.local")
+DEFAULT_FROM_EMAIL = config.get(
+    "email", "default_from_email", fallback="no-reply@arcamitte.local"
+)
 EMAIL_TIMEOUT = config.getint("email", "timeout", fallback=5)
 ARCAMITTE_ASYNC_EMAIL = config.getboolean("email", "async_email", fallback=True)
 ARCAMITTE_EMAIL_MAX_WORKERS = config.getint("email", "email_max_workers", fallback=8)
-ARCAMITTE_WEB_REQUEST_LIMIT_PER_MINUTE = config.getint("throttling", "web_request_limit_per_minute", fallback=15)
+ARCAMITTE_WEB_REQUEST_LIMIT_PER_MINUTE = config.getint(
+    "throttling", "web_request_limit_per_minute", fallback=15
+)
 
 # Caché en memoria para limitación de peticiones y control anti-flood
 CACHES = {
@@ -274,8 +405,12 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/minute",
-        "access_request": config.get("throttling", "api_access_request_rate", fallback="15/minute"),
-        "access_consume": config.get("throttling", "api_access_consume_rate", fallback="30/minute"),
+        "access_request": config.get(
+            "throttling", "api_access_request_rate", fallback="15/minute"
+        ),
+        "access_consume": config.get(
+            "throttling", "api_access_consume_rate", fallback="30/minute"
+        ),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",

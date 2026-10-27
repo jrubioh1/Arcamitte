@@ -273,7 +273,7 @@ curl -X GET http://127.0.0.1:8000/api/v1/documents/c5f590b2b80041d8e1f5f3e9c68c3
 
 ## 10. Verificación de Seguridad y Pruebas Unitarias
 
-La suite de pruebas incluye **124 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica y defensas anti-fuerza bruta:
+La suite de pruebas incluye **174 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, autenticación multifactor 2FA (TOTP), control de secuestro de sesiones (Session Hijacking), rotación dinámica de claves maestras y telemetría SIEM:
 
 ```bash
 poetry run pytest -v
@@ -281,13 +281,26 @@ poetry run pytest -v
 
 Resultado verificado:
 ```text
-============================= 124 passed in 31.25s =============================
+============================= 174 passed in 56.87s =============================
 ```
+
+### Casos de Prueba Avanzados y Escenarios de Abuso (Adversarial Testing)
+La batería de tests incluye pruebas específicas contra vectores de ataque y escenarios de abuso:
+- **Autenticación Multifactor Nativa (RFC 6238 / RFC 4226):** Verificación de derivas temporales, validación contra vectores oficiales de prueba del NIST/RFC 6238 Apéndice B y consumo único de códigos de rescate con hashes SHA-256 (`test_advanced_security_phase_a.py`).
+- **Prevención de Secuestro de Sesión (Session Hijacking):** Detección perimetral de discrepancia de IP en peticiones HTTP con cookies activas, invalidación inmediata de sesión, alerta SIEM y registro forense inalterable en `SessionSecurityMiddleware`.
+- **Control de Concurrencia (Single Concurrent Session):** Revocación automática de sesiones anteriores al detectarse un nuevo inicio de sesión desde otro navegador o dispositivo.
+- **Rotación Criptográfica en Caliente (MultiFernet Keyring):** Recifrado transaccional atómico de claves de datos (DEK) en reposo sin pérdida de disponibilidad mediante `python manage.py rotate_master_key`.
+- **Ataques de Fuerza Bruta y Credential Stuffing:** Bloqueo automático de cuentas tras 5 intentos fallidos consecutivos, baneo de IPs tras 10 fallos e intercepción perimetral con `HTTP 403 Forbidden` en `IPBanMiddleware`.
+- **Evasión de Contraseñas (Password Reuse Bypass):** Verificación con `PasswordHistoryValidator` impidiendo alternar o reutilizar cualquiera de las últimas 5 contraseñas previas.
+- **Manipulación de Base de Datos (Data Tampering):** Detección inmediata de adulteración de registros mediante verificación de cadena criptográfica (*Hash Chaining* secuencial).
+- **Inyección de Fórmulas CSV (CWE-1236):** Neutralización de comandos y macros DDE (`=CMD`, `+SUM`, `@IMPORTXML`, `-FORMULA`) en todas las exportaciones certificadas.
+- **Falsificación Documental de Auditoría:** Detección de alteraciones en volcados CSV mediante contraste del hash SHA-256 contra el recibo oficial inmutable `AuditExportReceipt`.
+- **Bypass de Privilegios:** Intentos de desbloqueo no autorizados o revocación de baneo por usuarios sin rol adecuado rechazados con `403 Forbidden`.
 
 ### Controles de Seguridad Verificados (SAST & SCA)
 El código y las dependencias han sido sometidos a auditoría de seguridad exhaustiva:
-- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 50.0.2`, `djangorestframework >= 3.18.3`).
-- **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 10.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
+- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 44.0.1`, `djangorestframework >= 3.18.2`, `segno >= 1.6.6`).
+- **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 13.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
 - **SAST OWASP (Semgrep OSS):** 0 hallazgos bloqueantes sobre 456 reglas activas (OWASP Top 10, CWE, inyecciones y CSRF).
 - **Subresource Integrity (SRI):** Atributos `integrity="sha384-..."` y `crossorigin="anonymous"` obligatorios en todos los recursos externos CDN.
 - **Hardening de Cabeceras y Cookies:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `LANGUAGE_COOKIE_SECURE`, `SECURE_CONTENT_TYPE_NOSNIFF`, `X_FRAME_OPTIONS = "DENY"` y HSTS activo en producción (`DEBUG=False`).
@@ -296,11 +309,21 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
 
 ## 11. Cumplimiento de Estándares de Seguridad
 
+- **Esquema Nacional de Seguridad (ENS - Categoría ALTA) & eIDAS:**
+  - `op.acc.1 / op.acc.2`: Autenticación multifactor 2FA/TOTP conforme a RFC 6238 y opción de obligatoriedad para perfiles staff.
+  - `op.acc.5 / op.acc.6`: Complejidad mínima de contraseñas (12 caracteres), prohibición de reutilización (historial de 5), caducidad periódica a 90 días, control de concurrencia y limitación de intentos fallidos.
+  - `op.exp.8`: Trazabilidad, integridad inalterable de registros mediante *Hash Chaining* y no repudio legal de exportaciones de auditoría mediante recibos oficiales `AuditExportReceipt` y huellas SHA-256.
+  - `op.seg.4`: Detección perimetral y baneo en lista negra de IPs atacantes, enlace de sesión a IP de origen (Anti-Hijacking).
+  - `op.sec.4`: Soporte de rotación periódica de claves de cifrado en reposo (MultiFernet).
 - **NIST SP 800-88 Rev. 1 (Media Sanitization):** Sobrescritura aleatoria de almacenamiento físico previa desvinculación de inodo.
+- **NIST SP 800-63B (Digital Identity Guidelines - AAL2):** Verificación en dos pasos (TOTP con HMAC-SHA1 y secreto de 160 bits), contraseñas robustas y caducidad temporal.
+- **NIST SP 800-57 Part 1 Rev. 5 (Key Management):** Rotación de claves maestras criptográficas y separación de claves de cifrado de datos (DEK) y claves de cifrado de claves (KEK).
 - **NIST SP 800-53 Rev. 5:**
+  - `AC-7`: Bloqueo automático de cuentas ante intentos no exitosos y alertas de seguridad.
+  - `AC-10 / AC-11`: Control de concurrencia de sesiones e invalidación por discrepancia de origen.
   - `SC-13 / SC-28`: Cifrado criptográfico fuerte en reposo y en tránsito.
   - `AC-3 / AC-6`: Menor privilegio y aislamiento departamental por UO.
-  - `AU-2 / AU-9`: Registro inmutable de eventos de acceso y auditoría forense.
+  - `AU-2 / AU-6 / AU-9 / AU-10 / AU-12`: Registro inmutable de eventos de acceso, conectores SIEM en tiempo real e integridad de registros de auditoría.
 - **OWASP API Security Top 10 (2023):**
   - `API1:2023 (BOLA)`: Aislamiento estricto de documentos por pertenencia de UO y usuario.
   - `API2:2023 (Broken Auth)`: Tokens de conocimiento cero y OTPs efímeros con caducidad forzada.
@@ -315,7 +338,8 @@ Para consultar la documentación completa de cada subsistema:
 - [Guía de Arquitectura Criptográfica](docs/ARCHITECTURE.md)
 - [Referencia Completa de la API REST](docs/API_REFERENCE.md)
 - [Manual de Administración y Operaciones](docs/ADMIN_GUIDE.md)
-- [Controles y Modelo de Seguridad](docs/SECURITY.md)
+- [Manual de Ciberseguridad y Guía de Configuración para Operadores (Didáctico)](docs/SECURITY_CONFIG_GUIDE.md)
+- [Controles Técnicos y Modelo de Seguridad](docs/SECURITY.md)
 
 ---
 

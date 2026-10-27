@@ -1,0 +1,367 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Gobernanza de Segundo Factor (2FA)" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+	<div>
+		<h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+			<i data-feather="key" class="text-primary"></i>
+			<span>{% trans "Gobernanza y Despliegue de Segundo Factor (2FA / TOTP)" %}</span>
+		</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Control de enrolamiento y cumplimiento de autenticación multifactor según RFC 6238 (ENS ALTO). Permite supervisar la adopción, exigir 2FA a usuarios específicos y resetear credenciales extraviadas." %}
+		</p>
+	</div>
+	<div>
+		<a href="{% url 'dashboard:totp_setup' %}" class="btn btn-primary d-inline-flex align-items-center gap-1 shadow-sm">
+			<i data-feather="smartphone" style="width:16px;height:16px;"></i>
+			<span>{% trans "Configurar Mi Propio 2FA" %}</span>
+		</a>
+	</div>
+</div>
+
+<!-- Tarjetas de Métricas de Adopción -->
+<div class="row g-3 mb-4">
+	<div class="col-12 col-sm-6 col-xl-3">
+		<div class="card shadow-sm border h-100">
+			<div class="card-body p-3">
+				<div class="d-flex justify-content-between align-items-start mb-2">
+					<span class="text-muted small fw-semibold text-uppercase">{% trans "Tasa de Adopción" %}</span>
+					<div class="p-2 bg-primary-subtle text-primary rounded-3">
+						<i data-feather="pie-chart" style="width:18px;height:18px;"></i>
+					</div>
+				</div>
+				<h3 class="fw-bold mb-1 font-mono text-primary">{{ adoption_pct }}%</h3>
+				<span class="small text-muted">{{ totp_enabled_count }} de {{ total_users }} {% trans "usuarios activos" %}</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-sm-6 col-xl-3">
+		<div class="card shadow-sm border h-100">
+			<div class="card-body p-3">
+				<div class="d-flex justify-content-between align-items-start mb-2">
+					<span class="text-muted small fw-semibold text-uppercase">{% trans "2FA Activo" %}</span>
+					<div class="p-2 bg-success-subtle text-success rounded-3">
+						<i data-feather="check-circle" style="width:18px;height:18px;"></i>
+					</div>
+				</div>
+				<h3 class="fw-bold mb-1 font-mono text-success">{{ totp_enabled_count }}</h3>
+				<span class="small text-muted">{% trans "Dispositivos móviles vinculados" %}</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-sm-6 col-xl-3">
+		<div class="card shadow-sm border h-100">
+			<div class="card-body p-3">
+				<div class="d-flex justify-content-between align-items-start mb-2">
+					<span class="text-muted small fw-semibold text-uppercase">{% trans "Exigidos Individualmente" %}</span>
+					<div class="p-2 bg-warning-subtle text-warning-emphasis rounded-3">
+						<i data-feather="lock" style="width:18px;height:18px;"></i>
+					</div>
+				</div>
+				<h3 class="fw-bold mb-1 font-mono text-warning-emphasis">{{ totp_enforced_count }}</h3>
+				<span class="small text-muted">{% trans "Casilla 'is_mfa_enforced' activa" %}</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-12 col-sm-6 col-xl-3">
+		<div class="card shadow-sm border h-100">
+			<div class="card-body p-3">
+				<div class="d-flex justify-content-between align-items-start mb-2">
+					<span class="text-muted small fw-semibold text-uppercase">{% trans "Cuentas Privilegiadas" %}</span>
+					<div class="p-2 bg-danger-subtle text-danger rounded-3">
+						<i data-feather="shield" style="width:18px;height:18px;"></i>
+					</div>
+				</div>
+				<h3 class="fw-bold mb-1 font-mono text-dark">{% trans "100% Mandatorio" %}</h3>
+				<span class="small text-muted">{% trans "Superusuarios y Admins UO" %}</span>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Directivas Institucionales de Exigencia de 2FA por Colectivo / Rol de UO -->
+<div class="card shadow-sm border mb-4">
+	<div class="card-header bg-light d-flex justify-content-between align-items-center">
+		<h5 class="card-title mb-0 fs-6 fw-bold d-flex align-items-center gap-2">
+			<i data-feather="sliders" style="width:16px;height:16px;" class="text-primary"></i>
+			{% trans "Directivas Institucionales de Exigencia de 2FA por Rol" %}
+		</h5>
+		<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "ENS Nivel ALTO" %}</span>
+	</div>
+	<div class="card-body">
+		<p class="text-muted small mb-3">
+			{% trans "Configure la obligatoriedad institucional del segundo factor (2FA) para los roles de la Malla de UOs. Para los roles de Superusuario Global y Administrador de UO, el segundo factor es estrictamente obligatorio por diseño criptográfico y no puede desactivarse." %}
+		</p>
+		<form method="post" action="{% url 'dashboard:2fa_governance' %}" class="row g-3 align-items-center">
+			{% csrf_token %}
+			<input type="hidden" name="action" value="update_role_policies">
+			
+			<div class="col-12 col-md-3">
+				<div class="border rounded p-2 bg-light d-flex justify-content-between align-items-center">
+					<div>
+						<div class="fw-bold small text-dark">{% trans "Superusuario Global" %}</div>
+						<div class="text-muted" style="font-size:0.75rem;">{% trans "Soberanía total" %}</div>
+					</div>
+					<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i data-feather="lock" style="width:11px;height:11px;" class="me-1"></i>{% trans "Innegociable" %}</span>
+				</div>
+			</div>
+
+			<div class="col-12 col-md-3">
+				<div class="border rounded p-2 bg-light d-flex justify-content-between align-items-center">
+					<div>
+						<div class="fw-bold small text-dark">{% trans "Administrador de UO" %}</div>
+						<div class="text-muted" style="font-size:0.75rem;">{% trans "Gestión UO y Cierre" %}</div>
+					</div>
+					<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i data-feather="lock" style="width:11px;height:11px;" class="me-1"></i>{% trans "Innegociable" %}</span>
+				</div>
+			</div>
+
+			<div class="col-12 col-md-3">
+				<div class="border rounded p-2 d-flex justify-content-between align-items-center {% if policy.mfa_enforced_for_auditors %}border-warning bg-warning-subtle bg-opacity-10{% else %}bg-white{% endif %}">
+					<div>
+						<label class="form-check-label fw-bold small text-dark d-block" for="id_mfa_auditors">
+							{% trans "Auditores de UO" %}
+						</label>
+						<span class="text-muted" style="font-size:0.75rem;">{% trans "Descargas preservadas" %}</span>
+					</div>
+					<div class="form-check form-switch m-0">
+						<input class="form-check-input" type="checkbox" name="mfa_enforced_for_auditors" id="id_mfa_auditors" {% if policy.mfa_enforced_for_auditors %}checked{% endif %}>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-md-3">
+				<div class="border rounded p-2 d-flex justify-content-between align-items-center {% if policy.mfa_enforced_for_operators %}border-warning bg-warning-subtle bg-opacity-10{% else %}bg-white{% endif %}">
+					<div>
+						<label class="form-check-label fw-bold small text-dark d-block" for="id_mfa_operators">
+							{% trans "Operadores de UO" %}
+						</label>
+						<span class="text-muted" style="font-size:0.75rem;">{% trans "Trámite documental" %}</span>
+					</div>
+					<div class="form-check form-switch m-0">
+						<input class="form-check-input" type="checkbox" name="mfa_enforced_for_operators" id="id_mfa_operators" {% if policy.mfa_enforced_for_operators %}checked{% endif %}>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-12 text-end mt-2">
+				<button type="submit" class="btn btn-sm btn-primary">
+					<i data-feather="save" style="width:13px;height:13px;" class="me-1"></i>
+					{% trans "Guardar Directivas de Rol" %}
+				</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- Pestañas de Filtro y Buscador -->
+<div class="card shadow-sm border mb-4">
+	<div class="card-header bg-white border-bottom-0 pb-0 pt-3">
+		<ul class="nav nav-tabs card-header-tabs">
+			<li class="nav-item">
+				<a class="nav-link {% if not status_filter %}active fw-bold{% endif %}" href="{% url 'dashboard:2fa_governance' %}">
+					{% trans "Todos los Usuarios" %} <span class="badge bg-light text-dark border ms-1">{{ total_users }}</span>
+				</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link {% if status_filter == 'active' %}active fw-bold{% endif %}" href="{% url 'dashboard:2fa_governance' %}?status=active">
+					{% trans "Con 2FA Activo" %} <span class="badge bg-success-subtle text-success ms-1">{{ totp_enabled_count }}</span>
+				</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link {% if status_filter == 'pending' %}active fw-bold{% endif %}" href="{% url 'dashboard:2fa_governance' %}?status=pending">
+					{% trans "Obligatorio (Pendiente)" %}
+				</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link {% if status_filter == 'optional' %}active fw-bold{% endif %}" href="{% url 'dashboard:2fa_governance' %}?status=optional">
+					{% trans "Opcional" %}
+				</a>
+			</li>
+		</ul>
+	</div>
+	<div class="card-body py-3">
+		<form method="get" class="row g-2 align-items-center"
+			  hx-get="{% url 'dashboard:2fa_governance' %}"
+			  hx-trigger="keyup changed delay:350ms from:#totpSearchInput"
+			  hx-target="#totpGovernanceTableContainer"
+			  hx-select="#totpGovernanceTableContainer">
+			{% if status_filter %}
+				<input type="hidden" name="status" value="{{ status_filter }}">
+			{% endif %}
+			<div class="col-12 col-md-6 col-lg-5">
+				<div class="input-group input-group-sm">
+					<span class="input-group-text bg-light text-muted border-end-0">
+						<i data-feather="search" style="width:14px;height:14px;"></i>
+					</span>
+					<input type="text"
+						   id="totpSearchInput"
+						   name="q"
+						   class="form-control border-start-0"
+						   placeholder="{% trans 'Buscar por usuario, correo o nombre...' %}"
+						   value="{{ search_query }}"
+						   autocomplete="off">
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- Tabla de Gobernanza 2FA -->
+<div id="totpGovernanceTableContainer" class="card shadow-sm border">
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead class="table-light">
+				<tr>
+					<th>{% trans "Usuario" %}</th>
+					<th>{% trans "Nombre / Correo" %}</th>
+					<th>{% trans "Unidades Organizativas (Roles)" %}</th>
+					<th>{% trans "Nivel de Privilegios" %}</th>
+					<th>{% trans "Estado 2FA" %}</th>
+					<th>{% trans "Exigencia Individual" %}</th>
+					<th class="text-end">{% trans "Acciones Administrativas" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for item in users_data %}
+					<tr>
+						<td>
+							<strong class="font-mono text-dark">{{ item.user.username }}</strong>
+						</td>
+						<td>
+							<div class="fw-semibold text-dark">{{ item.user.get_full_name|default:"-" }}</div>
+							<div class="small font-mono text-muted">{{ item.user.email|default:"-" }}</div>
+						</td>
+						<td>
+							{% for m in item.user.uo_memberships.all %}
+								{% if m.is_active %}
+									<span class="badge bg-light text-dark border font-mono me-1" title="{{ m.uo.name }}">
+										{{ m.uo.alias }} <span class="text-muted">({{ m.get_role_display }})</span>
+									</span>
+								{% endif %}
+							{% empty %}
+								<span class="badge bg-secondary-subtle text-secondary small">{% trans "Sin UO asignada" %}</span>
+							{% endfor %}
+						</td>
+						<td>
+							{% if item.user.is_superuser %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superusuario Global" %}</span>
+							{% elif item.profile.role_display_name %}
+								<span class="badge bg-light text-dark border">{{ item.profile.role_display_name }}</span>
+							{% else %}
+								<span class="badge bg-light text-secondary border">{% trans "Usuario Estándar" %}</span>
+							{% endif %}
+						</td>
+						<td>
+							{% if item.is_enabled %}
+								<span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">
+									<i data-feather="check-circle" style="width:12px;height:12px;"></i>
+									{% trans "2FA Activo" %}
+								</span>
+							{% elif item.is_required %}
+								<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle d-inline-flex align-items-center gap-1" title="{% trans 'El usuario está obligado a enrolar 2FA en su próximo inicio de sesión' %}">
+									<i data-feather="alert-triangle" style="width:12px;height:12px;"></i>
+									{% trans "Obligatorio (Pendiente)" %}
+								</span>
+							{% else %}
+								<span class="badge bg-light text-muted border">
+									{% trans "Opcional" %}
+								</span>
+							{% endif %}
+						</td>
+						<td>
+							{% if item.user.is_superuser or item.is_required and not item.is_enforced %}
+								<span class="badge bg-secondary-subtle text-muted" title="{% trans 'Obligatorio por directiva de rol institucional' %}">
+									<i data-feather="lock" style="width:11px;height:11px;" class="me-1"></i>{% trans "Por Rol" %}
+								</span>
+							{% else %}
+								<!-- Formulario Toggle de Exigencia Individual -->
+								<form method="post" action="{% url 'dashboard:2fa_governance' %}" class="d-inline">
+									{% csrf_token %}
+									<input type="hidden" name="user_id" value="{{ item.user.id }}">
+									{% if item.is_enforced %}
+										<button type="submit" class="btn btn-sm btn-outline-warning text-nowrap d-inline-flex align-items-center gap-1" title="{% trans 'Haga clic para liberar la exigencia individual' %}">
+											<i data-feather="check-square" style="width:13px;height:13px;"></i>
+											<span>{% trans "Exigido (Quitar)" %}</span>
+										</button>
+									{% else %}
+										<button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap d-inline-flex align-items-center gap-1" title="{% trans 'Haga clic para forzar 2FA obligatorio a este usuario' %}">
+											<i data-feather="square" style="width:13px;height:13px;"></i>
+											<span>{% trans "Forzar 2FA" %}</span>
+										</button>
+									{% endif %}
+								</form>
+							{% endif %}
+						</td>
+						<td class="text-end text-nowrap">
+							{% if item.is_enabled %}
+								<button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#reset2faModal{{ item.user.id }}" title="{% trans 'Resetear credenciales 2FA' %}">
+									<i data-feather="refresh-cw" style="width:13px;height:13px;"></i>
+									<span>{% trans "Resetear 2FA" %}</span>
+								</button>
+
+								<!-- Modal de Reseteo 2FA -->
+								<div class="modal fade" id="reset2faModal{{ item.user.id }}" tabindex="-1" aria-labelledby="reset2faModalLabel{{ item.user.id }}" aria-hidden="true">
+									<div class="modal-dialog text-start">
+										<div class="modal-content border-0 shadow">
+											<form method="post" action="{% url 'dashboard:user_reset_2fa' item.user.id %}">
+												{% csrf_token %}
+												<input type="hidden" name="next" value="{{ request.get_full_path }}">
+												<div class="modal-header bg-danger text-white">
+													<h5 class="modal-title fs-6 fw-bold d-flex align-items-center gap-2" id="reset2faModalLabel{{ item.user.id }}">
+														<i data-feather="refresh-cw"></i>
+														{% trans "Reseteo Administrativo de Segundo Factor" %}
+													</h5>
+													<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+												</div>
+												<div class="modal-body">
+													<p class="mb-2">
+														{% trans "¿Confirma el reseteo del autenticador 2FA para" %}
+														<strong class="font-mono text-dark">{{ item.user.username }}</strong>?
+													</p>
+													<p class="small text-muted mb-3">
+														{% trans "Se desvinculará de inmediato el dispositivo móvil actual y se destruirán sus códigos de recuperación. En su siguiente acceso, si el 2FA le es obligatorio, se le requerirá vincular un nuevo autenticador." %}
+													</p>
+													<div class="mb-3">
+														<label for="resetReason{{ item.user.id }}" class="form-label fw-bold small">
+															{% trans "Motivo o Registro del Incidente" %}
+														</label>
+														<input type="text" name="reason" id="resetReason{{ item.user.id }}" class="form-control form-control-sm" placeholder="{% trans 'Ej: Dispositivo móvil extraviado o restaurado de fábrica...' %}">
+													</div>
+												</div>
+												<div class="modal-footer bg-light">
+													<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+													<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
+														<i data-feather="refresh-cw" style="width:14px;height:14px;"></i>
+														<span>{% trans "Confirmar Reseteo" %}</span>
+													</button>
+												</div>
+											</form>
+										</div>
+									</div>
+								</div>
+							{% else %}
+								<span class="text-muted small">&mdash;</span>
+							{% endif %}
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="7" class="text-center py-5 text-muted">
+							<i data-feather="users" style="width: 36px; height: 36px;" class="mb-2"></i>
+							<h5 class="fw-bold">{% trans "No se encontraron usuarios" %}</h5>
+							<p class="small text-muted mb-0">{% trans "No hay usuarios que coincidan con el filtro seleccionado." %}</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}

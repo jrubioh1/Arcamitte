@@ -72,6 +72,24 @@
 				</li>
 
 				{% if request.user.is_superuser %}
+				<li class="arca-nav-header">
+					{% trans "Seguridad & Perímetro" %}
+				</li>
+				<li class="arca-nav-item {% if active_nav == 'locked_users' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:locked_users' %}">
+						<i data-feather="shield-off"></i> <span>{% trans "Usuarios Bloqueados" %}</span>
+					</a>
+				</li>
+				<li class="arca-nav-item {% if active_nav == '2fa_governance' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:2fa_governance' %}">
+						<i data-feather="lock"></i> <span>{% trans "Gobernanza 2FA" %}</span>
+					</a>
+				</li>
+				<li class="arca-nav-item {% if active_nav == 'security_ips' %}active{% endif %}">
+					<a class="arca-nav-link" href="{% url 'dashboard:ip_ban_list' %}">
+						<i data-feather="slash"></i> <span>{% trans "Lista Negra IPs" %}</span>
+					</a>
+				</li>
 				<li class="arca-nav-item {% if active_nav == 'tokens' %}active{% endif %}">
 					<a class="arca-nav-link" href="{% url 'dashboard:api_tokens' %}">
 						<i data-feather="key"></i> <span>{% trans "API Tokens (M2M)" %}</span>
@@ -258,6 +276,11 @@
 									<i data-feather="lock" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Contraseña" %}
 								</a>
 							</li>
+							<li>
+								<a class="dropdown-item" href="{% url 'dashboard:totp_setup' %}">
+									<i data-feather="shield" style="width:14px;height:14px;" class="me-2"></i> {% trans "Seguridad 2FA (TOTP)" %}
+								</a>
+							</li>
 							{% if request.user.is_superuser %}
 							<li>
 								<a class="dropdown-item" href="{% url 'dashboard:mode_selection' %}">
@@ -311,7 +334,14 @@
 	<!-- Scripts -->
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js" integrity="sha384-qEqAs1VsN9WH2myXDbiP2wGGIttL9bMRZBKCl54ZnzpDlVqbYANP9vMaoT/wvQcf" crossorigin="anonymous"></script>
+	<script src="{% static 'arcamitte/vendor/htmx.min.js' %}"></script>
+	<script defer src="{% static 'arcamitte/vendor/alpine.min.js' %}"></script>
 	<script src="{% static 'arcamitte/js/arcamitte.js' %}"></script>
+	<script>
+		document.addEventListener('htmx:configRequest', function(evt) {
+			evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+		});
+	</script>
 	{% block extra_js %}{% endblock %}
 </body>
 

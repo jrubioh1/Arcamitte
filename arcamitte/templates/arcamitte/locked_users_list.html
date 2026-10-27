@@ -1,0 +1,200 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Gestión de Cuentas Bloqueadas" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+	<div>
+		<h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+			<i data-feather="shield-off" class="text-danger"></i>
+			<span>{% trans "Cuentas de Usuario Bloqueadas y en Riesgo" %}</span>
+		</h1>
+		<p class="text-muted small mb-0">
+			{% trans "Panel perimetral exclusivo para Superusuarios. Permite la monitorización y desbloqueo 1-clic de cuentas afectadas por ataques de fuerza bruta o suspensión manual." %}
+		</p>
+	</div>
+	<div>
+		<a href="{% url 'dashboard:user_list' %}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1">
+			<i data-feather="users" style="width:16px;height:16px;"></i>
+			<span>{% trans "Ver Todos los Usuarios" %}</span>
+		</a>
+	</div>
+</div>
+
+<!-- Barra de Búsqueda y Filtros con HTMX -->
+<div class="card shadow-sm border mb-4">
+	<div class="card-body py-3">
+		<form method="get" class="row g-2 align-items-center"
+			  hx-get="{% url 'dashboard:locked_users' %}"
+			  hx-trigger="keyup changed delay:350ms from:#lockedSearchInput"
+			  hx-target="#lockedUsersTableContainer"
+			  hx-select="#lockedUsersTableContainer">
+			<div class="col-12 col-md-6 col-lg-5">
+				<div class="input-group input-group-sm">
+					<span class="input-group-text bg-light text-muted border-end-0">
+						<i data-feather="search" style="width:14px;height:14px;"></i>
+					</span>
+					<input type="text"
+						   id="lockedSearchInput"
+						   name="q"
+						   class="form-control border-start-0"
+						   placeholder="{% trans 'Buscar por usuario, correo o nombre...' %}"
+						   value="{{ search_query }}"
+						   autocomplete="off">
+				</div>
+			</div>
+			<div class="col-auto">
+				<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2">
+					<i data-feather="alert-triangle" style="width:13px;height:13px;" class="me-1"></i>
+					{{ total_locked }} {% trans "cuentas bloqueadas o con alertas" %}
+				</span>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- Tabla de Usuarios Bloqueados -->
+<div id="lockedUsersTableContainer" class="card shadow-sm border">
+	<div class="table-responsive">
+		<table class="table table-hover align-middle mb-0">
+			<thead class="table-light">
+				<tr>
+					<th>{% trans "Usuario" %}</th>
+					<th>{% trans "Nombre Completo" %}</th>
+					<th>{% trans "Correo Electrónico" %}</th>
+					<th>{% trans "Intentos Fallidos" %}</th>
+					<th>{% trans "Bloqueado Hasta" %}</th>
+					<th>{% trans "Estado Operativo" %}</th>
+					<th class="text-end">{% trans "Acciones de Remediación" %}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for u in users %}
+					<tr>
+						<td>
+							<strong class="font-mono text-dark">{{ u.username }}</strong>
+							{% if u.is_superuser or u.arcamitte_profile.is_global_admin %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.65rem;">
+									{% trans "Admin Global" %}
+								</span>
+							{% endif %}
+						</td>
+						<td>
+							{{ u.get_full_name|default:"-" }}
+						</td>
+						<td class="small font-mono">
+							{{ u.email|default:"-" }}
+						</td>
+						<td>
+							{% if u.arcamitte_profile.failed_login_attempts > 0 %}
+								<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-mono">
+									{{ u.arcamitte_profile.failed_login_attempts }} {% trans "intentos" %}
+								</span>
+							{% else %}
+								<span class="text-muted small">0</span>
+							{% endif %}
+						</td>
+						<td class="small font-mono">
+							{% if u.arcamitte_profile.is_locked %}
+								{% if u.arcamitte_profile.locked_until %}
+									<span class="text-danger fw-bold">
+										{{ u.arcamitte_profile.locked_until|date:"d/m/Y H:i:s" }} UTC
+									</span>
+								{% else %}
+									<span class="badge bg-danger">{% trans "Indefinido" %}</span>
+								{% endif %}
+							{% else %}
+								<span class="text-muted">&mdash;</span>
+							{% endif %}
+						</td>
+						<td>
+							{% if not u.is_active %}
+								<span class="badge bg-secondary">{% trans "Suspendido / Inactivo" %}</span>
+							{% elif u.arcamitte_profile.is_locked %}
+								<span class="badge bg-danger">{% trans "Bloqueado" %}</span>
+							{% else %}
+								<span class="badge bg-warning text-dark">{% trans "Alertado" %}</span>
+							{% endif %}
+						</td>
+						<td class="text-end text-nowrap">
+							<!-- Desbloqueo 1-Clic -->
+							{% if u.arcamitte_profile.is_locked or u.arcamitte_profile.failed_login_attempts > 0 %}
+								<form method="post" action="{% url 'dashboard:user_unlock' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea desbloquear inmediatamente y restaurar a 0 los contadores de seguridad de este usuario?' %}');">
+									{% csrf_token %}
+									<input type="hidden" name="next" value="{{ request.get_full_path }}">
+									<button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 shadow-sm" title="{% trans 'Desbloquear inmediatamente (1-clic)' %}">
+										<i data-feather="check-circle" style="width:14px;height:14px;"></i>
+										<span>{% trans "Desbloquear" %}</span>
+									</button>
+								</form>
+							{% endif %}
+
+							<!-- Botón de Suspensión Manual con Motivo -->
+							{% if u.is_active and u != request.user %}
+								<button type="button" class="btn btn-sm btn-outline-danger ms-1" data-bs-toggle="modal" data-bs-target="#suspendUserModal{{ u.id }}" title="{% trans 'Suspender cuenta' %}">
+									<i data-feather="slash" style="width:14px;height:14px;"></i>
+									<span>{% trans "Suspender" %}</span>
+								</button>
+
+								<!-- Modal de Suspensión para este usuario -->
+								<div class="modal fade" id="suspendUserModal{{ u.id }}" tabindex="-1" aria-labelledby="suspendModalLabel{{ u.id }}" aria-hidden="true">
+									<div class="modal-dialog text-start">
+										<div class="modal-content border-0 shadow">
+											<form method="post" action="{% url 'dashboard:user_suspend' u.id %}">
+												{% csrf_token %}
+												<div class="modal-header bg-danger text-white">
+													<h5 class="modal-title fs-6 fw-bold d-flex align-items-center gap-2" id="suspendModalLabel{{ u.id }}">
+														<i data-feather="alert-triangle"></i>
+														{% trans "Suspensión Administrativa de Cuenta" %}
+													</h5>
+													<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+												</div>
+												<div class="modal-body">
+													<p class="mb-2">
+														{% trans "¿Está seguro de suspender la cuenta del usuario" %}
+														<strong class="font-mono text-dark">{{ u.username }}</strong>?
+													</p>
+													<p class="small text-muted mb-3">
+														{% trans "Esta acción invalidará inmediatamente todas las sesiones activas en el sistema y bloqueará el inicio de sesión." %}
+													</p>
+													<div class="mb-3">
+														<label for="suspendReason{{ u.id }}" class="form-label fw-bold small">
+															{% trans "Justificación / Motivo Legal Obligatorio" %} <span class="text-danger">*</span>
+														</label>
+														<textarea name="reason" id="suspendReason{{ u.id }}" class="form-control" rows="3" required placeholder="{% trans 'Indique la razón legal o de seguridad (ej: Baja de personal, comportamiento anómalo)...' %}"></textarea>
+													</div>
+												</div>
+												<div class="modal-footer bg-light">
+													<button type="button" class="btn btn-light border" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+													<button type="submit" class="btn btn-danger d-inline-flex align-items-center gap-1">
+														<i data-feather="slash" style="width:14px;height:14px;"></i>
+														<span>{% trans "Confirmar Suspensión" %}</span>
+													</button>
+												</div>
+											</form>
+										</div>
+									</div>
+								</div>
+							{% elif not u.is_active %}
+								<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-sm btn-outline-primary ms-1" title="{% trans 'Reactivar en formulario de usuario' %}">
+									<i data-feather="edit-2" style="width:14px;height:14px;"></i>
+									<span>{% trans "Reactivar" %}</span>
+								</a>
+							{% endif %}
+						</td>
+					</tr>
+				{% empty %}
+					<tr>
+						<td colspan="7" class="text-center py-5 text-muted">
+							<i data-feather="shield" style="width: 42px; height: 42px;" class="mb-2 text-success opacity-75"></i>
+							<h5 class="fw-bold text-dark">{% trans "No hay usuarios bloqueados" %}</h5>
+							<p class="small text-muted mb-0">{% trans "Todos los usuarios activos se encuentran en estado operativo normal sin penalizaciones por fuerza bruta." %}</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+{% endblock %}

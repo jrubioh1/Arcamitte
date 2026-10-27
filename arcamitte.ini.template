@@ -38,6 +38,56 @@ fernet_key = cambiame-cambiame-cambiame-cambiame-cambiame=
 max_file_size = 52428800
 # Iteraciones de PBKDF2 para mitigación de timing attacks (por defecto: 20000)
 timing_pbkdf2_iterations = 20000
+# Intentos fallidos permitidos antes de bloquear la cuenta de usuario (por defecto: 5)
+user_max_failed_logins = 5
+# Duración del bloqueo temporal del usuario en minutos (por defecto: 30)
+user_lockout_duration_minutes = 30
+# Umbral de intentos fallidos de una IP en la ventana para baneo automático (por defecto: 10)
+ip_ban_failed_attempts_threshold = 10
+# Ventana de evaluación de ataques desde una IP en minutos (por defecto: 10)
+ip_ban_window_minutes = 10
+# Duración del baneo automático de IP en horas (por defecto: 24, 0 = permanente)
+ip_ban_default_duration_hours = 24
+# Política de contraseñas (ENS / NIST SP 800-63B)
+password_min_length = 12
+password_history_limit = 5
+password_expiration_days = 90
+# Buzón para alertas de incidentes y seguridad (si se omite, usa default_from_email)
+security_alerts_email = admin@arcamitte.local
+# Exigir 2FA obligatorio para administradores y superusuarios (por defecto: true)
+mfa_required_for_staff = true
+# Llavero de claves maestras Fernet (separadas por coma; la primera es la clave activa de cifrado)
+fernet_keys = 
+# Protección de Sesión: Forzar sesión única por usuario (invalida sesiones previas)
+single_session_per_user = true
+# Protección de Sesión: Vincular sesión a la dirección IP inicial del operador
+session_ip_binding = true
+# Conector Webhook / SIEM para telemetría y alertas en tiempo real
+siem_webhook_url = 
+siem_webhook_token = 
+siem_webhook_events = ip_ban,user_lockout,log_tamper,audit_export,master_key_rotated,malware_detected
+# Marca de Agua Forense Dinámica en Descargas PDF
+watermark_enabled = true
+watermark_opacity = 0.18
+
+[antivirus]
+# Motor Antivirus ClamAV en Memoria (Protocolo zINSTREAM)
+# Zero Disk Footprint: Cero escritura en disco antes ni durante el análisis.
+clamav_enabled = false
+clamav_host = 127.0.0.1
+clamav_port = 3310
+# Dejar vacío para TCP o especificar ruta para socket Unix (ej. /var/run/clamav/clamd.ctl)
+clamav_socket_path = 
+clamav_timeout = 10
+# Política de tolerancia: false = Fail-Secure (bloquea subidas si ClamAV cae), true = Fail-Open
+clamav_fail_open = false
+
+[timestamping]
+# Sellado Criptográfico Cualificado de Tiempo (RFC 3161 / eIDAS / ENS ALTO)
+rfc3161_enabled = false
+# URL de la Autoridad de Sellado de Tiempo (TSA) conforme a RFC 3161
+rfc3161_tsa_url = http://timestamp.digicert.com
+rfc3161_timeout = 10
 
 [email]
 # Backend de correo: estándar corporativo SMTP (o 'django.core.mail.backends.console.EmailBackend' para terminal)

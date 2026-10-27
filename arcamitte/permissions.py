@@ -2,7 +2,101 @@ from __future__ import annotations
 
 from typing import Any
 from rest_framework import permissions
-from arcamitte.models import APIToken
+from arcamitte.models import APIToken, UserUOMembership
+
+
+def is_global_admin(user: Any) -> bool:
+    """
+    Comprueba si el usuario tiene el rol de Administrador Global de Seguridad de Arcamitte.
+    Desacoplado de la lógica interna de Django Admin, evaluando el perfil institucional
+    con respaldo transparente a user.is_superuser para comandos de consola.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    profile = getattr(user, "arcamitte_profile", None)
+    if profile and getattr(profile, "is_global_admin", False):
+        return True
+    return bool(getattr(user, "is_superuser", False))
+
+
+def is_uo_admin(user: Any, uo: Any = None) -> bool:
+    """
+    Comprueba si el usuario es Administrador de una UO específica o de alguna UO activa.
+    Los Administradores Globales tienen potestad administrativa sobre todas las UOs.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if is_global_admin(user):
+        return True
+    qs = UserUOMembership.objects.filter(
+        user=user, is_active=True, role=UserUOMembership.Role.ADMIN
+    )
+    if uo is not None:
+        qs = qs.filter(uo=uo)
+    return qs.exists()
+
+
+def is_uo_auditor(user: Any, uo: Any = None) -> bool:
+    """
+    Comprueba si el usuario es Auditor de una UO específica o de alguna UO activa.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if is_global_admin(user):
+        return True
+    qs = UserUOMembership.objects.filter(
+        user=user, is_active=True, role=UserUOMembership.Role.AUDITOR
+    )
+    if uo is not None:
+        qs = qs.filter(uo=uo)
+    return qs.exists()
+
+
+def is_uo_operator(user: Any, uo: Any = None) -> bool:
+    """
+    Comprueba si el usuario es Operador de una UO específica o de alguna UO activa.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if is_global_admin(user):
+        return True
+    qs = UserUOMembership.objects.filter(
+        user=user, is_active=True, role=UserUOMembership.Role.OPERATOR
+    )
+    if uo is not None:
+        qs = qs.filter(uo=uo)
+    return qs.exists()
+
+
+def can_manage_security_perimeter(user: Any) -> bool:
+    """Determina si el usuario puede administrar el perímetro de seguridad (SOC, IPs, 2FA global)."""
+    return is_global_admin(user)
+
+
+def can_manage_api_tokens(user: Any) -> bool:
+    """Determina si el usuario puede crear, consultar y revocar API tokens M2M."""
+    return is_global_admin(user)
+
+
+def can_manage_uo_members(user: Any, uo: Any) -> bool:
+    """Determina si el usuario puede administrar miembros dentro de una UO."""
+    return is_global_admin(user) or is_uo_admin(user, uo)
+
+
+def can_burn_download(user: Any, document: Any) -> bool:
+    """Determina si el usuario puede descargar y clausurar destructivamente un asiento."""
+    if is_global_admin(user):
+        return True
+    origin_uo = getattr(document, "origin_uo", None)
+    return is_uo_admin(user, origin_uo)
+
+
+def can_audit_download(user: Any, document: Any) -> bool:
+    """Determina si el usuario puede realizar descargas de auditoría administrativa preservada."""
+    if is_global_admin(user):
+        return True
+    origin_uo = getattr(document, "origin_uo", None)
+    return is_uo_auditor(user, origin_uo) or is_uo_admin(user, origin_uo)
 
 
 class IsAuthenticatedOrToken(permissions.BasePermission):
@@ -12,7 +106,11 @@ class IsAuthenticatedOrToken(permissions.BasePermission):
     """
 
     def has_permission(self, request: Any, view: Any) -> bool:
-        if request.auth and isinstance(request.auth, APIToken) and request.auth.is_valid():
+        if (
+            request.auth
+            and isinstance(request.auth, APIToken)
+            and request.auth.is_valid()
+        ):
             return True
         return bool(request.user and request.user.is_authenticated)
 

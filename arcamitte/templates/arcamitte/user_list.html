@@ -29,6 +29,7 @@
 					<th>{% trans "Correo Electrónico" %}</th>
 					<th>{% trans "Unidades Organizativas (Roles)" %}</th>
 					<th>{% trans "Tipo de Cuenta" %}</th>
+					<th>{% trans "Segundo Factor (2FA)" %}</th>
 					<th>{% trans "Estado" %}</th>
 					<th class="text-end">{% trans "Acciones" %}</th>
 				</tr>
@@ -68,16 +69,37 @@
 							{% endfor %}
 						</td>
 						<td>
-							{% if u.is_superuser %}
-								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superusuario Global" %}</span>
-							{% elif u.is_staff %}
-								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal Administrativo" %}</span>
+							{% if u.is_superuser or u.arcamitte_profile.is_global_admin %}
+								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Administrador Global" %}</span>
+							{% elif u.uo_memberships.all %}
+								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal de UO" %}</span>
 							{% else %}
 								<span class="badge bg-light text-secondary border">{% trans "Usuario Estándar" %}</span>
 							{% endif %}
 						</td>
 						<td>
-							{% if u.is_active %}
+							{% if u.arcamitte_profile.is_totp_enabled %}
+								<span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">
+									<i data-feather="check-circle" style="width:11px;height:11px;"></i>
+									{% trans "Activo" %}
+								</span>
+							{% elif u.arcamitte_profile.is_totp_required %}
+								<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle d-inline-flex align-items-center gap-1" title="{% trans 'Obligatorio: Se requerirá configuración en su próximo acceso' %}">
+									<i data-feather="alert-triangle" style="width:11px;height:11px;"></i>
+									{% trans "Pendiente" %}
+								</span>
+							{% else %}
+								<span class="badge bg-light text-muted border">
+									{% trans "Opcional" %}
+								</span>
+							{% endif %}
+						</td>
+						<td>
+							{% if u.arcamitte_profile.is_locked %}
+								<span class="badge bg-danger text-white shadow-sm" title="{% trans 'Bloqueado por intentos fallidos hasta:' %} {{ u.arcamitte_profile.locked_until|date:'H:i d/m/Y' }}">
+									<i data-feather="shield-off" style="width:11px;height:11px;" class="me-1"></i>{% trans "Bloqueado" %}
+								</span>
+							{% elif u.is_active %}
 								<span class="badge bg-success">{% trans "Activo" %}</span>
 							{% else %}
 								<span class="badge bg-secondary">{% trans "Inactivo" %}</span>
@@ -90,10 +112,32 @@
 								</span>
 							{% else %}
 								<div class="btn-group btn-group-sm" role="group">
+									{% if u.arcamitte_profile.is_locked %}
+										<form method="post" action="{% url 'dashboard:user_unlock' u.id %}" class="d-inline me-1" onsubmit="return confirm('{% trans '¿Desea desbloquear inmediatamente la cuenta de este usuario?' %}');">
+											{% csrf_token %}
+											<input type="hidden" name="next" value="{{ request.get_full_path }}">
+											<button type="submit" class="btn btn-warning text-dark" title="{% trans 'Desbloquear cuenta de usuario' %}">
+												<i data-feather="unlock" style="width:14px;height:14px;"></i>
+												<span class="d-none d-md-inline ms-1">{% trans "Desbloquear" %}</span>
+											</button>
+										</form>
+									{% endif %}
+
 									<a href="{% url 'dashboard:user_edit' u.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar cuenta' %}">
 										<i data-feather="edit-2" style="width:14px;height:14px;"></i>
 										<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
 									</a>
+
+									{% if request.user.is_superuser and u.arcamitte_profile.is_totp_enabled %}
+										<form method="post" action="{% url 'dashboard:user_reset_2fa' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Confirma el reseteo del segundo factor (2FA) para este usuario? Perderá el acceso de su dispositivo móvil actual.' %}');">
+											{% csrf_token %}
+											<input type="hidden" name="next" value="{{ request.get_full_path }}">
+											<button type="submit" class="btn btn-outline-danger" title="{% trans 'Resetear segundo factor (2FA)' %}">
+												<i data-feather="refresh-cw" style="width:14px;height:14px;"></i>
+												<span class="d-none d-lg-inline ms-1">{% trans "Reset 2FA" %}</span>
+											</button>
+										</form>
+									{% endif %}
 
 									<form method="post" action="{% url 'dashboard:user_reset_password' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Desea generar una nueva clave temporal y enviarla al correo de este usuario?' %}');">
 										{% csrf_token %}

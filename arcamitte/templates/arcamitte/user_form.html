@@ -135,85 +135,65 @@
 					</div>
 
 					<!-- Privilegios de Acceso y Roles de Gobernanza -->
-					{% if form.is_staff or form.is_superuser %}
+					{% if form.is_global_admin %}
 						<div class="mb-4">
 							<h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
 								<i data-feather="lock" style="width:16px;height:16px;" class="text-primary"></i>
 								{% trans "Nivel de Privilegios y Gobernanza del Sistema" %}
 							</h6>
 							<p class="text-muted small mb-3">
-								{% trans "Defina las atribuciones operativas del usuario. A continuación se detallan las diferencias entre Acceso Administrativo y Superusuario Global:" %}
+								{% trans "Defina si este usuario ostenta la máxima autoridad del sistema como Administrador Global de Seguridad:" %}
 							</p>
 
-							<div class="row g-3">
-								{% if form.is_staff %}
-									<div class="col-md-6">
-										<div class="card h-100 border rounded-3 p-3 {% if form.is_staff.value %}border-primary bg-primary-subtle bg-opacity-10{% endif %}">
-											<div class="d-flex justify-content-between align-items-start mb-2">
-												<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
-													<i data-feather="users" style="width:12px;height:12px;" class="me-1"></i>{% trans "Nivel Departamental" %}
-												</span>
-											</div>
-											<div class="form-check mb-2">
-												{{ form.is_staff }}
-												<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_staff.id_for_label }}">
-													{% trans "Acceso Administrativo Departamental" %}
-												</label>
-											</div>
-											<div class="text-muted small flex-grow-1 ms-4">
-												<p class="mb-2">
-													{% trans "Habilita la autenticación en el panel interno. Permite operar en las Unidades Organizativas (UOs) donde el usuario esté expresamente asignado." %}
-												</p>
-												<ul class="ps-3 mb-0 text-secondary" style="font-size:0.8rem;">
-													<li>{% trans "Gestiona usuarios y personal exclusivamente de sus UOs." %}</li>
-													<li>{% trans "Cifra y tramita documentos departamentales." %}</li>
-													<li>{% trans "Sin visibilidad sobre organizaciones ajenas ni configuración global." %}</li>
-												</ul>
-											</div>
-											{% if form.is_staff.help_text and form.is_self %}
-												<div class="text-warning-emphasis small mt-2 ms-4 d-flex align-items-center gap-1">
-													<i data-feather="info" style="width:12px;height:12px;"></i>
-													<span>{{ form.is_staff.help_text }}</span>
-												</div>
-											{% endif %}
-										</div>
+							<div class="card border rounded-3 p-3 {% if form.is_global_admin.value %}border-danger bg-danger-subtle bg-opacity-10{% endif %}">
+								<div class="d-flex justify-content-between align-items-start mb-2">
+									<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+										<i data-feather="shield" style="width:12px;height:12px;" class="me-1"></i>{% trans "Control Total / Soberano" %}
+									</span>
+								</div>
+								<div class="form-check mb-2">
+									{{ form.is_global_admin }}
+									<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_global_admin.id_for_label }}">
+										{% trans "Administrador Global de Seguridad" %}
+									</label>
+								</div>
+								<div class="text-muted small flex-grow-1 ms-4">
+									<p class="mb-2">
+										{% trans "Otorga soberanía y autoridad total sobre toda la plataforma Arcamitte sin ninguna restricción de Unidad Organizativa." %}
+									</p>
+									<ul class="ps-3 mb-0 text-secondary" style="font-size:0.8rem;">
+										<li>{% trans "Creación, modificación y baja de cualquier Unidad Organizativa." %}</li>
+										<li>{% trans "Administración de todos los usuarios y emisión de tokens M2M." %}</li>
+										<li>{% trans "Auditoría forense global de todas las transferencias de la red." %}</li>
+										<li>{% trans "Gobernanza perimetral y directivas corporativas de seguridad." %}</li>
+									</ul>
+								</div>
+								{% if form.is_global_admin.help_text and form.is_self %}
+									<div class="text-warning-emphasis small mt-2 ms-4 d-flex align-items-center gap-1">
+										<i data-feather="info" style="width:12px;height:12px;"></i>
+										<span>{{ form.is_global_admin.help_text }}</span>
 									</div>
 								{% endif %}
+							</div>
+						</div>
+					{% endif %}
 
-								{% if form.is_superuser %}
-									<div class="col-md-6">
-										<div class="card h-100 border rounded-3 p-3 {% if form.is_superuser.value %}border-danger bg-danger-subtle bg-opacity-10{% endif %}">
-											<div class="d-flex justify-content-between align-items-start mb-2">
-												<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
-													<i data-feather="shield" style="width:12px;height:12px;" class="me-1"></i>{% trans "Control Total / Soberano" %}
-												</span>
-											</div>
-											<div class="form-check mb-2">
-												{{ form.is_superuser }}
-												<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_superuser.id_for_label }}">
-													{% trans "Superusuario Global del Sistema" %}
-												</label>
-											</div>
-											<div class="text-muted small flex-grow-1 ms-4">
-												<p class="mb-2">
-													{% trans "Otorga soberanía y autoridad total sobre toda la plataforma Arcamitte sin ninguna restricción de Unidad Organizativa." %}
-												</p>
-												<ul class="ps-3 mb-0 text-secondary" style="font-size:0.8rem;">
-													<li>{% trans "Creación, modificación y baja de cualquier Unidad Organizativa." %}</li>
-													<li>{% trans "Administración de todos los usuarios y emisión de tokens M2M." %}</li>
-													<li>{% trans "Auditoría forense global de todas las transferencias de la red." %}</li>
-													<li><strong>{% trans "Incluye automáticamente Acceso Administrativo Departamental." %}</strong></li>
-												</ul>
-											</div>
-											{% if form.is_superuser.help_text and form.is_self %}
-												<div class="text-warning-emphasis small mt-2 ms-4 d-flex align-items-center gap-1">
-													<i data-feather="info" style="width:12px;height:12px;"></i>
-													<span>{{ form.is_superuser.help_text }}</span>
-												</div>
-											{% endif %}
-										</div>
-									</div>
-								{% endif %}
+					{% if form.is_mfa_enforced %}
+						<div class="mb-4">
+							<h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+								<i data-feather="shield" style="width:16px;height:16px;" class="text-primary"></i>
+								{% trans "Gobernanza de Segundo Factor (2FA / TOTP)" %}
+							</h6>
+							<div class="card border rounded-3 p-3 {% if form.is_mfa_enforced.value %}border-primary bg-primary-subtle bg-opacity-10{% endif %}">
+								<div class="form-check mb-1">
+									{{ form.is_mfa_enforced }}
+									<label class="form-check-label fw-bold text-dark ms-1" for="{{ form.is_mfa_enforced.id_for_label }}">
+										{{ form.is_mfa_enforced.label }}
+									</label>
+								</div>
+								<div class="text-muted small ms-4">
+									{{ form.is_mfa_enforced.help_text }}
+								</div>
 							</div>
 						</div>
 					{% endif %}
@@ -232,24 +212,4 @@
 		</div>
 	</div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-	var isSuperuserCheckbox = document.getElementById('{{ form.is_superuser.id_for_label }}');
-	var isStaffCheckbox = document.getElementById('{{ form.is_staff.id_for_label }}');
-
-	if (isSuperuserCheckbox && isStaffCheckbox) {
-		isSuperuserCheckbox.addEventListener('change', function() {
-			if (this.checked) {
-				isStaffCheckbox.checked = true;
-			}
-		});
-		isStaffCheckbox.addEventListener('change', function() {
-			if (!this.checked && isSuperuserCheckbox.checked) {
-				this.checked = true;
-			}
-		});
-	}
-});
-</script>
 {% endblock %}
