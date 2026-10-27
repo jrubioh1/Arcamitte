@@ -27,7 +27,7 @@
 			&larr; {% trans "Volver al listado" %}
 		</a>
 		{% if can_audit_download %}
-			<a href="{% url 'dashboard:document_audit_download' doc.file_hash %}" class="btn btn-warning text-dark shadow-sm">
+			<a href="{% url 'dashboard:document_audit_download' doc.file_hash %}" data-reactive-download="1" class="btn btn-warning text-dark shadow-sm">
 				<i data-feather="shield" style="width:16px;height:16px;" class="me-1"></i> {% trans "Descarga de Auditoría (Preservada)" %}
 			</a>
 		{% endif %}
@@ -248,7 +248,7 @@
 <div class="modal fade" id="downloadAndBurnModal" tabindex="-1" aria-labelledby="downloadAndBurnModalLabel" aria-hidden="true">
 	<div class="modal-dialog">
 		<div class="modal-content border-0 shadow">
-			<form method="post" action="{% url 'dashboard:document_download_and_burn' doc.file_hash %}">
+			<form method="post" action="{% url 'dashboard:document_download_and_burn' doc.file_hash %}" data-download-modal-form="1">
 				{% csrf_token %}
 				<div class="modal-header bg-danger text-white">
 					<h5 class="modal-title fs-6 fw-bold d-flex align-items-center gap-2" id="downloadAndBurnModalLabel">

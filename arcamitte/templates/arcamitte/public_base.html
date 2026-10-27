@@ -1,5 +1,5 @@
 {% load static i18n %}<!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'es' }}">
+<html lang="{{ LANGUAGE_CODE|default:'es' }}" class="h-full bg-slate-50 antialiased">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -8,66 +8,82 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="shortcut icon" href="{% static 'arcamitte/img/logo.jpg' %}" />
 
     <title>{% block title %}{% trans "Arcamitte - Microservicio Criptográfico de Entrega Segura" %}{% endblock %}</title>
 
-    <!-- Bootstrap 5.3 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <!-- Estilos propios Arcamitte -->
+    <!-- Tailwind CSS + Flowbite + Tom Select (Sin Bootstrap) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: false },
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+                    },
+                    colors: {
+                        arca: {
+                            primary: '#2563eb',
+                            dark: '#0f172a',
+                            surface: '#f8fafc',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.min.css" rel="stylesheet" />
+    <!-- Sistema de Diseño Tailwind / Shadcn de Arcamitte -->
     <link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-light d-flex flex-column min-vh-100">
+<body class="bg-slate-50 d-flex flex-column min-vh-100 text-slate-800 font-sans">
 
-    <!-- Navbar Superior con estilo Arcamitte -->
-    <header class="navbar navbar-expand-md navbar-dark bg-dark sticky-top shadow-sm py-2" style="background-color: var(--arca-sidebar-bg) !important;">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="{% url 'arcamitte:request-access' %}">
-                <img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte Logo" class="rounded-2 shadow-sm" style="width: 32px; height: 32px; object-fit: cover;">
-                <span class="text-white">Arcamitte</span>
+    <!-- Navbar Superior Pública Compacta Tailwind Dark -->
+    <header class="sticky-top shadow-sm border-bottom" style="background-color: var(--arca-sidebar-bg) !important; border-color: rgba(255,255,255,0.08) !important;">
+        <div class="container d-flex flex-wrap align-items-center justify-content-between py-2" style="min-height: 58px;">
+            <a class="d-flex align-items-center gap-2 text-decoration-none" href="{% url 'arcamitte:request-access' %}">
+                <img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte Logo" class="rounded-2 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; border: 1px solid rgba(255,255,255,0.15);">
+                <span class="text-white fw-bold" style="font-size: 1.25rem; letter-spacing: -0.02em;">Arcamitte</span>
             </a>
 
-            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav" aria-controls="publicNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            <div class="d-flex flex-wrap align-items-center gap-2 ms-auto" id="publicNav">
+                <div class="d-inline-flex align-items-center p-1 rounded-3" style="background-color: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); gap: 4px;">
+                    <a href="{% url 'arcamitte:request-access' %}"
+                       class="px-3 py-1 rounded-2 text-decoration-none small d-inline-flex align-items-center gap-1 {% if active_public_tab == 'request' or request.resolver_match.url_name == 'request-access' or request.resolver_match.url_name == 'index' %}bg-primary text-white fw-bold shadow-sm{% else %}text-white-50{% endif %}"
+                       style="transition: all 0.15s ease;">
+                        <i data-feather="key" style="width:14px;height:14px;"></i>
+                        <span>{% trans "Solicitar Acceso" %}</span>
+                    </a>
+                    <a href="{% url 'arcamitte:redeem-otp' %}"
+                       class="px-3 py-1 rounded-2 text-decoration-none small d-inline-flex align-items-center gap-1 {% if active_public_tab == 'redeem' or request.resolver_match.url_name == 'redeem-otp' %}bg-success text-white fw-bold shadow-sm{% else %}text-white-50{% endif %}"
+                       style="transition: all 0.15s ease;">
+                        <i data-feather="download" style="width:14px;height:14px;"></i>
+                        <span>{% trans "Descargar Documento" %}</span>
+                    </a>
+                </div>
 
-            <div class="collapse navbar-collapse" id="publicNav">
-                <ul class="navbar-nav ms-auto align-items-md-center gap-2 mt-2 mt-md-0">
-                    <li class="nav-item">
-                        <a href="{% url 'arcamitte:request-access' %}" class="nav-link text-white-50 {% if request.resolver_match.url_name == 'request-access' %}active text-white fw-semibold{% endif %}">
-                            <i data-feather="key" style="width:14px;height:14px;" class="me-1"></i> {% trans "Solicitar Acceso" %}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{% url 'arcamitte:redeem-otp' %}" class="nav-link text-white-50 {% if request.resolver_match.url_name == 'redeem-otp' %}active text-white fw-semibold{% endif %}">
-                            <i data-feather="download" style="width:14px;height:14px;" class="me-1"></i> {% trans "Descargar Documento" %}
-                        </a>
-                    </li>
+                <!-- Selector de Idioma -->
+                <div class="btn-group btn-group-sm ms-1" role="group" aria-label="Idioma" style="background-color: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
+                    <a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
+                       class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary text-white{% else %}text-white-50{% endif %} px-2 py-1 fw-semibold">
+                        ES
+                    </a>
+                    <a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
+                       class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary text-white{% else %}text-white-50{% endif %} px-2 py-1 fw-semibold">
+                        EN
+                    </a>
+                </div>
 
-                    <!-- Selector de Idioma -->
-                    <li class="nav-item ms-md-2">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Idioma">
-                            <a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
-                               class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary{% else %}btn-outline-secondary text-white-50{% endif %} px-2 py-1 fw-semibold">
-                                ES
-                            </a>
-                            <a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
-                               class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary{% else %}btn-outline-secondary text-white-50{% endif %} px-2 py-1 fw-semibold">
-                                EN
-                            </a>
-                        </div>
-                    </li>
-
-                    <!-- Enlace al Dashboard Operativo -->
-                    <li class="nav-item ms-md-2">
-                        <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-light d-flex align-items-center gap-1 px-3">
-                            <i data-feather="lock" style="width:14px;height:14px;"></i>
-                            <span>{% trans "Panel Privado" %}</span>
-                        </a>
-                    </li>
-                </ul>
+                <!-- Enlace al Dashboard Operativo -->
+                <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1 px-3 ms-1">
+                    <i data-feather="lock" style="width:14px;height:14px;"></i>
+                    <span>{% trans "Panel Privado" %}</span>
+                </a>
             </div>
         </div>
     </header>
@@ -109,17 +125,12 @@
         </div>
     </footer>
 
-    <!-- Scripts Bootstrap 5.3 & Feather Icons -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- Scripts Tom Select, Flowbite, Feather Icons & Arcamitte -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js" integrity="sha384-qEqAs1VsN9WH2myXDbiP2wGGIttL9bMRZBKCl54ZnzpDlVqbYANP9vMaoT/wvQcf" crossorigin="anonymous"></script>
+    <script defer src="{% static 'arcamitte/vendor/alpine.min.js' %}"></script>
     <script src="{% static 'arcamitte/js/arcamitte.js' %}"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            if (window.feather) {
-                feather.replace();
-            }
-        });
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -233,14 +233,15 @@ class DashboardLoginView(auth_views.LoginView):
 
     def get_success_url(self) -> str:
         if self.request.user.is_superuser:
-            return reverse_lazy("dashboard:mode_selection")
+            self.request.session.setdefault("dashboard_mode", "governance")
         return reverse_lazy("dashboard:home")
 
 
 class DashboardModeSelectionView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     Selector de modo de trabajo exclusivo para superusuarios (Mode Gateway).
-    Permite alternar entre el Modo Gobernanza Global y el Modo Operativa Documental.
+    Permite alternar entre el Modo Gobernanza Global y el Modo Operativa Documental,
+    reseteando siempre la vista hacia el Dashboard principal limpio.
     """
 
     login_url = "dashboard:login"
@@ -253,15 +254,7 @@ class DashboardModeSelectionView(LoginRequiredMixin, UserPassesTestMixin, View):
         set_mode = request.GET.get("set")
         if set_mode in ["governance", "operational"]:
             request.session["dashboard_mode"] = set_mode
-            fallback_url = reverse("dashboard:home")
-            next_url = request.GET.get("next") or fallback_url
-            if not url_has_allowed_host_and_scheme(
-                url=next_url,
-                allowed_hosts={request.get_host()},
-                require_https=request.is_secure(),
-            ):
-                next_url = fallback_url
-            return redirect(next_url)
+            return redirect(reverse("dashboard:home"))
 
         current_mode = request.session.get("dashboard_mode", "governance")
         return render(
@@ -2065,11 +2058,28 @@ class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         analytics_uos = get_user_analytics_uos(self.request.user)
+        if self.request.user.is_superuser:
+            analytics_users = User.objects.filter(is_active=True).order_by("username")
+        else:
+            analytics_users = (
+                User.objects.filter(
+                    models.Q(
+                        uo_memberships__uo__in=analytics_uos,
+                        uo_memberships__is_active=True,
+                    )
+                    | models.Q(pk=self.request.user.pk),
+                    is_active=True,
+                )
+                .distinct()
+                .order_by("username")
+            )
         context["active_nav"] = "analytics"
         context["analytics_uos"] = analytics_uos
+        context["analytics_users"] = analytics_users
         context["is_superuser"] = self.request.user.is_superuser
         context["selected_uo"] = self.request.GET.get("uo", "")
         context["selected_uo_role"] = self.request.GET.get("uo_role", "all")
+        context["selected_user"] = self.request.GET.get("user", "")
         context["selected_range"] = self.request.GET.get("range", "14d")
         context["selected_burn_policy"] = self.request.GET.get("burn_policy", "")
         context["selected_status"] = self.request.GET.get("status", "")
@@ -2091,19 +2101,31 @@ def filter_analytics_querysets(
 ]:
     """
     Delimita los QuerySets de Documentos y Logs según la matriz de autorización,
-    filtros departamentales, política de destrucción BAR, estado y ventanas temporales.
+    filtros departamentales (incluyendo asientos sin UO de origen 'NONE'), usuario,
+    política de destrucción BAR, estado y ventanas temporales.
     Retorna (docs_qs, logs_qs, target_uo_obj, meta, error_response).
     """
     requested_uo = request.GET.get("uo", "").strip().upper()
     target_uo_obj: OrganizationalUnit | None = None
+    filter_no_origin_uo = requested_uo == "NONE"
 
-    if requested_uo:
+    if requested_uo and not filter_no_origin_uo:
         target_uo_obj = OrganizationalUnit.objects.filter(
             alias__iexact=requested_uo, is_active=True
         ).first()
         if not target_uo_obj and requested_uo.isdigit():
             target_uo_obj = OrganizationalUnit.objects.filter(
                 numeric_code=int(requested_uo), is_active=True
+            ).first()
+        if not target_uo_obj:
+            uo_search_pool = (
+                OrganizationalUnit.objects.filter(is_active=True)
+                if request.user.is_superuser
+                else analytics_uos
+            )
+            target_uo_obj = uo_search_pool.filter(
+                models.Q(alias__icontains=requested_uo)
+                | models.Q(name__icontains=requested_uo)
             ).first()
         if not target_uo_obj:
             return (
@@ -2135,14 +2157,35 @@ def filter_analytics_querysets(
                 ),
             )
 
-    docs_qs = EncryptedDocument.objects.select_related("origin_uo", "target_uo").all()
+    docs_qs = EncryptedDocument.objects.select_related(
+        "origin_uo", "target_uo", "uploaded_by"
+    ).all()
     logs_qs = DocumentAccessLog.objects.select_related(
         "document", "origin_uo", "target_uo"
     ).all()
 
-    # 1. Filtro Perimetral UO y Rol
+    # 1. Filtro Perimetral UO, Sin UO de Origen ("NONE") y Rol
     uo_role = request.GET.get("uo_role", "all").strip().lower()
-    if target_uo_obj:
+    if filter_no_origin_uo:
+        docs_qs = docs_qs.filter(origin_uo__isnull=True)
+        logs_qs = logs_qs.filter(
+            models.Q(origin_uo__isnull=True)
+            & (
+                models.Q(document__isnull=True)
+                | models.Q(document__origin_uo__isnull=True)
+            )
+        )
+        if not request.user.is_superuser:
+            docs_qs = docs_qs.filter(
+                models.Q(target_uo__in=analytics_uos)
+                | models.Q(uploaded_by=request.user)
+            )
+            logs_qs = logs_qs.filter(
+                models.Q(target_uo__in=analytics_uos)
+                | models.Q(document__target_uo__in=analytics_uos)
+                | models.Q(document__uploaded_by=request.user)
+            )
+    elif target_uo_obj:
         if uo_role == "origin":
             docs_qs = docs_qs.filter(origin_uo=target_uo_obj)
             logs_qs = logs_qs.filter(
@@ -2176,6 +2219,37 @@ def filter_analytics_querysets(
             | models.Q(document__origin_uo__in=analytics_uos)
             | models.Q(document__target_uo__in=analytics_uos)
         )
+
+    # 1.b Filtro por Usuario (uploaded_by / actor, exacto o por coincidencia escrita)
+    requested_user = request.GET.get("user", "").strip()
+    if requested_user:
+        target_user = User.objects.filter(username__iexact=requested_user).first()
+        if not target_user and requested_user.isdigit():
+            target_user = User.objects.filter(pk=int(requested_user)).first()
+        if target_user:
+            docs_qs = docs_qs.filter(uploaded_by=target_user)
+            user_log_q = models.Q(document__uploaded_by=target_user) | models.Q(
+                email__iexact=target_user.username
+            )
+            if target_user.email:
+                user_log_q |= models.Q(email__iexact=target_user.email)
+            logs_qs = logs_qs.filter(user_log_q)
+        else:
+            matching_users = User.objects.filter(
+                models.Q(username__icontains=requested_user)
+                | models.Q(first_name__icontains=requested_user)
+                | models.Q(last_name__icontains=requested_user)
+                | models.Q(email__icontains=requested_user)
+            )
+            if matching_users.exists():
+                docs_qs = docs_qs.filter(uploaded_by__in=matching_users)
+                logs_qs = logs_qs.filter(
+                    models.Q(document__uploaded_by__in=matching_users)
+                    | models.Q(email__icontains=requested_user)
+                )
+            else:
+                docs_qs = docs_qs.none()
+                logs_qs = logs_qs.none()
 
     # 2. Filtro Política BAR
     burn_policy = request.GET.get("burn_policy", "").strip().upper()
@@ -2258,6 +2332,7 @@ def filter_analytics_querysets(
         ),
         "uo": requested_uo,
         "uo_role": uo_role,
+        "user": requested_user,
         "burn_policy": burn_policy,
         "status": status_val,
     }
@@ -2552,17 +2627,21 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                 "security": security_metrics,
                 "meta": meta,
                 "scope_info": {
-                    "is_global": request.user.is_superuser and not target_uo_obj,
+                    "is_global": request.user.is_superuser and not target_uo_obj and meta.get("uo") != "NONE",
                     "uo_alias": (
-                        target_uo_obj.alias
-                        if target_uo_obj
+                        str(_("Sin UO de origen (Asientos Personales)"))
+                        if meta.get("uo") == "NONE"
                         else (
-                            str(_("Global (Toda la Organización)"))
-                            if request.user.is_superuser
+                            target_uo_obj.alias
+                            if target_uo_obj
                             else (
-                                analytics_uos.first().alias
-                                if analytics_uos.count() == 1
-                                else str(_("Mis UOs"))
+                                str(_("Global (Toda la Organización)"))
+                                if request.user.is_superuser
+                                else (
+                                    analytics_uos.first().alias
+                                    if analytics_uos.count() == 1
+                                    else str(_("Mis UOs"))
+                                )
                             )
                         )
                     ),
@@ -3831,7 +3910,7 @@ class DashboardTOTPVerifyView(View):
             )
 
         if user.is_superuser:
-            return redirect("dashboard:mode_selection")
+            request.session.setdefault("dashboard_mode", "governance")
         return redirect("dashboard:home")
 
 

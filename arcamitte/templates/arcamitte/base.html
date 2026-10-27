@@ -1,6 +1,6 @@
 {% load static i18n %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'es' }}">
+<html lang="{{ LANGUAGE_CODE|default:'es' }}" class="h-full bg-slate-50 antialiased">
 
 <head>
 	<meta charset="utf-8">
@@ -10,21 +10,43 @@
 
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 	<link rel="shortcut icon" href="{% static 'arcamitte/img/logo.jpg' %}" />
 
 	<title>{% block title %}{% trans "Panel de Control" %}{% endblock %} | Arcamitte</title>
 
-	<!-- Bootstrap 5.3 -->
-	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-	<!-- Estilos propios Arcamitte -->
+	<!-- Tailwind CSS + Flowbite + Tom Select (Sin Bootstrap) -->
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			corePlugins: { preflight: false },
+			theme: {
+				extend: {
+					fontFamily: {
+						sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+						mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+					},
+					colors: {
+						arca: {
+							primary: '#2563eb',
+							dark: '#0f172a',
+							surface: '#f8fafc',
+						}
+					}
+				}
+			}
+		};
+	</script>
+	<link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+	<link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.min.css" rel="stylesheet" />
+	<!-- Sistema de Diseño Tailwind / Shadcn de Arcamitte -->
 	<link href="{% static 'arcamitte/css/arcamitte.css' %}" rel="stylesheet">
 	{% block extra_head %}{% endblock %}
 </head>
 
-<body>
+<body class="min-h-screen bg-slate-50 text-slate-800 font-sans">
 	<div class="arca-wrapper">
-		<!-- Sidebar Lateral Personalizado Arcamitte -->
+		<!-- Sidebar Lateral Tailwind / Slate Dark -->
 		<nav id="arcaSidebar" class="arca-sidebar">
 			<a class="arca-brand" href="{% url 'dashboard:home' %}">
 				<img src="{% static 'arcamitte/img/logo.jpg' %}" alt="Arcamitte" class="arca-brand-logo">
@@ -154,62 +176,46 @@
 					<button id="arcaSidebarToggle" type="button" class="arca-toggle-btn" aria-label="Toggle navigation">
 						<i data-feather="menu" style="width:18px;height:18px;"></i>
 					</button>
-					<span class="d-none d-sm-inline text-muted small">
+					<span class="d-none d-sm-inline text-muted small font-medium">
 						{% trans "Custodia Criptográfica Descentralizada" %}
 					</span>
 				</div>
 
 				<div class="d-flex align-items-center gap-2">
 					{% if request.user.is_superuser %}
-					<!-- Selector Ágil de Modo Superusuario -->
-					<div class="dropdown me-1">
-						<button class="btn btn-sm {% if dashboard_mode == 'governance' %}btn-outline-danger{% else %}btn-outline-primary{% endif %} dropdown-toggle d-flex align-items-center gap-1 shadow-sm" type="button" id="modeSwitchBtn" data-bs-toggle="dropdown" aria-expanded="false">
-							{% if dashboard_mode == 'governance' %}
-								<i data-feather="shield" style="width:13px;height:13px;"></i>
-								<span class="d-none d-md-inline small fw-bold">{% trans "Modo Gobernanza" %}</span>
-							{% else %}
-								<i data-feather="file-text" style="width:13px;height:13px;"></i>
-								<span class="d-none d-md-inline small fw-bold">{% trans "Modo Operativa" %}</span>
-							{% endif %}
-						</button>
-						<ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="modeSwitchBtn" style="z-index: 1060;">
-							<li><h6 class="dropdown-header small text-uppercase fw-bold">{% trans "Modo de Interfaz" %}</h6></li>
-							<li>
-								<a class="dropdown-item {% if dashboard_mode == 'governance' %}active{% endif %}" href="{% url 'dashboard:mode_selection' %}?set=governance&next={{ request.get_full_path|urlencode }}">
-									<i data-feather="shield" style="width:14px;height:14px;" class="me-2"></i> {% trans "Gobernanza Global" %}
-								</a>
-							</li>
-							<li>
-								<a class="dropdown-item {% if dashboard_mode == 'operational' %}active{% endif %}" href="{% url 'dashboard:mode_selection' %}?set=operational&next={{ request.get_full_path|urlencode }}">
-									<i data-feather="file-text" style="width:14px;height:14px;" class="me-2"></i> {% trans "Operativa Documental" %}
-								</a>
-							</li>
-							<li><hr class="dropdown-divider"></li>
-							<li>
-								<a class="dropdown-item small" href="{% url 'dashboard:mode_selection' %}">
-									<i data-feather="sliders" style="width:14px;height:14px;" class="me-2"></i> {% trans "Pantalla de Selección de Modo" %}
-								</a>
-							</li>
-						</ul>
+					<!-- Conmutador Único Directo (1-clic) de Modo Superusuario estilo Segmented Pill Tailwind -->
+					<div class="arca-segmented-control me-1" role="group" id="modeSwitchGroup" aria-label="{% trans 'Modo de Interfaz' %}">
+						<a href="{% url 'dashboard:mode_selection' %}?set=governance"
+						   class="arca-segmented-item {% if dashboard_mode == 'governance' %}active-governance{% endif %}"
+						   title="{% trans 'Gobernanza Global' %}">
+							<i data-feather="shield" style="width:13px;height:13px;"></i>
+							<span>{% trans "Modo Gobernanza" %}</span>
+						</a>
+						<a href="{% url 'dashboard:mode_selection' %}?set=operational"
+						   class="arca-segmented-item {% if dashboard_mode == 'operational' %}active-operational{% endif %}"
+						   title="{% trans 'Operativa Documental' %}">
+							<i data-feather="file-text" style="width:13px;height:13px;"></i>
+							<span>{% trans "Modo Operativa" %}</span>
+						</a>
 					</div>
 					{% endif %}
 
-					<!-- Selector de Idioma (ES / EN) -->
-					<div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Idioma' %}">
+					<!-- Selector de Idioma (ES / EN) estilo Segmented Pill -->
+					<div class="arca-segmented-control" role="group" aria-label="{% trans 'Idioma' %}">
 						<a href="{% url 'arcamitte:set-language' %}?lang=es&next={{ request.get_full_path|urlencode }}" 
-						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'es' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold"
+						   class="arca-segmented-item {% if LANGUAGE_CODE|slice:':2' == 'es' %}active-operational{% endif %}"
 						   title="Español">
 							ES
 						</a>
 						<a href="{% url 'arcamitte:set-language' %}?lang=en&next={{ request.get_full_path|urlencode }}" 
-						   class="btn btn-sm {% if LANGUAGE_CODE|slice:':2' == 'en' %}btn-primary text-white{% else %}btn-outline-secondary bg-white text-muted{% endif %} px-2 py-1 fw-semibold"
+						   class="arca-segmented-item {% if LANGUAGE_CODE|slice:':2' == 'en' %}active-operational{% endif %}"
 						   title="English">
 							EN
 						</a>
 					</div>
 
 					<div class="dropdown ms-1">
-						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
+						<button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 rounded-lg px-2.5 py-1.5" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
 							<span class="badge bg-primary text-white rounded-circle p-1 d-inline-flex align-items-center justify-content-center" style="width:24px;height:24px;">
 								{{ request.user.username|make_list|first|upper }}
 							</span>
@@ -281,13 +287,6 @@
 									<i data-feather="shield" style="width:14px;height:14px;" class="me-2"></i> {% trans "Seguridad 2FA (TOTP)" %}
 								</a>
 							</li>
-							{% if request.user.is_superuser %}
-							<li>
-								<a class="dropdown-item" href="{% url 'dashboard:mode_selection' %}">
-									<i data-feather="sliders" style="width:14px;height:14px;" class="me-2"></i> {% trans "Cambiar Modo de Inicio" %}
-								</a>
-							</li>
-							{% endif %}
 							<li>
 								<a class="dropdown-item" href="{% url 'arcamitte:request-access' %}" target="_blank">
 									<i data-feather="globe" style="width:14px;height:14px;" class="me-2"></i> {% trans "Portal Público Canje" %}
@@ -331,8 +330,9 @@
 		</div>
 	</div>
 
-	<!-- Scripts -->
-	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+	<!-- Scripts: Tom Select, Flowbite, Feather Icons, HTMX, Alpine.js y Arcamitte Core -->
+	<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js" integrity="sha384-qEqAs1VsN9WH2myXDbiP2wGGIttL9bMRZBKCl54ZnzpDlVqbYANP9vMaoT/wvQcf" crossorigin="anonymous"></script>
 	<script src="{% static 'arcamitte/vendor/htmx.min.js' %}"></script>
 	<script defer src="{% static 'arcamitte/vendor/alpine.min.js' %}"></script>

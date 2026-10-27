@@ -201,6 +201,7 @@ class RequestAccessView(ArcamitteI18nViewMixin, View):
             self.template_name,
             {
                 "form": form,
+                "active_public_tab": "request",
                 "LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "es"),
             },
         )
@@ -227,6 +228,7 @@ class RequestAccessView(ArcamitteI18nViewMixin, View):
                 self.template_name,
                 {
                     "form": form,
+                    "active_public_tab": "request",
                     "LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "es"),
                 },
                 status=400,
@@ -307,6 +309,7 @@ class RedeemOtpView(ArcamitteI18nViewMixin, View):
                 "form": form,
                 "file_hash": file_hash,
                 "email": email,
+                "active_public_tab": "redeem",
                 "LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "es"),
             },
         )
@@ -348,6 +351,7 @@ class RedeemOtpView(ArcamitteI18nViewMixin, View):
                     "form": form,
                     "file_hash": file_hash,
                     "email": email,
+                    "active_public_tab": "redeem",
                     "LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "es"),
                 },
                 status=400,

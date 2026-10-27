@@ -134,9 +134,10 @@ class DashboardTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["user"].is_authenticated)
-        self.assertContains(response, "Selección de Modo de Trabajo")
-        self.assertContains(response, "Gobernanza y Administración")
-        self.assertContains(response, "Operativa Documental")
+        self.assertContains(response, "Dashboard Criptográfico")
+        self.assertContains(response, "Modo Gobernanza")
+        self.assertContains(response, "Modo Operativa")
+        self.assertNotContains(response, "Cambiar Modo de Inicio")
 
         # 2. Login como Usuario Regular (Operador) -> Directo al Dashboard Operativo
         self.client.logout()

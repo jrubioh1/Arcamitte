@@ -6505,3 +6505,23 @@ msgstr "miembro"
 
 msgid "registros"
 msgstr "registros"
+
+
+msgid "Sin UO de origen (Asientos Personales)"
+msgstr "Sin UO de origen (Asientos Personales)"
+
+
+msgid "Escribir o seleccionar UO emisora..."
+msgstr "Escribir o seleccionar UO emisora..."
+
+msgid "Escribir o seleccionar UO receptora..."
+msgstr "Escribir o seleccionar UO receptora..."
+
+msgid "Escribir o seleccionar UO..."
+msgstr "Escribir o seleccionar UO..."
+
+msgid "Escribir o seleccionar acción..."
+msgstr "Escribir o seleccionar acción..."
+
+msgid "Escribir o seleccionar usuario..."
+msgstr "Escribir o seleccionar usuario..."

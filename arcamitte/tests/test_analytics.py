@@ -306,4 +306,30 @@ class AnalyticsDashboardTestCase(TestCase):
         self.assertEqual(data_search["count"], 1)
         self.assertEqual(data_search["items"][0]["filename"], "blueprint_tech.pdf")
 
+        # 6. Filtro por asientos sin UO de origen (uo=NONE) y por usuario (user=...)
+        resp_none_uo = self.client.get(f"{reverse('dashboard:analytics_data')}?uo=NONE")
+        self.assertEqual(resp_none_uo.status_code, 200)
+        self.assertEqual(resp_none_uo.json()["meta"]["uo"], "NONE")
+
+        self.doc_tech.uploaded_by = self.admin_tech
+        self.doc_tech.save(update_fields=["uploaded_by"])
+
+        resp_by_user = self.client.get(f"{reverse('dashboard:analytics_data')}?user=admin_tech")
+        self.assertEqual(resp_by_user.status_code, 200)
+        self.assertEqual(resp_by_user.json()["meta"]["user"], "admin_tech")
+        self.assertEqual(resp_by_user.json()["kpis"]["total_documents"], 1)
+
+        # 7. Filtro por texto escrito parcial en UO y Usuario + combobox arca-searchable-select
+        resp_html = self.client.get(reverse("dashboard:analytics"))
+        self.assertContains(resp_html, "arca-searchable-select")
+        self.assertContains(resp_html, 'data-allow-custom="1"')
+
+        resp_partial_uo = self.client.get(f"{reverse('dashboard:analytics_data')}?uo=Tecnolog")
+        self.assertEqual(resp_partial_uo.status_code, 200)
+        self.assertEqual(resp_partial_uo.json()["scope_info"]["uo_alias"], "TECH")
+
+        resp_partial_user = self.client.get(f"{reverse('dashboard:analytics_data')}?user=admin_t")
+        self.assertEqual(resp_partial_user.status_code, 200)
+        self.assertEqual(resp_partial_user.json()["kpis"]["total_documents"], 1)
+
 

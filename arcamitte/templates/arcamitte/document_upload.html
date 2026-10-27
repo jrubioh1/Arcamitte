@@ -48,7 +48,7 @@
 							<label class="form-label fw-semibold" for="id_origin_uo">
 								{% trans "UO Emisora" %}
 							</label>
-							<select name="origin_uo" id="id_origin_uo" class="form-select">
+							<select name="origin_uo" id="id_origin_uo" class="form-select arca-searchable-select" data-placeholder="{% trans 'Escribir o seleccionar UO emisora...' %}">
 								<option value="">-- {% trans "Ninguna (Asiento Personal Privado)" %} --</option>
 								{% for uo in available_origin_uos %}
 									<option value="{{ uo.id }}" {% if selected_origin_uo == uo.id|stringformat:"s" %}selected{% endif %}>
@@ -65,7 +65,7 @@
 							<label class="form-label fw-semibold" for="id_target_uo">
 								{% trans "UO Receptora (Destino)" %}
 							</label>
-							<select name="target_uo" id="id_target_uo" class="form-select">
+							<select name="target_uo" id="id_target_uo" class="form-select arca-searchable-select" data-placeholder="{% trans 'Escribir o seleccionar UO receptora...' %}">
 								<option value="">-- {% trans "Ninguna / Destinatario Externo" %} --</option>
 								{% for uo in all_target_uos %}
 									<option value="{{ uo.id }}" {% if selected_target_uo == uo.id|stringformat:"s" %}selected{% endif %}>

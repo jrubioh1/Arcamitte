@@ -25,22 +25,27 @@
 
 <div class="card shadow-sm border-0 mb-4">
 	<div class="card-body p-3">
-		<form method="get" class="row g-2 align-items-center">
-			<div class="col-md-9">
+		<form method="get" class="row g-2 align-items-center"
+			  hx-get="{% url 'dashboard:audit_receipt_list' %}"
+			  hx-trigger="input changed delay:250ms from:#receiptSearchInput"
+			  hx-target="#auditReceiptsTableContainer"
+			  hx-select="#auditReceiptsTableContainer"
+			  hx-push-url="true">
+			<div class="col-md-11">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por código de recibo, hash SHA-256, operador o justificación legal...' %}">
+					<input type="text" id="receiptSearchInput" name="q" value="{{ query|default:'' }}" class="form-control" placeholder="{% trans 'Buscar por código de recibo, hash SHA-256, operador o justificación legal...' %}" autocomplete="off">
 				</div>
 			</div>
-			<div class="col-md-3 d-flex gap-2">
-				<button type="submit" class="btn btn-secondary w-100">{% trans "Buscar" %}</button>
-				{% if query %}
-					<a href="{% url 'dashboard:audit_receipt_list' %}" class="btn btn-outline-secondary">{% trans "Limpiar" %}</a>
-				{% endif %}
+			<div class="col-md-1">
+				<a href="{% url 'dashboard:audit_receipt_list' %}" class="btn btn-outline-secondary w-100" title="{% trans 'Limpiar' %}">
+					<i data-feather="rotate-ccw" style="width:14px;height:14px;"></i>
+				</a>
 			</div>
 		</form>
 	</div>
 
+	<div id="auditReceiptsTableContainer">
 	<div class="table-responsive">
 		<table class="table table-hover align-middle mb-0">
 			<thead>
@@ -124,5 +129,6 @@
 			</ul>
 		</div>
 	{% endif %}
+	</div>
 </div>
 {% endblock %}

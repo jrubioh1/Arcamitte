@@ -70,29 +70,34 @@
 
 <div class="card shadow-sm border-0 mb-4">
 	<div class="card-body p-3">
-		<form method="get" class="row g-2 align-items-center">
-			<div class="col-md-6">
+		<form method="get" class="row g-2 align-items-center"
+			  hx-get="{% url 'dashboard:ip_ban_list' %}"
+			  hx-trigger="input changed delay:250ms from:#ipSearchInput, change from:#ipStatusSelect"
+			  hx-target="#ipBanTableContainer"
+			  hx-select="#ipBanTableContainer"
+			  hx-push-url="true">
+			<div class="col-md-7">
 				<div class="input-group">
 					<span class="input-group-text bg-white"><i data-feather="search" style="width:14px;height:14px;"></i></span>
-					<input type="text" name="q" value="{{ query|default:'' }}" class="form-control font-mono" placeholder="{% trans 'Buscar por IP o motivo...' %}">
+					<input type="text" id="ipSearchInput" name="q" value="{{ query|default:'' }}" class="form-control font-mono" placeholder="{% trans 'Buscar por IP o motivo...' %}" autocomplete="off">
 				</div>
 			</div>
-			<div class="col-md-3">
-				<select name="status" class="form-select">
+			<div class="col-md-4">
+				<select id="ipStatusSelect" name="status" class="form-select arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
 					<option value="">-- {% trans "Todos los estados" %} --</option>
 					<option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Bloqueo Activo" %}</option>
 					<option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Desactivado / Expirado" %}</option>
 				</select>
 			</div>
-			<div class="col-md-3 d-flex gap-2">
-				<button type="submit" class="btn btn-secondary w-100">{% trans "Filtrar" %}</button>
-				{% if query or status_filter %}
-					<a href="{% url 'dashboard:ip_ban_list' %}" class="btn btn-outline-secondary">{% trans "Limpiar" %}</a>
-				{% endif %}
+			<div class="col-md-1">
+				<a href="{% url 'dashboard:ip_ban_list' %}" class="btn btn-outline-secondary w-100" title="{% trans 'Limpiar' %}">
+					<i data-feather="rotate-ccw" style="width:14px;height:14px;"></i>
+				</a>
 			</div>
 		</form>
 	</div>
 
+	<div id="ipBanTableContainer">
 	<div class="table-responsive">
 		<table class="table table-hover align-middle mb-0">
 			<thead>
@@ -183,5 +188,6 @@
 			</ul>
 		</div>
 	{% endif %}
+	</div>
 </div>
 {% endblock %}

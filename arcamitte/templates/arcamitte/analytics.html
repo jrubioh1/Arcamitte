@@ -96,10 +96,6 @@
 					<i data-feather="rotate-ccw" style="width:13px;height:13px;"></i>
 					<span class="d-none d-sm-inline">{% trans "Limpiar Filtros" %}</span>
 				</button>
-				<button id="refreshBtn" class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm" type="button" title="{% trans 'Recargar métricas con los filtros activos' %}">
-					<i data-feather="refresh-cw" id="refreshIcon" style="width:13px;height:13px;"></i>
-					<span>{% trans "Actualizar" %}</span>
-				</button>
 			</div>
 		</div>
 
@@ -121,25 +117,22 @@
 				</button>
 			</div>
 
-			<!-- Rango Manual personalizado (visible si se pulsa Rango Manual) -->
+			<!-- Rango Manual personalizado (reactivo al elegir ambas fechas) -->
 			<div id="customDateContainer" class="d-none d-flex align-items-center gap-2 ms-auto">
-				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 140px;" placeholder="{% trans 'Desde' %}" title="{% trans 'Fecha Inicio' %}">
+				<input type="date" id="dateFromInput" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Desde' %}" title="{% trans 'Fecha Inicio' %}">
 				<span class="text-muted small">&rarr;</span>
-				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 140px;" placeholder="{% trans 'Hasta' %}" title="{% trans 'Fecha Fin' %}">
-				<button type="button" id="applyCustomDateBtn" class="btn btn-sm btn-outline-primary py-1 px-2">
-					{% trans "Aplicar Rango" %}
-				</button>
+				<input type="date" id="dateToInput" class="form-control form-control-sm" style="width: 145px;" placeholder="{% trans 'Hasta' %}" title="{% trans 'Fecha Fin' %}">
 			</div>
 		</div>
 
-		<!-- Filtros de Departamento, Política BAR y Estado -->
-		<div class="row g-2">
-			<!-- Selector de UO -->
-			<div class="col-md-4 col-sm-6">
-				<label class="form-label text-muted small fw-semibold mb-1">
-					<i data-feather="grid" style="width:12px;height:12px;" class="me-1"></i>{% trans "Unidad Organizativa" %}
+		<!-- Filtros de Departamento, Usuario, Política BAR y Estado -->
+		<div class="row g-2 align-items-end">
+			<!-- Selector de UO (incluyendo Asientos sin UO de origen) -->
+			<div class="col-lg-3 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
+				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+					<i data-feather="grid" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Unidad Organizativa" %}</span>
 				</label>
-				<select id="uoFilterSelect" class="form-select form-select-sm">
+				<select id="uoFilterSelect" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar UO...' %}">
 					{% if is_superuser %}
 						<option value="" {% if not selected_uo %}selected{% endif %}>
 							-- {% trans "Toda la Organización (Global)" %} --
@@ -149,6 +142,9 @@
 							-- {% trans "Todas mis UOs autorizadas" %} --
 						</option>
 					{% endif %}
+					<option value="NONE" {% if selected_uo == "NONE" %}selected{% endif %}>
+						{% trans "Sin UO de origen (Asientos Personales)" %}
+					</option>
 					{% for uo in analytics_uos %}
 						<option value="{{ uo.alias }}" {% if selected_uo == uo.alias %}selected{% endif %}>
 							{{ uo.alias }} - {{ uo.name }}
@@ -158,24 +154,39 @@
 			</div>
 
 			<!-- Rol en el Trámite (Origen / Destino) -->
-			<div class="col-md-2 col-sm-6">
-				<label class="form-label text-muted small fw-semibold mb-1">
-					<i data-feather="repeat" style="width:12px;height:12px;" class="me-1"></i>{% trans "Intervención UO" %}
+			<div class="col-lg-2 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
+				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+					<i data-feather="repeat" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Intervención UO" %}</span>
 				</label>
-				<select id="uoRoleFilterSelect" class="form-select form-select-sm">
+				<select id="uoRoleFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Origen o Destino' %}">
 					<option value="all" {% if selected_uo_role == "all" %}selected{% endif %}>{% trans "Origen o Destino" %}</option>
 					<option value="origin" {% if selected_uo_role == "origin" %}selected{% endif %}>{% trans "Solo Emisora (Origen)" %}</option>
 					<option value="target" {% if selected_uo_role == "target" %}selected{% endif %}>{% trans "Solo Receptora (Destino)" %}</option>
 				</select>
 			</div>
 
-			<!-- Política BAR -->
-			<div class="col-md-3 col-sm-6">
-				<label class="form-label text-muted small fw-semibold mb-1">
-					<i data-feather="flame" style="width:12px;height:12px;" class="me-1"></i>{% trans "Política Destrucción (BAR)" %}
+			<!-- Selector de Usuario -->
+			<div class="col-lg-2 col-md-4 col-sm-6 d-flex flex-column justify-content-end">
+				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+					<i data-feather="user" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Usuario" %}</span>
 				</label>
-				<select id="burnPolicyFilterSelect" class="form-select form-select-sm">
-					<option value="">-- {% trans "Todas las políticas" %} --</option>
+				<select id="userFilterSelect" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar usuario...' %}">
+					<option value="" {% if not selected_user %}selected{% endif %}>-- {% trans "Todos los Usuarios" %} --</option>
+					{% for u in analytics_users %}
+						<option value="{{ u.username }}" {% if selected_user == u.username %}selected{% endif %}>
+							{{ u.username }}{% if u.get_full_name %} ({{ u.get_full_name }}){% endif %}
+						</option>
+					{% endfor %}
+				</select>
+			</div>
+
+			<!-- Política BAR -->
+			<div class="col-lg-3 col-md-6 col-sm-6 d-flex flex-column justify-content-end">
+				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+					<i data-feather="flame" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Política Destrucción (BAR)" %}</span>
+				</label>
+				<select id="burnPolicyFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todas las políticas' %}">
+					<option value="" {% if not selected_burn_policy %}selected{% endif %}>-- {% trans "Todas las políticas" %} --</option>
 					{% for val, label in burn_policy_choices %}
 						<option value="{{ val }}" {% if selected_burn_policy == val %}selected{% endif %}>{{ label }}</option>
 					{% endfor %}
@@ -183,11 +194,11 @@
 			</div>
 
 			<!-- Estado Documental -->
-			<div class="col-md-3 col-sm-6">
-				<label class="form-label text-muted small fw-semibold mb-1">
-					<i data-feather="check-circle" style="width:12px;height:12px;" class="me-1"></i>{% trans "Estado Documental" %}
+			<div class="col-lg-2 col-md-6 col-sm-6 d-flex flex-column justify-content-end">
+				<label class="form-label text-muted small fw-semibold mb-1 d-flex align-items-center gap-1 text-truncate" style="height: 20px; line-height: 20px;">
+					<i data-feather="check-circle" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Estado Documental" %}</span>
 				</label>
-				<select id="statusFilterSelect" class="form-select form-select-sm">
+				<select id="statusFilterSelect" class="form-select form-select-sm arca-searchable-select" data-placeholder="{% trans 'Todos los estados' %}">
 					<option value="" {% if not selected_status %}selected{% endif %}>-- {% trans "Todos los estados" %} --</option>
 					<option value="active" {% if selected_status == "active" %}selected{% endif %}>{% trans "En Custodia Activa" %}</option>
 					<option value="consumed" {% if selected_status == "consumed" %}selected{% endif %}>{% trans "Destruidos por Canje (BAR)" %}</option>
@@ -469,6 +480,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		range: "{{ selected_range|default:'14d' }}",
 		uo: "{{ selected_uo|default:'' }}",
 		uo_role: "{{ selected_uo_role|default:'all' }}",
+		user: "{{ selected_user|default:'' }}",
 		burn_policy: "{{ selected_burn_policy|default:'' }}",
 		status: "{{ selected_status|default:'' }}",
 		date_from: "{{ selected_date_from|default:'' }}",
@@ -488,6 +500,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (activeFilters.range) params.set("range", activeFilters.range);
 		if (activeFilters.uo) params.set("uo", activeFilters.uo);
 		if (activeFilters.uo_role && activeFilters.uo_role !== "all") params.set("uo_role", activeFilters.uo_role);
+		if (activeFilters.user) params.set("user", activeFilters.user);
 		if (activeFilters.burn_policy) params.set("burn_policy", activeFilters.burn_policy);
 		if (activeFilters.status) params.set("status", activeFilters.status);
 		if (activeFilters.range === "custom") {
@@ -505,6 +518,8 @@ document.addEventListener("DOMContentLoaded", function() {
 	const I18N = {
 		policyPrefix: "{% trans 'Política:' %} ",
 		statusPrefix: "{% trans 'Estado:' %} ",
+		userPrefix: "{% trans 'Usuario:' %} ",
+		noOriginUoLabel: "{% trans 'Sin UO de origen (Asientos Personales)' %}",
 		statusActive: "{% trans 'Activos' %}",
 		statusConsumed: "{% trans 'Destruidos (BAR)' %}",
 		statusExpired: "{% trans 'Caducados' %}",
@@ -548,7 +563,10 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (!summaryEl) return;
 		let parts = [];
 		if (meta && meta.date_label) parts.push(meta.date_label);
-		if (activeFilters.uo) parts.push("UO: " + activeFilters.uo);
+		if (activeFilters.uo) {
+			parts.push(activeFilters.uo === "NONE" ? I18N.noOriginUoLabel : "UO: " + activeFilters.uo);
+		}
+		if (activeFilters.user) parts.push(I18N.userPrefix + activeFilters.user);
 		if (activeFilters.burn_policy) parts.push(I18N.policyPrefix + activeFilters.burn_policy);
 		if (activeFilters.status) {
 			const statusLabels = { active: I18N.statusActive, consumed: I18N.statusConsumed, expired: I18N.statusExpired };
@@ -1187,22 +1205,21 @@ document.addEventListener("DOMContentLoaded", function() {
 		});
 	});
 
-	// Rango Manual (Aplicar)
-	const applyCustomDateBtn = document.getElementById("applyCustomDateBtn");
-	if (applyCustomDateBtn) {
-		applyCustomDateBtn.addEventListener("click", function() {
-			const dFrom = document.getElementById("dateFromInput").value;
-			const dTo = document.getElementById("dateToInput").value;
-			if (!dFrom || !dTo) {
-				alert(I18N.selectBothDates);
-				return;
-			}
+	// Rango Manual (reactivo al seleccionar ambas fechas)
+	const dateFromInput = document.getElementById("dateFromInput");
+	const dateToInput = document.getElementById("dateToInput");
+	function onCustomDateChange() {
+		const dFrom = dateFromInput ? dateFromInput.value : "";
+		const dTo = dateToInput ? dateToInput.value : "";
+		if (dFrom && dTo) {
 			activeFilters.range = "custom";
 			activeFilters.date_from = dFrom;
 			activeFilters.date_to = dTo;
 			fetchAnalyticsData();
-		});
+		}
 	}
+	if (dateFromInput) dateFromInput.addEventListener("change", onCustomDateChange);
+	if (dateToInput) dateToInput.addEventListener("change", onCustomDateChange);
 
 	// Filtro UO
 	const uoFilterSelect = document.getElementById("uoFilterSelect");
@@ -1218,6 +1235,15 @@ document.addEventListener("DOMContentLoaded", function() {
 	if (uoRoleFilterSelect) {
 		uoRoleFilterSelect.addEventListener("change", function() {
 			activeFilters.uo_role = this.value;
+			fetchAnalyticsData();
+		});
+	}
+
+	// Filtro Usuario
+	const userFilterSelect = document.getElementById("userFilterSelect");
+	if (userFilterSelect) {
+		userFilterSelect.addEventListener("change", function() {
+			activeFilters.user = this.value;
 			fetchAnalyticsData();
 		});
 	}
@@ -1240,14 +1266,6 @@ document.addEventListener("DOMContentLoaded", function() {
 		});
 	}
 
-	// Botón Refrescar
-	const refreshBtn = document.getElementById("refreshBtn");
-	if (refreshBtn) {
-		refreshBtn.addEventListener("click", function() {
-			fetchAnalyticsData();
-		});
-	}
-
 	// Botón Limpiar Filtros
 	const resetFiltersBtn = document.getElementById("resetFiltersBtn");
 	if (resetFiltersBtn) {
@@ -1255,6 +1273,7 @@ document.addEventListener("DOMContentLoaded", function() {
 			activeFilters.range = "14d";
 			activeFilters.uo = "";
 			activeFilters.uo_role = "all";
+			activeFilters.user = "";
 			activeFilters.burn_policy = "";
 			activeFilters.status = "";
 			activeFilters.date_from = "";
@@ -1262,8 +1281,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
 			if (uoFilterSelect) uoFilterSelect.value = "";
 			if (uoRoleFilterSelect) uoRoleFilterSelect.value = "all";
+			if (userFilterSelect) userFilterSelect.value = "";
 			if (burnPolicyFilterSelect) burnPolicyFilterSelect.value = "";
 			if (statusFilterSelect) statusFilterSelect.value = "";
+			if (window.arcaSyncSearchableSelects) window.arcaSyncSearchableSelects();
+			if (dateFromInput) dateFromInput.value = "";
+			if (dateToInput) dateToInput.value = "";
 			if (customDateContainer) customDateContainer.classList.add("d-none");
 
 			rangeButtons.forEach(b => {

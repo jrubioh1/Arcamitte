@@ -6425,3 +6425,23 @@ msgstr "member"
 
 msgid "registros"
 msgstr "records"
+
+
+msgid "Sin UO de origen (Asientos Personales)"
+msgstr "No Origin OU (Personal Records)"
+
+
+msgid "Escribir o seleccionar UO emisora..."
+msgstr "Type or select origin OU..."
+
+msgid "Escribir o seleccionar UO receptora..."
+msgstr "Type or select target OU..."
+
+msgid "Escribir o seleccionar UO..."
+msgstr "Type or select OU..."
+
+msgid "Escribir o seleccionar acción..."
+msgstr "Type or select action..."
+
+msgid "Escribir o seleccionar usuario..."
+msgstr "Type or select user..."

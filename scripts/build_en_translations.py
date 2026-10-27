@@ -680,6 +680,7 @@ TRANSLATIONS = {
     "Secreto TOTP cifrado": "Encrypted TOTP secret",
     "Segundo Factor de Autenticación": "Two-Factor Authentication",
     "Sin UO": "No OU",
+    "Sin UO de origen (Asientos Personales)": "No Origin OU (Personal Records)",
     "Sin documento": "No document",
     "Sin evaluar": "Not evaluated",
     "Solo Receptora (Destino)": "Receiving Only (Destination)",
@@ -713,6 +714,11 @@ TRANSLATIONS = {
     "¿Baneo activo?": "Ban active?",
     "¿Desea desbloquear inmediatamente la cuenta de este usuario?": "Do you want to immediately unlock this user's account?",
     "Última actualización de contraseña": "Last password update",
+    "Escribir o seleccionar UO...": "Type or select OU...",
+    "Escribir o seleccionar usuario...": "Type or select user...",
+    "Escribir o seleccionar acción...": "Type or select action...",
+    "Escribir o seleccionar UO emisora...": "Type or select origin OU...",
+    "Escribir o seleccionar UO receptora...": "Type or select target OU...",
 }
 
 
