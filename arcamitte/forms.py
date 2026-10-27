@@ -541,3 +541,31 @@ class PasswordChangeCustomForm(forms.Form):
                     self.add_error("new_password", exc)
 
         return cleaned_data
+
+
+class BatchImportForm(forms.Form):
+    """
+    Formulario para la importación masiva de Unidades Organizativas y Usuarios vía archivo JSON.
+    Diseñado para el Dashboard de Arcamitte con Tailwind CSS (sin Bootstrap ni /admin).
+    """
+
+    json_file = forms.FileField(
+        label=_("Archivo JSON de aprovisionamiento"),
+        widget=forms.ClearableFileInput(
+            attrs={
+                "class": "block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500",
+                "accept": ".json,application/json",
+            }
+        ),
+        help_text=_(
+            "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
+        ),
+    )
+
+    def clean_json_file(self) -> Any:
+        f = self.cleaned_data.get("json_file")
+        if not f:
+            raise ValidationError(_("Debe adjuntar un archivo JSON."))
+        if not f.name.lower().endswith(".json"):
+            raise ValidationError(_("El archivo debe tener extensión .json."))
+        return f

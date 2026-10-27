@@ -1,0 +1,175 @@
+{% extends "arcamitte/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Carga Masiva JSON" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+	<!-- Encabezado de Página -->
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
+		<div>
+			<div class="flex items-center gap-2 mb-1">
+				<a href="{% url 'dashboard:uo_list' %}" class="text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors">
+					{% trans "Unidades Organizativas" %}
+				</a>
+				<span class="text-slate-400">/</span>
+				<span class="text-slate-800 text-sm font-semibold">{% trans "Carga Masiva" %}</span>
+			</div>
+			<h1 class="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+				<i data-feather="upload-cloud" class="w-6 h-6 text-blue-600"></i>
+				<span>{% trans "Aprovisionamiento Masivo JSON" %}</span>
+			</h1>
+			<p class="text-sm text-slate-500 mt-1">
+				{% trans "Aprovisione o actualice de forma simultánea e idempotente Unidades Organizativas (UOs) y cuentas de usuario con roles de seguridad." %}
+			</p>
+		</div>
+		<div class="flex items-center gap-2">
+			<a href="{% url 'dashboard:uo_list' %}" class="btn btn-outline-secondary text-sm flex items-center gap-1.5 shadow-sm">
+				<i data-feather="arrow-left" class="w-4 h-4"></i>
+				<span>{% trans "Volver a UOs" %}</span>
+			</a>
+		</div>
+	</div>
+
+	<!-- Alertas de Error del Formulario -->
+	{% if form.errors %}
+		<div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm space-y-1.5 shadow-sm">
+			<div class="font-semibold flex items-center gap-1.5 text-rose-900">
+				<i data-feather="alert-octagon" class="w-4 h-4 text-rose-600"></i>
+				<span>{% trans "No se pudo procesar el archivo JSON. Revise los errores:" %}</span>
+			</div>
+			{% for error in form.non_field_errors %}
+				<div class="pl-6">{{ error }}</div>
+			{% endfor %}
+			{% for field in form %}
+				{% for error in field.errors %}
+					<div class="pl-6"><strong class="font-medium">{{ field.label }}:</strong> {{ error }}</div>
+				{% endfor %}
+			{% endfor %}
+		</div>
+	{% endif %}
+
+	<!-- Tarjeta Principal: Subida de Archivo -->
+	<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
+		<div class="max-w-2xl">
+			<h2 class="text-lg font-semibold text-slate-900 mb-2">{% trans "Cargar archivo de estructura .json" %}</h2>
+			<p class="text-sm text-slate-500 mb-6 leading-relaxed">
+				{% trans "El motor ejecutará una transacción atómica verificando la sintaxis y unicidad. Si una UO o usuario ya existe, actualizará sus atributos preservando la integridad histórica de auditoría y credenciales." %}
+			</p>
+
+			<form method="post" enctype="multipart/form-data" class="space-y-6">
+				{% csrf_token %}
+				<div>
+					<label for="{{ form.json_file.id_for_label }}" class="block text-sm font-semibold text-slate-800 mb-2">
+						{{ form.json_file.label }} <span class="text-rose-500">*</span>
+					</label>
+					{{ form.json_file }}
+					{% if form.json_file.help_text %}
+						<p class="mt-2 text-xs text-slate-500 leading-normal">{{ form.json_file.help_text }}</p>
+					{% endif %}
+				</div>
+
+				<div class="flex items-center gap-3 pt-2">
+					<button type="submit" class="btn btn-primary flex items-center gap-2 px-5 py-2.5 font-medium shadow-sm transition-all">
+						<i data-feather="play" class="w-4 h-4"></i>
+						<span>{% trans "Ejecutar Carga Masiva" %}</span>
+					</button>
+					<a href="{% url 'dashboard:uo_list' %}" class="btn btn-outline-secondary px-4 py-2.5 text-sm">
+						{% trans "Cancelar" %}
+					</a>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<!-- Tarjeta Informativa: Esquema y Ejemplos de Estructura -->
+	<div class="bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 shadow-md p-6 sm:p-8 space-y-4">
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
+			<div>
+				<h3 class="text-base font-semibold text-white flex items-center gap-2">
+					<i data-feather="code" class="w-5 h-5 text-emerald-400"></i>
+					<span>{% trans "Especificación y Ejemplo Oficial de Estructura JSON" %}</span>
+				</h3>
+				<p class="text-xs text-slate-400 mt-0.5">
+					{% trans "Compatible con administradores globales adscritos a UO, administradores transversales y operadores departamentales." %}
+				</p>
+			</div>
+			<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+				UTF-8 Validado
+			</span>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300 py-1">
+			<div class="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60">
+				<span class="font-semibold text-emerald-400 block mb-1">🏢 Unidades Organizativas</span>
+				Requisitos: <code>numeric_code</code>, <code>alias</code>, <code>name</code>, <code>email</code>. Opcionales: <code>description</code>, <code>is_active</code>.
+			</div>
+			<div class="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60">
+				<span class="font-semibold text-sky-400 block mb-1">👥 Usuarios Departamentales</span>
+				Asignados a su UO mediante <code>uo_alias</code> o <code>uo_numeric_code</code> y <code>role</code> (<code>OPERATOR</code>, <code>AUDITOR</code>, <code>ADMIN</code>).
+			</div>
+			<div class="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60">
+				<span class="font-semibold text-indigo-400 block mb-1">🛡️ Administradores Globales</span>
+				Definidos con <code>"is_global_admin": true</code>. Pueden adscribirse a una UO departamental o actuar de forma transversal sin UO.
+			</div>
+		</div>
+
+		<pre class="bg-slate-950 text-slate-200 p-4 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto leading-relaxed shadow-inner">{
+  "organizational_units": [
+    {
+      "numeric_code": 1001,
+      "alias": "AUDITORIA",
+      "name": "Dirección de Auditoría Interna y Cumplimiento",
+      "email": "auditoria@arcamitte.local",
+      "description": "Supervisión de riesgos y trazabilidad legal",
+      "is_active": true
+    },
+    {
+      "numeric_code": 1002,
+      "alias": "RRHH",
+      "name": "Recursos Humanos y Relaciones Laborales",
+      "email": "rrhh@arcamitte.local",
+      "description": "Gestión de nóminas y personal",
+      "is_active": true
+    }
+  ],
+  "users": [
+    {
+      "username": "ciso_global",
+      "email": "ciso@arcamitte.local",
+      "first_name": "Marcos",
+      "last_name": "Alonso",
+      "is_global_admin": true,
+      "is_mfa_enforced": true,
+      "uo_alias": "AUDITORIA",
+      "role": "ADMIN"
+    },
+    {
+      "username": "dpo_transversal",
+      "email": "dpo@arcamitte.local",
+      "first_name": "Clara",
+      "last_name": "Vega",
+      "is_global_admin": true,
+      "is_mfa_enforced": true
+    },
+    {
+      "username": "operador_rrhh",
+      "email": "operador.rrhh@arcamitte.local",
+      "first_name": "Carlos",
+      "last_name": "Mendoza",
+      "uo_alias": "RRHH",
+      "role": "OPERATOR"
+    },
+    {
+      "username": "auditor_rrhh",
+      "email": "auditor.rrhh@arcamitte.local",
+      "first_name": "Lucía",
+      "last_name": "Gómez",
+      "uo_alias": "RRHH",
+      "role": "AUDITOR"
+    }
+  ]
+}</pre>
+	</div>
+</div>
+{% endblock %}

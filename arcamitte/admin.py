@@ -1548,25 +1548,6 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
         )
 
 
-class OrganizationalUnitBatchImportForm(forms.Form):
-    """Formulario para la carga masiva e idempotente de UOs y Usuarios vía JSON."""
-
-    json_file = forms.FileField(
-        label=_("Archivo JSON de aprovisionamiento"),
-        help_text=_(
-            "Archivo con extensión .json que contenga las definiciones de 'organizational_units' y 'users' según el esquema oficial."
-        ),
-    )
-
-    def clean_json_file(self) -> Any:
-        f = self.cleaned_data.get("json_file")
-        if not f:
-            raise forms.ValidationError(_("Debe adjuntar un archivo JSON."))
-        if not f.name.lower().endswith(".json"):
-            raise forms.ValidationError(_("El archivo debe tener extensión .json."))
-        return f
-
-
 class UserUOMembershipInlineForUO(admin.TabularInline):
     """Gestión de miembros de usuarios asignados a una UO."""
 
@@ -1579,10 +1560,8 @@ class UserUOMembershipInlineForUO(admin.TabularInline):
 class OrganizationalUnitAdmin(admin.ModelAdmin):
     """
     Panel de administración para la gestión de Unidades Organizativas (UO).
-    Soporta carga masiva JSON restringida al Rol Maestro (superuser).
     """
 
-    change_list_template = "admin/arcamitte/organizationalunit_change_list.html"
     list_display = (
         "numeric_code",
         "alias",
@@ -1627,66 +1606,6 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
         return UserUOMembership.objects.filter(
             user=request.user, uo=obj, role=UserUOMembership.Role.ADMIN, is_active=True
         ).exists()
-
-    def get_urls(self) -> List[Any]:
-        urls = super().get_urls()
-        custom_urls = [
-            path(
-                "import-batch/",
-                self.admin_site.admin_view(self.import_batch_view),
-                name="arcamitte_organizationalunit_import_batch",
-            ),
-        ]
-        return custom_urls + urls
-
-    def import_batch_view(self, request: HttpRequest) -> HttpResponse:
-        if not request.user.is_superuser:
-            raise PermissionDenied(
-                _("Solo el Rol Maestro (Superusuario) puede realizar cargas masivas de UOs y Usuarios.")
-            )
-
-        if request.method == "POST":
-            form = OrganizationalUnitBatchImportForm(request.POST, request.FILES)
-            if form.is_valid():
-                uploaded_file = form.cleaned_data["json_file"]
-                try:
-                    content = uploaded_file.read().decode("utf-8")
-                    data = json.loads(content)
-                    uos_count, users_count, notes = process_batch_import_json(data)
-                    notes_display = notes[:15]
-                    notes_formatted = format_html_join("<br>", "{}", ((n,) for n in notes_display))
-                    if len(notes) > 15:
-                        notes_formatted = format_html("{}...", notes_formatted)
-                    msg = format_html(
-                        "<strong>Carga masiva completada:</strong> Se procesaron {} UOs y {} usuarios vinculados.<br>{}",
-                        uos_count,
-                        users_count,
-                        notes_formatted,
-                    )
-                    messages.success(request, msg)
-                    return HttpResponseRedirect(reverse("admin:arcamitte_organizationalunit_changelist"))
-                except json.JSONDecodeError as exc:
-                    messages.error(request, format_html("<strong>Error de sintaxis JSON:</strong> {}", exc))
-                except forms.ValidationError as exc:
-                    messages.error(
-                        request,
-                        format_html(
-                            "<strong>Error de validación:</strong> {}",
-                            exc.message if hasattr(exc, "message") else exc,
-                        ),
-                    )
-                except Exception as exc:
-                    messages.error(request, format_html("<strong>Error en la importación masiva:</strong> {}", exc))
-        else:
-            form = OrganizationalUnitBatchImportForm()
-
-        context = {
-            **self.admin_site.each_context(request),
-            "title": _("Carga Masiva de Unidades Organizativas y Usuarios (JSON)"),
-            "form": form,
-            "opts": self.model._meta,
-        }
-        return render(request, "admin/arcamitte/import_batch.html", context)
 
 
 @admin.register(AccessVerificationToken)

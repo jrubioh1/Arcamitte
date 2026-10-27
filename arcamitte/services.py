@@ -1790,7 +1790,8 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 "alias": "RRHH",
                 "name": "Dirección de Recursos Humanos",
                 "email": "rrhh@empresa.com",
-                "description": "Gestión de personal y talento"
+                "description": "Gestión de personal y talento",
+                "is_active": true
             }
         ],
         "users": [
@@ -1801,7 +1802,8 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 "last_name": "García",
                 "role": "ADMIN",
                 "uo_alias": "RRHH",
-                "is_staff": true,
+                "is_global_admin": false,
+                "is_mfa_enforced": false,
                 "password": "PasswordOpcional123"
             }
         ]
@@ -1838,6 +1840,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             name = (uo_data.get("name") or "").strip()
             email = (uo_data.get("email") or "").strip().lower()
             description = (uo_data.get("description") or "").strip()
+            uo_is_active = bool(uo_data.get("is_active", True))
 
             if not code or not alias or not name or not email:
                 raise ValidationError(
@@ -1866,7 +1869,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     "name": name,
                     "email": clean_email,
                     "description": description,
-                    "is_active": True,
+                    "is_active": uo_is_active,
                 },
             )
             uos_processed += 1
@@ -1875,7 +1878,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 f"UO [{uo.numeric_code}] {uo.alias} {action_desc} exitosamente."
             )
 
-        # 2. Procesar Usuarios y Membresías
+        # 2. Procesar Usuarios, Membresías y Gobernanza
         for u_data in user_list:
             if not isinstance(u_data, dict):
                 raise ValidationError(
@@ -1885,12 +1888,25 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             email = (u_data.get("email") or "").strip().lower()
             first_name = (u_data.get("first_name") or "").strip()
             last_name = (u_data.get("last_name") or "").strip()
+            user_is_active = bool(u_data.get("is_active", True))
+
+            is_global_admin_flag = bool(
+                u_data.get("is_global_admin", False) or u_data.get("is_superuser", False)
+            )
+            is_mfa_enforced_flag = bool(u_data.get("is_mfa_enforced", False))
+            must_change_pwd_param = u_data.get("must_change_password")
+
             raw_role = (
                 (u_data.get("role") or UserUOMembership.Role.OPERATOR).strip().upper()
             )
+            if raw_role == "OPERADOR":
+                raw_role = UserUOMembership.Role.OPERATOR
+            elif raw_role in ("ADMINISTRADOR", "ADMIN_UO"):
+                raw_role = UserUOMembership.Role.ADMIN
+
             uo_alias = (u_data.get("uo_alias") or "").strip().upper()
-            uo_code = u_data.get("uo_numeric_code")
-            is_staff = bool(u_data.get("is_staff", False))
+            uo_code = u_data.get("uo_numeric_code") or u_data.get("uo_code")
+            memberships_data = u_data.get("memberships")
             raw_password = u_data.get("password")
 
             if not username or not email:
@@ -1903,49 +1919,97 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
 
             clean_email = validate_safe_email(email)
 
-            # Buscar UO de destino
-            target_uo = None
-            if uo_alias:
-                target_uo = OrganizationalUnit.objects.filter(alias=uo_alias).first()
-            if not target_uo and uo_code:
-                try:
-                    target_uo = OrganizationalUnit.objects.filter(
-                        numeric_code=int(uo_code)
-                    ).first()
-                except (ValueError, TypeError):
-                    target_uo = None
+            # Resolver lista de UOs a vincular (soporta formato plano y lista 'memberships')
+            memberships_to_process = []
+            if memberships_data and isinstance(memberships_data, list):
+                for m_item in memberships_data:
+                    if isinstance(m_item, dict):
+                        m_alias = (m_item.get("uo_alias") or "").strip().upper()
+                        m_code = m_item.get("uo_code") or m_item.get("uo_numeric_code")
+                        m_role = (m_item.get("role") or UserUOMembership.Role.OPERATOR).strip().upper()
+                        if m_role == "OPERADOR":
+                            m_role = UserUOMembership.Role.OPERATOR
+                        elif m_role in ("ADMINISTRADOR", "ADMIN_UO"):
+                            m_role = UserUOMembership.Role.ADMIN
+                        memberships_to_process.append((m_alias, m_code, m_role))
+            elif uo_alias or uo_code:
+                memberships_to_process.append((uo_alias, uo_code, raw_role))
 
-            if not target_uo:
+            # Para usuarios departamentales es obligatorio al menos una UO
+            if not is_global_admin_flag and not memberships_to_process:
                 raise ValidationError(
                     _(
-                        "No se encontró la UO '%(uo)s' asociada al usuario '%(username)s'. Debe definirse previamente."
+                        "El usuario departamental '%(username)s' requiere asignar 'uo_alias' o 'uo_numeric_code'."
                     )
-                    % {"uo": uo_alias or uo_code, "username": username}
+                    % {"username": username}
                 )
 
-            role = (
-                raw_role
-                if raw_role in UserUOMembership.Role.values
-                else UserUOMembership.Role.OPERATOR
-            )
+            # Resolver objetos UO
+            target_memberships = []
+            for m_alias, m_code, m_role in memberships_to_process:
+                target_uo = None
+                if m_alias:
+                    target_uo = OrganizationalUnit.objects.filter(alias=m_alias).first()
+                if not target_uo and m_code:
+                    try:
+                        target_uo = OrganizationalUnit.objects.filter(
+                            numeric_code=int(m_code)
+                        ).first()
+                    except (ValueError, TypeError):
+                        target_uo = None
 
+                if not target_uo:
+                    raise ValidationError(
+                        _(
+                            "No se encontró la UO '%(uo)s' asociada al usuario '%(username)s'. Debe definirse previamente."
+                        )
+                        % {"uo": m_alias or m_code, "username": username}
+                    )
+
+                role = (
+                    m_role
+                    if m_role in UserUOMembership.Role.values
+                    else UserUOMembership.Role.OPERATOR
+                )
+                target_memberships.append((target_uo, role))
+
+            # Desacoplamiento de roles de Django Admin:
+            # is_staff e is_superuser solo corresponden a is_global_admin
             user = User.objects.filter(username=username).first()
             user_created = False
+            must_change = False
+            password_to_record = None
+
             if not user:
                 user = User(
                     username=username,
                     email=clean_email,
                     first_name=first_name,
                     last_name=last_name,
-                    is_staff=is_staff,
+                    is_active=user_is_active,
+                    is_staff=is_global_admin_flag,
+                    is_superuser=is_global_admin_flag,
                 )
                 if raw_password:
-                    validate_password(raw_password, user=user)
-                    user.set_password(raw_password)
+                    if not user.check_password(raw_password):
+                        validate_password(raw_password, user=user)
+                        user.set_password(raw_password)
+                        password_to_record = raw_password
+                        must_change = (
+                            bool(must_change_pwd_param)
+                            if must_change_pwd_param is not None
+                            else False
+                        )
                 else:
                     auto_pass = generate_secure_temporary_password(length=14)
                     validate_password(auto_pass, user=user)
                     user.set_password(auto_pass)
+                    password_to_record = auto_pass
+                    must_change = (
+                        bool(must_change_pwd_param)
+                        if must_change_pwd_param is not None
+                        else True
+                    )
                 user.save()
                 user_created = True
             else:
@@ -1954,22 +2018,61 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     user.first_name = first_name
                 if last_name:
                     user.last_name = last_name
-                user.is_staff = is_staff
+                user.is_active = user_is_active
+                user.is_staff = is_global_admin_flag
+                user.is_superuser = is_global_admin_flag
                 if raw_password:
-                    validate_password(raw_password, user=user)
-                    user.set_password(raw_password)
+                    if not user.check_password(raw_password):
+                        validate_password(raw_password, user=user)
+                        user.set_password(raw_password)
+                        password_to_record = raw_password
+                        must_change = (
+                            bool(must_change_pwd_param)
+                            if must_change_pwd_param is not None
+                            else False
+                        )
                 user.save()
 
-            UserUOMembership.objects.update_or_create(
-                user=user,
-                uo=target_uo,
-                defaults={"role": role, "is_active": True},
+            # Sincronizar directivas de UserProfile
+            profile = get_or_create_user_profile(user)
+            profile.is_global_admin = is_global_admin_flag
+            profile.is_mfa_enforced = is_mfa_enforced_flag
+            if must_change_pwd_param is not None or user_created:
+                profile.must_change_password = must_change
+
+            profile.save(
+                update_fields=[
+                    "is_global_admin",
+                    "is_mfa_enforced",
+                    "must_change_password",
+                    "updated_at",
+                ]
             )
-            sync_user_role_permissions(user, role)
+
+            if password_to_record:
+                record_password_change(user, password_to_record)
+                if must_change_pwd_param is not None:
+                    profile.must_change_password = bool(must_change_pwd_param)
+                    profile.save(update_fields=["must_change_password"])
+
+            # Procesar membresías de UO
+            for target_uo, role in target_memberships:
+                UserUOMembership.objects.update_or_create(
+                    user=user,
+                    uo=target_uo,
+                    defaults={"role": role, "is_active": True},
+                )
+                sync_user_role_permissions(user, role)
+
             users_processed += 1
             action_desc = "creado" if user_created else "actualizado"
+            uo_info = (
+                ", ".join(f"{t[0].alias} ({t[1]})" for t in target_memberships)
+                if target_memberships
+                else "Administrador Global (sin UO departamental)"
+            )
             feedback_notes.append(
-                f"Usuario '{username}' ({clean_email}) {action_desc} y asignado a UO {target_uo.alias} con rol {role}."
+                f"Usuario '{username}' ({clean_email}) {action_desc}: {uo_info}."
             )
 
     return uos_processed, users_processed, feedback_notes

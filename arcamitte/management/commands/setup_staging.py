@@ -15,9 +15,16 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from arcamitte.models import DocumentAccessLog, EncryptedDocument, OrganizationalUnit, UserUOMembership
+from arcamitte.models import (
+    DocumentAccessLog,
+    EncryptedDocument,
+    OrganizationalUnit,
+    UserUOMembership,
+    get_or_create_user_profile,
+)
 from arcamitte.services import (
     process_batch_import_json,
+    record_password_change,
     shred_and_delete_file,
     sync_user_role_permissions,
     upload_and_encrypt_document,
@@ -144,10 +151,16 @@ class Command(BaseCommand):
         admin_user.is_superuser = True
         admin_user.save()
 
+        admin_profile = get_or_create_user_profile(admin_user)
+        admin_profile.is_global_admin = True
+        admin_profile.must_change_password = False
+        admin_profile.save(update_fields=["is_global_admin", "must_change_password"])
+        record_password_change(admin_user, admin_pass)
+
         status_admin = "creado" if created else "actualizado"
         self.stdout.write(
             self.style.SUCCESS(
-                f"✓ Administrador Maestro {status_admin}: usuario='{admin_username}', contraseña='{admin_pass}'"
+                f"✓ Administrador Maestro {status_admin}: usuario='{admin_username}', contraseña='{admin_pass}' (is_global_admin=True)"
             )
         )
 
@@ -189,7 +202,6 @@ class Command(BaseCommand):
                     "password": "PasswordDir#2026",
                     "uo_alias": "DIRECCION",
                     "role": "ADMIN",
-                    "is_staff": False,
                 },
                 {
                     "username": "gestor_rrhh",
@@ -197,7 +209,6 @@ class Command(BaseCommand):
                     "password": "PasswordRRHH#2026",
                     "uo_alias": "RRHH",
                     "role": "OPERATOR",
-                    "is_staff": False,
                 },
                 {
                     "username": "auditor_rrhh",
@@ -205,7 +216,6 @@ class Command(BaseCommand):
                     "password": "PasswordAuditor#2026",
                     "uo_alias": "RRHH",
                     "role": "AUDITOR",
-                    "is_staff": False,
                 },
                 {
                     "username": "gestor_legal",
@@ -213,7 +223,6 @@ class Command(BaseCommand):
                     "password": "PasswordLegal#2026",
                     "uo_alias": "LEGAL",
                     "role": "OPERATOR",
-                    "is_staff": False,
                 },
                 {
                     "username": "auditor_general",
@@ -221,14 +230,11 @@ class Command(BaseCommand):
                     "password": "PasswordAudGral#2026",
                     "uo_alias": "AUDITORIA",
                     "role": "AUDITOR",
-                    "is_staff": False,
                 },
             ],
         }
 
         uos_count, users_count, _ = process_batch_import_json(data)
-        for membership in UserUOMembership.objects.filter(is_active=True):
-            sync_user_role_permissions(membership.user, membership.role)
         self.stdout.write(self.style.SUCCESS(f"✓ Creadas/Actualizadas {uos_count} UOs y {users_count} usuarios con roles y permisos sincronizados."))
 
         # ----------------------------------------------------------------------

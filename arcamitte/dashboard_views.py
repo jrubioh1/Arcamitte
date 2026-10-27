@@ -26,6 +26,7 @@ from django.views import View
 from django.views.generic import ListView, TemplateView
 
 from arcamitte.forms import (
+    BatchImportForm,
     OrganizationalUnitForm,
     PasswordChangeCustomForm,
     PasswordResetRequestForm,
@@ -62,6 +63,7 @@ from arcamitte.services import (
     get_user_administered_uos,
     is_totp_required_for_user,
     is_uo_admin,
+    process_batch_import_json,
     record_audit_log,
     reset_user_password_and_notify,
     reset_user_totp,
@@ -1349,6 +1351,62 @@ class DashboardUOCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
             request,
             self.template_name,
             {"form": form, "is_new": True, "active_nav": "uos"},
+        )
+
+
+class DashboardBatchImportView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Carga masiva e idempotente de Unidades Organizativas y Usuarios vía archivo JSON.
+    Restringido al Rol Maestro (Superusuario o Administrador Global).
+    """
+
+    login_url = "dashboard:login"
+    template_name = "arcamitte/batch_import.html"
+
+    def test_func(self) -> bool:
+        user = self.request.user
+        return bool(user.is_authenticated and (user.is_superuser or is_global_admin(user)))
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        form = BatchImportForm()
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "active_nav": "uos"},
+        )
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        form = BatchImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_file = form.cleaned_data["json_file"]
+            try:
+                content = uploaded_file.read().decode("utf-8")
+                data = json.loads(content)
+                uos_count, users_count, notes = process_batch_import_json(data)
+                notes_preview = " | ".join(notes[:5])
+                if len(notes) > 5:
+                    notes_preview += f" ... (+{len(notes) - 5} operaciones más)"
+                messages.success(
+                    request,
+                    _("Carga masiva completada exitosamente: %(uos)d UOs y %(users)d usuarios procesados. %(notes)s")
+                    % {"uos": uos_count, "users": users_count, "notes": notes_preview},
+                )
+                return redirect("dashboard:uo_list")
+            except UnicodeDecodeError:
+                form.add_error("json_file", _("El archivo no tiene una codificación UTF-8 válida."))
+            except json.JSONDecodeError as exc:
+                form.add_error("json_file", _("Error de sintaxis JSON: %(error)s") % {"error": str(exc)})
+            except ValidationError as exc:
+                msg = exc.message if hasattr(exc, "message") else str(exc)
+                form.add_error(None, _("Error de validación del esquema: %(error)s") % {"error": msg})
+            except Exception as exc:
+                logger.error(f"[BATCH IMPORT ERROR] Fallo durante importación masiva: {exc}", exc_info=True)
+                form.add_error(None, _("Ocurrió un error inesperado al procesar el archivo: %(error)s") % {"error": str(exc)})
+
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "active_nav": "uos"},
         )
 
 

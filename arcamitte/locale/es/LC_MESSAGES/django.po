@@ -6525,3 +6525,57 @@ msgstr "Escribir o seleccionar acción..."
 
 msgid "Escribir o seleccionar usuario..."
 msgstr "Escribir o seleccionar usuario..."
+
+
+msgid "Aprovisionamiento Masivo JSON"
+msgstr "Aprovisionamiento Masivo JSON"
+
+msgid "Aprovisione o actualice de forma simultánea e idempotente Unidades Organizativas (UOs) y cuentas de usuario con roles de seguridad."
+msgstr "Aprovisione o actualice de forma simultánea e idempotente Unidades Organizativas (UOs) y cuentas de usuario con roles de seguridad."
+
+msgid "Carga Masiva"
+msgstr "Carga Masiva"
+
+msgid "Carga Masiva (JSON)"
+msgstr "Carga Masiva (JSON)"
+
+#, python-format
+msgid "Carga masiva completada exitosamente: %(uos)d UOs y %(users)d usuarios procesados. %(notes)s"
+msgstr "Carga masiva completada exitosamente: %(uos)d UOs y %(users)d usuarios procesados. %(notes)s"
+
+msgid "Cargar archivo de estructura .json"
+msgstr "Cargar archivo de estructura .json"
+
+msgid "Compatible con administradores globales adscritos a UO, administradores transversales y operadores departamentales."
+msgstr "Compatible con administradores globales adscritos a UO, administradores transversales y operadores departamentales."
+
+msgid "El archivo no tiene una codificación UTF-8 válida."
+msgstr "El archivo no tiene una codificación UTF-8 válida."
+
+msgid "El motor ejecutará una transacción atómica verificando la sintaxis y unicidad. Si una UO o usuario ya existe, actualizará sus atributos preservando la integridad histórica de auditoría y credenciales."
+msgstr "El motor ejecutará una transacción atómica verificando la sintaxis y unicidad. Si una UO o usuario ya existe, actualizará sus atributos preservando la integridad histórica de auditoría y credenciales."
+
+#, python-format
+msgid "El usuario departamental '%(username)s' requiere asignar 'uo_alias' o 'uo_numeric_code'."
+msgstr "El usuario departamental '%(username)s' requiere asignar 'uo_alias' o 'uo_numeric_code'."
+
+#, python-format
+msgid "Error de sintaxis JSON: %(error)s"
+msgstr "Error de sintaxis JSON: %(error)s"
+
+#, python-format
+msgid "Error de validación del esquema: %(error)s"
+msgstr "Error de validación del esquema: %(error)s"
+
+msgid "Especificación y Ejemplo Oficial de Estructura JSON"
+msgstr "Especificación y Ejemplo Oficial de Estructura JSON"
+
+msgid "No se pudo procesar el archivo JSON. Revise los errores:"
+msgstr "No se pudo procesar el archivo JSON. Revise los errores:"
+
+#, python-format
+msgid "Ocurrió un error inesperado al procesar el archivo: %(error)s"
+msgstr "Ocurrió un error inesperado al procesar el archivo: %(error)s"
+
+msgid "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
+msgstr "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."

@@ -35,14 +35,33 @@
   ],
   "users": [
     {
+      "username": "ciso_global",
+      "email": "ciso@arcamitte.local",
+      "first_name": "Marcos",
+      "last_name": "Alonso",
+      "password": "PasswordCISO#2026",
+      "is_global_admin": true,
+      "is_mfa_enforced": true,
+      "uo_alias": "DIRECCION",
+      "role": "ADMIN"
+    },
+    {
+      "username": "dpo_global",
+      "email": "dpo@arcamitte.local",
+      "first_name": "Clara",
+      "last_name": "Vega",
+      "password": "PasswordDPO#2026",
+      "is_global_admin": true,
+      "is_mfa_enforced": true
+    },
+    {
       "username": "admin_dir",
       "email": "admin_dir@arcamitte.local",
       "first_name": "Elena",
       "last_name": "Vázquez",
       "password": "PasswordDir#2026",
       "uo_alias": "DIRECCION",
-      "role": "ADMIN",
-      "is_staff": true
+      "role": "ADMIN"
     },
     {
       "username": "gestor_rrhh",
@@ -51,8 +70,7 @@
       "last_name": "Mendoza",
       "password": "PasswordRRHH#2026",
       "uo_alias": "RRHH",
-      "role": "OPERATOR",
-      "is_staff": true
+      "role": "OPERATOR"
     },
     {
       "username": "auditor_rrhh",
@@ -61,8 +79,7 @@
       "last_name": "Gómez",
       "password": "PasswordAuditor#2026",
       "uo_alias": "RRHH",
-      "role": "AUDITOR",
-      "is_staff": true
+      "role": "AUDITOR"
     },
     {
       "username": "gestor_legal",
@@ -71,8 +88,7 @@
       "last_name": "Sanz",
       "password": "PasswordLegal#2026",
       "uo_alias": "LEGAL",
-      "role": "OPERATOR",
-      "is_staff": true
+      "role": "OPERATOR"
     },
     {
       "username": "auditor_general",
@@ -81,8 +97,7 @@
       "last_name": "Navarro",
       "password": "PasswordAudGral#2026",
       "uo_alias": "AUDITORIA",
-      "role": "AUDITOR",
-      "is_staff": true
+      "role": "AUDITOR"
     }
   ]
 }

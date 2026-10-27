@@ -4,7 +4,7 @@
 {% block title %}{% trans "Gestión de Usuarios y Accesos" %}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
 	<div>
 		<h1 class="h3 fw-bold mb-1">{% trans "Directorio de Usuarios y Accesos" %}</h1>
 		<p class="text-muted small mb-0">
@@ -12,10 +12,18 @@
 		</p>
 	</div>
 	{% if can_create_user %}
-		<a href="{% url 'dashboard:user_create' %}" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm">
-			<i data-feather="user-plus" style="width:16px;height:16px;"></i>
-			<span>{% trans "Nuevo Usuario" %}</span>
-		</a>
+		<div class="d-flex align-items-center gap-2">
+			{% if is_superuser or is_global_admin %}
+			<a href="{% url 'dashboard:batch_import' %}" class="btn btn-outline-primary d-flex align-items-center gap-1 shadow-sm">
+				<i data-feather="upload-cloud" style="width:16px;height:16px;"></i>
+				<span>{% trans "Carga Masiva (JSON)" %}</span>
+			</a>
+			{% endif %}
+			<a href="{% url 'dashboard:user_create' %}" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm">
+				<i data-feather="user-plus" style="width:16px;height:16px;"></i>
+				<span>{% trans "Nuevo Usuario" %}</span>
+			</a>
+		</div>
 	{% endif %}
 </div>
 

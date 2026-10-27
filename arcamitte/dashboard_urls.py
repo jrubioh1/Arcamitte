@@ -77,6 +77,11 @@ urlpatterns = [
         name="uo_list",
     ),
     path(
+        "unidades-organizativas/carga-masiva/",
+        dashboard_views.DashboardBatchImportView.as_view(),
+        name="batch_import",
+    ),
+    path(
         "unidades-organizativas/nueva/",
         dashboard_views.DashboardUOCreateView.as_view(),
         name="uo_create",

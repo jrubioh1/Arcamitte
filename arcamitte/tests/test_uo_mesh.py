@@ -16,6 +16,7 @@ from django.urls import reverse
 
 from arcamitte.models import (
     OrganizationalUnit,
+    PasswordHistory,
     UserUOMembership,
 )
 from arcamitte.services import (
@@ -433,7 +434,7 @@ class BatchImportProvisioningTestCase(TestCase):
     Pruebas completas del módulo de aprovisionamiento masivo JSON:
     - Servicio `process_batch_import_json` (idempotencia y validaciones).
     - Comando CLI `manage.py load_batch`.
-    - Interfaz gráfica en Django Admin `/admin/arcamitte/organizationalunit/import-batch/`.
+    - Vista web en Dashboard `/dashboard/unidades-organizativas/carga-masiva/`.
     """
 
     def setUp(self) -> None:
@@ -470,7 +471,6 @@ class BatchImportProvisioningTestCase(TestCase):
                     "last_name": "Sánchez",
                     "role": "ADMIN",
                     "uo_alias": "SEGURIDAD",
-                    "is_staff": True,
                 },
                 {
                     "username": "david.auditor",
@@ -479,7 +479,23 @@ class BatchImportProvisioningTestCase(TestCase):
                     "last_name": "Molina",
                     "role": "AUDITOR",
                     "uo_numeric_code": 5002,
-                    "is_staff": True,
+                },
+                {
+                    "username": "ciso.corp",
+                    "email": "ciso.corp@empresa.com",
+                    "first_name": "Marcos",
+                    "last_name": "Alonso",
+                    "is_global_admin": True,
+                    "is_mfa_enforced": True,
+                    "uo_alias": "SEGURIDAD",
+                    "role": "ADMIN",
+                },
+                {
+                    "username": "global.indep",
+                    "email": "global.indep@empresa.com",
+                    "first_name": "Clara",
+                    "last_name": "Vega",
+                    "is_global_admin": True,
                 },
             ],
         }
@@ -488,25 +504,45 @@ class BatchImportProvisioningTestCase(TestCase):
         """La carga masiva procesa UOs y usuarios y es completamente idempotente."""
         uos_count, users_count, notes = process_batch_import_json(self.valid_batch_data)
         self.assertEqual(uos_count, 2)
-        self.assertEqual(users_count, 2)
+        self.assertEqual(users_count, 4)
 
         uo_sec = OrganizationalUnit.objects.get(numeric_code=5001)
         self.assertEqual(uo_sec.alias, "SEGURIDAD")
         self.assertEqual(uo_sec.email, "ciso@empresa.com")
 
+        # Usuario departamental puro: is_staff=False, pertenencia en UO
         user_lucia = User.objects.get(username="lucia.ciso")
         self.assertEqual(user_lucia.first_name, "Lucía")
-        self.assertTrue(user_lucia.is_staff)
+        self.assertFalse(user_lucia.is_staff)
+        self.assertFalse(user_lucia.arcamitte_profile.is_global_admin)
+        self.assertTrue(PasswordHistory.objects.filter(user=user_lucia).exists())
 
         membership_lucia = UserUOMembership.objects.get(user=user_lucia, uo=uo_sec)
         self.assertEqual(membership_lucia.role, UserUOMembership.Role.ADMIN)
 
+        # Superusuario con UO y rol departamental
+        user_ciso = User.objects.get(username="ciso.corp")
+        self.assertTrue(user_ciso.is_staff)
+        self.assertTrue(user_ciso.is_superuser)
+        self.assertTrue(user_ciso.arcamitte_profile.is_global_admin)
+        self.assertTrue(user_ciso.arcamitte_profile.is_mfa_enforced)
+        membership_ciso = UserUOMembership.objects.get(user=user_ciso, uo=uo_sec)
+        self.assertEqual(membership_ciso.role, UserUOMembership.Role.ADMIN)
+
+        # Superusuario transversal sin UO
+        user_indep = User.objects.get(username="global.indep")
+        self.assertTrue(user_indep.is_staff)
+        self.assertTrue(user_indep.is_superuser)
+        self.assertTrue(user_indep.arcamitte_profile.is_global_admin)
+        self.assertEqual(UserUOMembership.objects.filter(user=user_indep).count(), 0)
+
         # Ejecución repetida idéntica (idempotencia garantizada)
         uos_count2, users_count2, notes2 = process_batch_import_json(self.valid_batch_data)
         self.assertEqual(uos_count2, 2)
-        self.assertEqual(users_count2, 2)
+        self.assertEqual(users_count2, 4)
         self.assertEqual(OrganizationalUnit.objects.filter(numeric_code=5001).count(), 1)
         self.assertEqual(User.objects.filter(username="lucia.ciso").count(), 1)
+        self.assertEqual(User.objects.filter(username="ciso.corp").count(), 1)
 
     def test_process_batch_import_json_validation_errors(self) -> None:
         """Validaciones defensivas ante JSON mal estructurado o con campos faltantes."""
@@ -542,15 +578,19 @@ class BatchImportProvisioningTestCase(TestCase):
             self.assertIn("Carga masiva completada exitosamente", output_str)
             self.assertTrue(OrganizationalUnit.objects.filter(numeric_code=5001).exists())
             self.assertTrue(User.objects.filter(username="lucia.ciso").exists())
+            self.assertTrue(User.objects.filter(username="ciso.corp").exists())
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-    def test_admin_import_batch_view_security(self) -> None:
-        """La vista GUI de importación masiva está estrictamente reservada para el Rol Maestro."""
-        # Usuario staff normal -> 403 Forbidden
-        self.client.force_login(self.regular_staff)
-        url = reverse("admin:arcamitte_organizationalunit_import_batch")
+    def test_dashboard_batch_import_view_security_and_upload(self) -> None:
+        """La vista de carga masiva en el Dashboard está reservada para Rol Maestro y procesa JSON."""
+        # Usuario sin privilegios -> 403 Forbidden
+        user_operator = User.objects.create_user(
+            username="simple_op", email="op@arcamitte.local", password="OpPassword#2026"
+        )
+        self.client.force_login(user_operator)
+        url = reverse("dashboard:batch_import")
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 403)
 
@@ -558,14 +598,16 @@ class BatchImportProvisioningTestCase(TestCase):
         self.client.force_login(self.superuser)
         resp_super = self.client.get(url)
         self.assertEqual(resp_super.status_code, 200)
-        self.assertContains(resp_super, "Importación Masiva de Unidades Organizativas y Usuarios")
+        self.assertContains(resp_super, "Aprovisionamiento Masivo JSON")
 
         # Subida exitosa vía formulario POST
         json_bytes = json.dumps(self.valid_batch_data).encode("utf-8")
         uploaded_file = SimpleUploadedFile("batch.json", json_bytes, content_type="application/json")
         post_resp = self.client.post(url, {"json_file": uploaded_file})
         self.assertEqual(post_resp.status_code, 302)  # Redirección a la lista de UOs
+        self.assertRedirects(post_resp, reverse("dashboard:uo_list"))
         self.assertTrue(OrganizationalUnit.objects.filter(numeric_code=5001).exists())
+        self.assertTrue(User.objects.filter(username="ciso.corp").exists())
 
     def test_sync_user_role_permissions_operator_and_auditor(self) -> None:
         """Verifica que la asignación de permisos según rol opere con el principio de menor privilegio."""
@@ -685,4 +727,3 @@ class BatchImportProvisioningTestCase(TestCase):
         self.assertEqual(auditor_list.status_code, 200)
         auditor_add = self.client.get(reverse("admin:arcamitte_encrypteddocument_add"))
         self.assertEqual(auditor_add.status_code, 200)
-
