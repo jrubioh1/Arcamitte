@@ -13,7 +13,7 @@
 	</div>
 	{% if can_create_user %}
 		<div class="d-flex align-items-center gap-2">
-			{% if is_superuser or is_global_admin %}
+			{% if is_global_admin %}
 			<a href="{% url 'dashboard:batch_import' %}" class="btn btn-outline-primary d-flex align-items-center gap-1 shadow-sm">
 				<i data-feather="upload-cloud" style="width:16px;height:16px;"></i>
 				<span>{% trans "Carga Masiva (JSON)" %}</span>
@@ -83,7 +83,7 @@
 							{% endfor %}
 						</td>
 						<td>
-							{% if u.is_superuser or u.arcamitte_profile.is_global_admin %}
+							{% if u.arcamitte_profile.is_global_admin %}
 								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Administrador Global" %}</span>
 							{% elif u.uo_memberships.all %}
 								<span class="badge bg-primary-subtle text-primary border border-primary-subtle">{% trans "Personal de UO" %}</span>
@@ -120,7 +120,7 @@
 							{% endif %}
 						</td>
 						<td class="text-end">
-							{% if u.is_superuser and not request.user.is_superuser %}
+							{% if u.arcamitte_profile.is_global_admin and not is_global_admin %}
 								<span class="badge bg-secondary-subtle text-muted border px-2 py-1" title="{% trans 'Solo administrable por un superusuario global' %}">
 									<i data-feather="lock" style="width:12px;height:12px;" class="me-1"></i>{% trans "Protegido" %}
 								</span>
@@ -142,7 +142,7 @@
 										<span class="d-none d-md-inline ms-1">{% trans "Editar" %}</span>
 									</a>
 
-									{% if request.user.is_superuser and u.arcamitte_profile.is_totp_enabled %}
+									{% if is_global_admin and u.arcamitte_profile.is_totp_enabled %}
 										<form method="post" action="{% url 'dashboard:user_reset_2fa' u.id %}" class="d-inline" onsubmit="return confirm('{% trans '¿Confirma el reseteo del segundo factor (2FA) para este usuario? Perderá el acceso de su dispositivo móvil actual.' %}');">
 											{% csrf_token %}
 											<input type="hidden" name="next" value="{{ request.get_full_path }}">

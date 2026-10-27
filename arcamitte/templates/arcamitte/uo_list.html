@@ -11,13 +11,13 @@
 			{% trans "Estructura departamental para la custodia y derivación de documentos confidenciales." %}
 		</p>
 	</div>
-	{% if is_superuser or is_global_admin %}
+	{% if is_global_admin %}
 		<div class="d-flex align-items-center gap-2">
 			<a href="{% url 'dashboard:batch_import' %}" class="btn btn-outline-primary d-flex align-items-center gap-1 shadow-sm">
 				<i data-feather="upload-cloud" style="width:16px;height:16px;"></i>
 				<span>{% trans "Carga Masiva (JSON)" %}</span>
 			</a>
-			{% if is_superuser %}
+			{% if is_global_admin %}
 			<a href="{% url 'dashboard:uo_create' %}" class="btn btn-primary d-flex align-items-center gap-1 shadow-sm">
 				<i data-feather="plus" style="width:16px;height:16px;"></i>
 				<span>{% trans "Nueva Unidad Organizativa" %}</span>
@@ -82,7 +82,7 @@
 							{% endif %}
 						</td>
 						<td class="text-end">
-							{% if is_superuser or uo.id in administered_uo_ids %}
+							{% if is_global_admin or uo.id in administered_uo_ids %}
 								<div class="btn-group btn-group-sm" role="group">
 									<a href="{% url 'dashboard:uo_edit' uo.id %}" class="btn btn-outline-secondary" title="{% trans 'Modificar UO' %}">
 										<i data-feather="edit" style="width:14px;height:14px;"></i>

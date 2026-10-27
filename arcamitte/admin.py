@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
+from arcamitte.permissions import is_global_admin
 from arcamitte.models import (
     AccessVerificationToken,
     DocumentAccessLog,
@@ -583,7 +584,7 @@ class EncryptedDocumentAddForm(forms.ModelForm):
         cleaned_data = super().clean()
         origin_uo = cleaned_data.get("origin_uo")
         request_user = getattr(self, "request_user", None)
-        if request_user and not request_user.is_superuser:
+        if request_user and not is_global_admin(request_user):
             if not origin_uo:
                 self.add_error("origin_uo", _("Debe seleccionar una Unidad Organizativa emisora a la que pertenezca."))
             else:
@@ -792,7 +793,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
           o asientos personales creados por el propio usuario (origin_uo=None).
         """
         qs = super().get_queryset(request).select_related("origin_uo", "target_uo", "uploaded_by")
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return qs
         user_uos = UserUOMembership.objects.filter(
             user=request.user, is_active=True
@@ -805,7 +806,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
         """Restringe la selección de UO emisora a las UOs en las que el usuario es miembro activo."""
-        if db_field.name == "origin_uo" and not request.user.is_superuser:
+        if db_field.name == "origin_uo" and not is_global_admin(request.user):
             user_uos = UserUOMembership.objects.filter(
                 user=request.user, is_active=True
             ).values_list("uo_id", flat=True)
@@ -817,7 +818,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     def get_changeform_initial_data(self, request: HttpRequest) -> dict:
         """Pre-selecciona la UO activa principal del usuario como UO emisora por defecto."""
         initial = super().get_changeform_initial_data(request)
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             first_membership = UserUOMembership.objects.filter(
                 user=request.user, is_active=True
             ).first()
@@ -832,7 +833,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
             def __init__(self, *args: Any, **form_kwargs: Any) -> None:
                 self.request_user = request.user
                 super().__init__(*args, **form_kwargs)
-                if not request.user.is_superuser and "origin_uo" in self.fields:
+                if not is_global_admin(request.user) and "origin_uo" in self.fields:
                     user_uos = UserUOMembership.objects.filter(
                         user=request.user, is_active=True
                     ).values_list("uo_id", flat=True)
@@ -1176,7 +1177,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
 
     def audit_download_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
         """Vista de descarga de auditoría administrativa para staff autorizado."""
-        if not (request.user.is_superuser or request.user.has_perm("arcamitte.can_audit_download")):
+        if not (is_global_admin(request.user) or request.user.has_perm("arcamitte.can_audit_download")):
             raise PermissionDenied(_("No cuenta con permisos para realizar descargas de auditoría administrativa."))
 
         doc = self.get_object(request, object_id)
@@ -1221,7 +1222,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
         if not doc:
             raise Http404(_("Documento no encontrado."))
 
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             user_uos = UserUOMembership.objects.filter(
                 user=request.user, is_active=True
             ).values_list("uo_id", flat=True)
@@ -1268,7 +1269,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
         user_agent = request.META.get("HTTP_USER_AGENT")
         for doc in queryset:
             if not doc.is_consumed:
-                if not request.user.is_superuser:
+                if not is_global_admin(request.user):
                     user_uos = UserUOMembership.objects.filter(
                         user=request.user, is_active=True
                     ).values_list("uo_id", flat=True)
@@ -1294,7 +1295,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("Descarga de auditoría administrativa"))
     def admin_audit_download_action(self, request: HttpRequest, queryset: Any) -> Optional[HttpResponse]:
-        if not (request.user.is_superuser or request.user.has_perm("arcamitte.can_audit_download")):
+        if not (is_global_admin(request.user) or request.user.has_perm("arcamitte.can_audit_download")):
             raise PermissionDenied(_("No cuenta con permisos de auditoría."))
 
         count = queryset.count()
@@ -1437,7 +1438,7 @@ class EncryptedDocumentAdmin(admin.ModelAdmin):
     def actions_column(self, obj: EncryptedDocument) -> str:
         """Columna consolidada de acciones responsive según permisos activos."""
         req = getattr(self, "_current_request", None)
-        can_audit = (req is None) or req.user.is_superuser or req.user.has_perm("arcamitte.can_audit_download")
+        can_audit = (req is None) or is_global_admin(req.user) or req.user.has_perm("arcamitte.can_audit_download")
 
         buttons = [self.corporate_email_button(obj)]
         if can_audit:
@@ -1585,7 +1586,7 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> models.QuerySet:
         qs = super().get_queryset(request)
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return qs
         user_uos = UserUOMembership.objects.filter(
             user=request.user, is_active=True
@@ -1593,13 +1594,13 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
         return qs.filter(id__in=user_uos)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
-        return request.user.is_superuser
+        return is_global_admin(request.user)
 
     def has_delete_permission(self, request: HttpRequest, obj: Optional[OrganizationalUnit] = None) -> bool:
-        return request.user.is_superuser
+        return is_global_admin(request.user)
 
     def has_change_permission(self, request: HttpRequest, obj: Optional[OrganizationalUnit] = None) -> bool:
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return True
         if obj is None:
             return True
@@ -1617,7 +1618,7 @@ class AccessVerificationTokenAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> models.QuerySet:
         qs = super().get_queryset(request).select_related("document__origin_uo", "document__target_uo")
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return qs
         user_uos = UserUOMembership.objects.filter(
             user=request.user, is_active=True
@@ -1663,7 +1664,7 @@ class DocumentAccessLogAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> models.QuerySet:
         qs = super().get_queryset(request).select_related("origin_uo", "target_uo", "document")
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return qs
         user_uos = UserUOMembership.objects.filter(
             user=request.user, is_active=True
@@ -1704,6 +1705,16 @@ try:
     admin.site.unregister(User)
 except admin.sites.NotRegistered:
     pass
+
+# Permitir acceso al admin tradicional exclusivamente a usuarios activos con rol de Administrador Global
+admin.site.has_permission = lambda request: bool(
+    request.user and request.user.is_active and is_global_admin(request.user)
+)
+
+# Permitir acceso al admin tradicional exclusivamente a usuarios activos con rol de Administrador Global
+admin.site.has_permission = lambda request: bool(
+    request.user and request.user.is_active and is_global_admin(request.user)
+)
 
 
 @admin.register(User)

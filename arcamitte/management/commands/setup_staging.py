@@ -133,36 +133,8 @@ class Command(BaseCommand):
         # ----------------------------------------------------------------------
         # 3. Superusuario / Administrador Maestro
         # ----------------------------------------------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING("=== 3. Configurando Administrador Maestro (Superusuario) ==="))
-        admin_username = "admin"
-        admin_email = "admin@arcamitte.local"
-        admin_pass = "AdminMaster#2026"
-
-        admin_user, created = User.objects.get_or_create(
-            username=admin_username,
-            defaults={"email": admin_email, "is_staff": True, "is_superuser": True},
-        )
-        try:
-            validate_password(admin_pass, user=admin_user)
-        except ValidationError as val_err:
-            logger.debug(f"Aviso de validación en contraseña de staging: {val_err}")
-        admin_user.set_password(admin_pass)
-        admin_user.is_staff = True
-        admin_user.is_superuser = True
-        admin_user.save()
-
-        admin_profile = get_or_create_user_profile(admin_user)
-        admin_profile.is_global_admin = True
-        admin_profile.must_change_password = False
-        admin_profile.save(update_fields=["is_global_admin", "must_change_password"])
-        record_password_change(admin_user, admin_pass)
-
-        status_admin = "creado" if created else "actualizado"
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"✓ Administrador Maestro {status_admin}: usuario='{admin_username}', contraseña='{admin_pass}' (is_global_admin=True)"
-            )
-        )
+        # El Administrador Maestro se aprovisiona limpiamente dentro del lote JSON
+        # mediante su rol institucional 'is_global_admin=True'.
 
         # ----------------------------------------------------------------------
         # 4. Carga Masiva de Malla de UOs y Usuarios Departamentales
@@ -196,6 +168,33 @@ class Command(BaseCommand):
                 },
             ],
             "users": [
+                {
+                    "username": "admin",
+                    "email": "admin@arcamitte.local",
+                    "first_name": "Administrador",
+                    "last_name": "Maestro",
+                    "password": "AdminMaster#2026",
+                    "is_global_admin": True,
+                    "must_change_password": False,
+                },
+                {
+                    "username": "admin",
+                    "email": "admin@arcamitte.local",
+                    "first_name": "Administrador",
+                    "last_name": "Maestro",
+                    "password": "AdminMaster#2026",
+                    "is_global_admin": True,
+                    "must_change_password": False,
+                },
+                {
+                    "username": "admin",
+                    "email": "admin@arcamitte.local",
+                    "first_name": "Administrador",
+                    "last_name": "Maestro",
+                    "password": "AdminMaster#2026",
+                    "is_global_admin": True,
+                    "must_change_password": False,
+                },
                 {
                     "username": "admin_dir",
                     "email": "admin_dir@arcamitte.local",
@@ -318,14 +317,13 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.NOTICE("\n🌐 ACCESOS WEB DISPONIBLES:"))
         self.stdout.write(f"   • Panel de Administración Arcamitte: {base_url}/dashboard/")
-        self.stdout.write(f"   • Panel Django Admin Tradicional:    {base_url}/admin/")
-        self.stdout.write(f"   • Pasarela Pública (Pedir):          {base_url}/solicitar/")
+                self.stdout.write(f"   • Pasarela Pública (Pedir):          {base_url}/solicitar/")
         self.stdout.write(f"   • Pasarela Pública (Canjear):        {base_url}/canjear/")
 
         self.stdout.write(self.style.NOTICE("\n👥 CUENTAS DE USUARIO Y ROLES DISPONIBLES:"))
         self.stdout.write(f"   {'USUARIO':<18} {'CONTRASEÑA':<22} {'ROL / UO':<30} {'CORREO'}")
         self.stdout.write("   " + "-" * 90)
-        self.stdout.write(f"   {'admin':<18} {'AdminMaster#2026':<22} {'Master Admin (Superuser)':<30} {'admin@arcamitte.local'}")
+        self.stdout.write(f"   {'admin':<18} {'AdminMaster#2026':<22} {'Master Admin (Administrador Global)':<30} {'admin@arcamitte.local'}")
         self.stdout.write(f"   {'admin_dir':<18} {'PasswordDir#2026':<22} {'ADMIN en DIRECCION (1001)':<30} {'admin_dir@arcamitte.local'}")
         self.stdout.write(f"   {'gestor_rrhh':<18} {'PasswordRRHH#2026':<22} {'OPERATOR en RRHH (1002)':<30} {'gestor_rrhh@arcamitte.local'}")
         self.stdout.write(f"   {'auditor_rrhh':<18} {'PasswordAuditor#2026':<22} {'AUDITOR en RRHH (1002)':<30} {'auditor_rrhh@arcamitte.local'}")
@@ -349,9 +347,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING(f"      • Enlace 1-Clic: {base_url}/solicitar/?hash={doc_3.file_hash}"))
 
         self.stdout.write(self.style.NOTICE("\n💡 GUÍA DE PRUEBAS DE AISLAMIENTO MULTI-TENANT (ROLES Y UO):"))
-        self.stdout.write("   • Usuario 'admin' (Master Admin / CISO): Dispone de visibilidad global y puede seleccionar cualquier UO Emisora.")
+        self.stdout.write("   • Usuario 'admin' (Administrador Global / CISO): Dispone de visibilidad global y puede seleccionar cualquier UO Emisora.")
         self.stdout.write("   • Usuarios departamentales (ej. 'gestor_rrhh' o 'gestor_legal'):")
-        self.stdout.write("     - Al acceder a /dashboard/ o /admin/, el campo 'UO Emisora' se restringe automáticamente a las UOs en las que son miembros activos.")
+        self.stdout.write("     - Al acceder a /dashboard/, el campo 'UO Emisora' se restringe automáticamente a las UOs en las que son miembros activos.")
         self.stdout.write("     - Solo visualizan documentos donde su UO figura como Emisora o Receptora en la Malla.")
 
         self.stdout.write(self.style.NOTICE("\n📧 CORREO ELECTRÓNICO EN STAGING (SALIDA DIRECTA EN CONSOLA):"))
@@ -360,7 +358,6 @@ class Command(BaseCommand):
         self.stdout.write("     se imprimirá de forma inmediata en la terminal donde ejecutes 'manage.py runserver'.")
         self.stdout.write("   • Para despliegues de producción real, ajusta en 'arcamitte.ini' -> 'backend = django.core.mail.backends.smtp.EmailBackend'.")
         self.stdout.write("   • Además, siempre puedes auditar los tokens en tiempo real en:")
-        self.stdout.write(f"     {base_url}/admin/arcamitte/accessverificationtoken/")
 
         self.stdout.write(self.style.SUCCESS("\n" + "=" * 95))
         self.stdout.write("Para arrancar el servidor web de desarrollo:")

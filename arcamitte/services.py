@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from arcamitte.permissions import is_global_admin
 from arcamitte.models import (
     AccessVerificationToken,
     DocumentAccessLog,
@@ -670,8 +671,7 @@ def upload_and_encrypt_document(
     # Comprobación de seguridad: El usuario debe pertenecer a la origin_uo si no es superusuario
     if (
         uploaded_by is not None
-        and hasattr(uploaded_by, "is_superuser")
-        and not uploaded_by.is_superuser
+        and not is_global_admin(uploaded_by)
     ):
         if origin_uo is not None:
             if not UserUOMembership.objects.filter(
@@ -692,8 +692,7 @@ def upload_and_encrypt_document(
             # Comprobación de seguridad: El usuario debe pertenecer a la origin_uo del documento existente si no es superusuario
             if (
                 uploaded_by is not None
-                and hasattr(uploaded_by, "is_superuser")
-                and not uploaded_by.is_superuser
+                and not is_global_admin(uploaded_by)
             ):
                 if existing_doc.origin_uo is not None:
                     if not UserUOMembership.objects.filter(
@@ -1428,7 +1427,7 @@ def admin_decrypt_document(
         admin_user
         and hasattr(admin_user, "is_authenticated")
         and admin_user.is_authenticated
-        and not getattr(admin_user, "is_superuser", False)
+        and not is_global_admin(admin_user)
     ):
         user_auditor_uos = list(
             UserUOMembership.objects.filter(
@@ -1576,7 +1575,7 @@ def admin_download_and_burn_document(
         admin_user
         and hasattr(admin_user, "is_authenticated")
         and admin_user.is_authenticated
-        and not getattr(admin_user, "is_superuser", False)
+        and not is_global_admin(admin_user)
     ):
         user_admin_uos = list(
             UserUOMembership.objects.filter(
@@ -1736,7 +1735,7 @@ def sync_user_role_permissions(user: Any, role: str | None = None) -> list[str]:
     a las membresías activas del usuario en Unidades Organizativas (OPERATOR, AUDITOR, ADMIN).
     Garantiza que el usuario tenga acceso a las secciones del panel administrativo según su rol.
     """
-    if not user or getattr(user, "is_superuser", False):
+    if not user or is_global_admin(user):
         return []
 
     from django.contrib.auth.models import Group, Permission
@@ -1890,9 +1889,7 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
             last_name = (u_data.get("last_name") or "").strip()
             user_is_active = bool(u_data.get("is_active", True))
 
-            is_global_admin_flag = bool(
-                u_data.get("is_global_admin", False) or u_data.get("is_superuser", False)
-            )
+            is_global_admin_flag = bool(u_data.get("is_global_admin", False))
             is_mfa_enforced_flag = bool(u_data.get("is_mfa_enforced", False))
             must_change_pwd_param = u_data.get("must_change_password")
 
@@ -1973,8 +1970,8 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 )
                 target_memberships.append((target_uo, role))
 
-            # Desacoplamiento de roles de Django Admin:
-            # is_staff e is_superuser solo corresponden a is_global_admin
+            # Desacoplamiento total de Django Admin:
+            # Los privilegios se gestionan exclusivamente mediante is_global_admin y roles UO
             user = User.objects.filter(username=username).first()
             user_created = False
             must_change = False
@@ -1987,8 +1984,8 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                     first_name=first_name,
                     last_name=last_name,
                     is_active=user_is_active,
-                    is_staff=is_global_admin_flag,
-                    is_superuser=is_global_admin_flag,
+                    is_staff=False,
+                    is_superuser=False,
                 )
                 if raw_password:
                     if not user.check_password(raw_password):
@@ -2019,8 +2016,8 @@ def process_batch_import_json(data: Any) -> tuple[int, int, list[str]]:
                 if last_name:
                     user.last_name = last_name
                 user.is_active = user_is_active
-                user.is_staff = is_global_admin_flag
-                user.is_superuser = is_global_admin_flag
+                user.is_staff = False
+                user.is_superuser = False
                 if raw_password:
                     if not user.check_password(raw_password):
                         validate_password(raw_password, user=user)
@@ -2182,7 +2179,7 @@ def is_uo_admin(user: Any, uo: OrganizationalUnit) -> bool:
     """
     if not user or not user.is_authenticated:
         return False
-    if user.is_superuser:
+    if is_global_admin(user):
         return True
     return UserUOMembership.objects.filter(
         user=user,
@@ -2199,7 +2196,7 @@ def get_user_administered_uos(user: Any) -> Any:
     """
     if not user or not user.is_authenticated:
         return OrganizationalUnit.objects.none()
-    if user.is_superuser:
+    if is_global_admin(user):
         return OrganizationalUnit.objects.all().order_by("numeric_code")
     return (
         OrganizationalUnit.objects.filter(
@@ -2244,7 +2241,7 @@ def get_scoped_documents_for_request(
                 .select_related("origin_uo", "target_uo", "uploaded_by")
                 .distinct()
             )
-        if token.created_by and token.created_by.is_superuser:
+        if token.created_by and is_global_admin(token.created_by):
             return EncryptedDocument.objects.all().select_related(
                 "origin_uo", "target_uo", "uploaded_by"
             )
@@ -2256,7 +2253,7 @@ def get_scoped_documents_for_request(
     # 2. Autenticación interactiva de usuario
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
-        if getattr(user, "is_superuser", False):
+        if is_global_admin(user):
             return EncryptedDocument.objects.all().select_related(
                 "origin_uo", "target_uo", "uploaded_by"
             )
@@ -2298,13 +2295,13 @@ def can_user_or_token_terminate_document(
     if token and isinstance(token, APIToken) and token.is_valid():
         if not token.has_scope("documents:terminate"):
             return False
-        if not token.uo and token.created_by and token.created_by.is_superuser:
+        if not token.uo and token.created_by and is_global_admin(token.created_by):
             return True
         return bool(token.uo and document.origin_uo_id == token.uo_id)
 
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
-        if user.is_superuser:
+        if is_global_admin(user):
             return True
         if document.origin_uo_id:
             return UserUOMembership.objects.filter(
@@ -2335,7 +2332,7 @@ def can_user_or_token_decrypt_for_audit(
     if token and isinstance(token, APIToken) and token.is_valid():
         if not token.has_scope("documents:admin_decrypt"):
             return False
-        if not token.uo and token.created_by and token.created_by.is_superuser:
+        if not token.uo and token.created_by and is_global_admin(token.created_by):
             return True
         return bool(
             token.uo
@@ -2347,7 +2344,7 @@ def can_user_or_token_decrypt_for_audit(
 
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
-        if user.is_superuser:
+        if is_global_admin(user):
             return True
         uo_ids = [
             uid
@@ -2381,7 +2378,7 @@ def get_scoped_audit_logs_for_request(
     if token and isinstance(token, APIToken) and token.is_valid():
         if not token.has_scope("audit:read"):
             return DocumentAccessLog.objects.none()
-        if not token.uo and token.created_by and token.created_by.is_superuser:
+        if not token.uo and token.created_by and is_global_admin(token.created_by):
             return DocumentAccessLog.objects.all().select_related(
                 "document", "origin_uo", "target_uo"
             )
@@ -2399,7 +2396,7 @@ def get_scoped_audit_logs_for_request(
 
     user = getattr(request, "user", None)
     if user and user.is_authenticated:
-        if user.is_superuser:
+        if is_global_admin(user):
             return DocumentAccessLog.objects.all().select_related(
                 "document", "origin_uo", "target_uo"
             )
@@ -3061,7 +3058,7 @@ def send_security_alert_admin(
     if not admin_email:
         User = get_user_model()
         recipients = list(
-            User.objects.filter(is_superuser=True, is_active=True)
+            User.objects.filter(arcamitte_profile__is_global_admin=True, is_active=True)
             .exclude(email="")
             .values_list("email", flat=True)
         )
@@ -3237,10 +3234,9 @@ def is_totp_required_for_user(user: Any) -> bool:
     Determina si el usuario debe pasar obligatoriamente por el segundo factor (2FA / TOTP).
     Criterios de seguridad estricta (Zero Trust / ENS ALTO):
     1. Si el usuario ya tiene 2FA configurado y activo (is_totp_enabled).
-    2. Si es Superusuario Global (is_superuser).
-    3. Si es Personal Administrativo de plataforma (is_staff).
-    4. Si cuenta con rol de Administrador de Unidad Organizativa (UserUOMembership.Role.ADMIN).
-    5. Si tiene la directiva individual forzada por un superusuario (is_mfa_enforced).
+    2. Si es Administrador Global de Seguridad (is_global_admin).
+    3. Si cuenta con rol de Administrador de Unidad Organizativa (UserUOMembership.Role.ADMIN).
+    4. Si tiene la directiva individual forzada por un administrador (is_mfa_enforced).
     """
     if not user or not user.is_authenticated:
         return False
@@ -3257,7 +3253,7 @@ def is_totp_required_for_user(user: Any) -> bool:
     )
 
     # 1. Superusuario Global / Administrador de Seguridad (siempre obligatorio por ENS ALTO)
-    if is_global_admin(user) or getattr(user, "is_staff", False):
+    if is_global_admin(user):
         return True
 
     # 2. Administrador de Unidad Organizativa (siempre obligatorio)

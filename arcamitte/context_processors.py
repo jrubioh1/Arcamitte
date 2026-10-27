@@ -6,17 +6,19 @@ from django.http import HttpRequest
 from django.utils.translation import gettext_lazy as _
 
 from arcamitte.models import UserUOMembership
+from arcamitte.permissions import is_global_admin
 
 
 def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
     """
     Inyecta en todas las plantillas el estado de gobernanza del usuario, el modo de interfaz
-    y la información de rol y Unidad Organizativa activa.
+    y la información de rol y Unidad Organizativa activa, utilizando exclusivamente is_global_admin.
     """
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return {
             "dashboard_mode": "operational",
+            "is_global_admin": False,
             "user_is_uo_admin": False,
             "user_is_auditor": False,
             "user_can_view_audit_logs": False,
@@ -27,7 +29,6 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
             "user_primary_uo_name": "",
         }
 
-    # Modo para superusuario (por defecto governance si no está seleccionado)
     mode = request.session.get("dashboard_mode", "governance")
 
     primary_membership = (
@@ -36,18 +37,20 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
         .first()
     )
 
-    is_admin = user.is_superuser or (
+    is_global = is_global_admin(user)
+
+    is_admin = is_global or (
         primary_membership is not None
         and primary_membership.role == UserUOMembership.Role.ADMIN
     )
 
-    is_auditor = user.is_superuser or (
+    is_auditor = is_global or (
         primary_membership is not None
         and primary_membership.role == UserUOMembership.Role.AUDITOR
     )
 
-    can_view_audit_logs = user.is_superuser or is_admin or is_auditor
-    can_view_analytics = user.is_superuser or is_admin or is_auditor or (
+    can_view_audit_logs = is_global or is_admin or is_auditor
+    can_view_analytics = is_global or is_admin or is_auditor or (
         UserUOMembership.objects.filter(
             user=user,
             is_active=True,
@@ -55,9 +58,9 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
         ).exists()
     )
 
-    if user.is_superuser:
-        user_primary_role = "SUPERUSER"
-        user_primary_role_display = str(_("Superusuario"))
+    if is_global:
+        user_primary_role = "GLOBAL_ADMIN"
+        user_primary_role_display = str(_("Administrador Global"))
         user_primary_uo_alias = ""
         user_primary_uo_name = ""
     elif primary_membership:
@@ -73,6 +76,7 @@ def arcamitte_dashboard_context(request: HttpRequest) -> dict[str, Any]:
 
     return {
         "dashboard_mode": mode,
+        "is_global_admin": is_global,
         "user_is_uo_admin": is_admin,
         "user_is_auditor": is_auditor,
         "user_can_view_audit_logs": can_view_audit_logs,

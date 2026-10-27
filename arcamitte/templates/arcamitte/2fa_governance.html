@@ -250,7 +250,7 @@
 							{% endfor %}
 						</td>
 						<td>
-							{% if item.user.is_superuser %}
+							{% if item.user.arcamitte_profile.is_global_admin %}
 								<span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans "Superusuario Global" %}</span>
 							{% elif item.profile.role_display_name %}
 								<span class="badge bg-light text-dark border">{{ item.profile.role_display_name }}</span>
@@ -276,7 +276,7 @@
 							{% endif %}
 						</td>
 						<td>
-							{% if item.user.is_superuser or item.is_required and not item.is_enforced %}
+							{% if item.user.arcamitte_profile.is_global_admin or item.is_required and not item.is_enforced %}
 								<span class="badge bg-secondary-subtle text-muted" title="{% trans 'Obligatorio por directiva de rol institucional' %}">
 									<i data-feather="lock" style="width:11px;height:11px;" class="me-1"></i>{% trans "Por Rol" %}
 								</span>

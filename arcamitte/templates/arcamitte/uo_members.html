@@ -69,14 +69,14 @@
 									{% endif %}
 								</td>
 								<td>
-									{% if m.user.is_superuser and not request.user.is_superuser %}
+									{% if m.user.arcamitte_profile.is_global_admin and not is_global_admin %}
 										<span class="badge bg-danger-subtle text-danger border py-2 px-3">
 											{{ m.get_role_display }}
 										</span>
 										<small class="text-muted d-block" style="font-size:0.75rem;">
 											{% trans "(Superusuario: protegido)" %}
 										</small>
-									{% elif m.user == request.user and not request.user.is_superuser %}
+									{% elif m.user == request.user and not is_global_admin %}
 										<span class="badge bg-secondary-subtle text-dark border py-2 px-3">
 											{{ m.get_role_display }}
 										</span>
@@ -97,11 +97,11 @@
 									{% endif %}
 								</td>
 								<td>
-									{% if m.user.is_superuser and not request.user.is_superuser %}
+									{% if m.user.arcamitte_profile.is_global_admin and not is_global_admin %}
 										<span class="badge bg-success" title="{% trans 'No se puede modificar el estado de un superusuario' %}">
 											{% trans "Activo" %}
 										</span>
-									{% elif m.user == request.user and not request.user.is_superuser %}
+									{% elif m.user == request.user and not is_global_admin %}
 										<span class="badge bg-success" title="{% trans 'No puede desactivar su propia membresía' %}">
 											{% trans "Activo" %}
 										</span>
@@ -121,7 +121,7 @@
 									{% endif %}
 								</td>
 								<td class="text-end">
-									{% if m.user.is_superuser and not request.user.is_superuser %}
+									{% if m.user.arcamitte_profile.is_global_admin and not is_global_admin %}
 										<span class="badge bg-secondary-subtle text-muted border p-2 d-inline-flex align-items-center gap-1" title="{% trans 'Solo administrable por un superusuario global' %}">
 											<i data-feather="lock" style="width:13px;height:13px;"></i>
 											<span class="small">{% trans "Protegido" %}</span>
@@ -138,7 +138,7 @@
 											</form>
 
 											<!-- Botón Eliminar Membresía -->
-											{% if m.user == request.user and not request.user.is_superuser %}
+											{% if m.user == request.user and not is_global_admin %}
 												<button type="button" class="btn btn-outline-secondary btn-sm" disabled title="{% trans 'No puede auto-expulsarse de esta Unidad Organizativa' %}">
 													<i data-feather="user-x" style="width:13px;height:13px;"></i>
 												</button>

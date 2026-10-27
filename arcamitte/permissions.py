@@ -8,15 +8,13 @@ from arcamitte.models import APIToken, UserUOMembership
 def is_global_admin(user: Any) -> bool:
     """
     Comprueba si el usuario tiene el rol de Administrador Global de Seguridad de Arcamitte.
-    Desacoplado de la lógica interna de Django Admin, evaluando el perfil institucional
-    con respaldo transparente a user.is_superuser para comandos de consola.
+    Evaluado exclusivamente sobre el perfil institucional (UserProfile.is_global_admin),
+    completamente desacoplado de las marcas internas de Django (is_staff / is_superuser).
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
     profile = getattr(user, "arcamitte_profile", None)
-    if profile and getattr(profile, "is_global_admin", False):
-        return True
-    return bool(getattr(user, "is_superuser", False))
+    return bool(profile and getattr(profile, "is_global_admin", False))
 
 
 def is_uo_admin(user: Any, uo: Any = None) -> bool:
@@ -129,7 +127,7 @@ class HasTokenScope(permissions.BasePermission):
 
     def has_permission(self, request: Any, view: Any) -> bool:
         # Los superusuarios en sesiones web siempre tienen permiso
-        if request.user and request.user.is_authenticated and request.user.is_superuser:
+        if request.user and request.user.is_authenticated and is_global_admin(request.user):
             return True
 
         token = request.auth

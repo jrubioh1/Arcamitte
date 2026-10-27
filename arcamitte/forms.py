@@ -157,10 +157,10 @@ class OrganizationalUnitForm(forms.ModelForm):
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
-    def __init__(self, *args: Any, is_superuser: bool = False, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, is_global_admin: bool = False, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.is_superuser = is_superuser
-        if not is_superuser:
+        self.is_global_admin = is_global_admin
+        if not self.is_global_admin:
             # Los administradores de UO no pueden alterar el código ni el alias ya fijados
             if "numeric_code" in self.fields:
                 self.fields["numeric_code"].disabled = True
@@ -199,12 +199,12 @@ class UserManagementForm(forms.ModelForm):
     def __init__(
         self,
         *args: Any,
-        is_superuser: bool = False,
+        is_global_admin: bool = False,
         current_user: Any = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.is_superuser = is_superuser
+        self.is_global_admin = is_global_admin
         self.current_user = current_user
         self.is_self = bool(
             self.instance
@@ -227,7 +227,7 @@ class UserManagementForm(forms.ModelForm):
                     "Protegido por seguridad: No puede desactivar su propia cuenta de usuario."
                 )
 
-        if is_superuser:
+        if self.is_global_admin:
             initial_mfa = False
             initial_global = False
             if self.instance and getattr(self.instance, "pk", None):
@@ -235,8 +235,6 @@ class UserManagementForm(forms.ModelForm):
                 if profile:
                     initial_mfa = getattr(profile, "is_mfa_enforced", False)
                     initial_global = getattr(profile, "is_global_admin", False)
-                if getattr(self.instance, "is_superuser", False):
-                    initial_global = True
 
             self.fields["is_mfa_enforced"] = forms.BooleanField(
                 required=False,
@@ -271,43 +269,32 @@ class UserManagementForm(forms.ModelForm):
                     "Por motivos de seguridad y continuidad del servicio, no puede desactivar su propia cuenta de usuario."
                 )
             )
+        profile = getattr(self.instance, "arcamitte_profile", None) if (self.instance and self.instance.pk) else None
         if (
             self.instance
             and self.instance.pk
-            and getattr(self.instance, "is_superuser", False)
+            and profile
+            and profile.is_global_admin
             and not is_active
         ):
-            other_superusers = (
-                User.objects.filter(is_superuser=True, is_active=True)
-                .exclude(pk=self.instance.pk)
+            from arcamitte.models import UserProfile
+            other_global_admins = (
+                UserProfile.objects.filter(is_global_admin=True, user__is_active=True)
+                .exclude(user_id=self.instance.pk)
                 .count()
             )
-            if other_superusers == 0:
+            if other_global_admins == 0:
                 raise ValidationError(
                     _(
-                        "No es posible desactivar al único superusuario activo del sistema."
+                        "No es posible desactivar al único Administrador Global activo del sistema."
                     )
                 )
         return is_active
 
     def clean_is_global_admin(self) -> bool:
         is_global = self.cleaned_data.get("is_global_admin", False)
-        # Compatibilidad con envíos directos de 'is_superuser'
-        if not is_global and self.data.get("is_superuser") in (
-            True,
-            "True",
-            "true",
-            "1",
-            "on",
-        ):
-            is_global = True
-
-        was_global = False
-        if self.instance and self.instance.pk:
-            profile = getattr(self.instance, "arcamitte_profile", None)
-            was_global = getattr(self.instance, "is_superuser", False) or getattr(
-                profile, "is_global_admin", False
-            )
+        profile = getattr(self.instance, "arcamitte_profile", None) if (self.instance and self.instance.pk) else None
+        was_global = profile.is_global_admin if profile else False
 
         if self.is_self and was_global and not is_global:
             raise ValidationError(
@@ -317,49 +304,33 @@ class UserManagementForm(forms.ModelForm):
             )
 
         if self.instance and self.instance.pk and was_global and not is_global:
-            other_superusers = (
-                User.objects.filter(is_superuser=True, is_active=True)
-                .exclude(pk=self.instance.pk)
+            from arcamitte.models import UserProfile
+            other_global_admins = (
+                UserProfile.objects.filter(is_global_admin=True, user__is_active=True)
+                .exclude(user_id=self.instance.pk)
                 .count()
             )
-            if other_superusers == 0:
+            if other_global_admins == 0:
                 raise ValidationError(
                     _(
-                        "No es posible revocar los privilegios al único superusuario activo del sistema."
+                        "No es posible revocar los privilegios al único Administrador Global activo del sistema."
                     )
                 )
         return is_global
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
-        # Restricción jerárquica estricta: Solo un superusuario global puede conceder privilegios
-        if not self.is_superuser:
+        # Restricción jerárquica estricta: Solo un Administrador Global puede conceder privilegios
+        if not self.is_global_admin:
             if (
                 self.data.get("is_global_admin")
-                or self.data.get("is_superuser")
-                or self.data.get("is_staff")
                 or cleaned_data.get("is_global_admin")
-                or cleaned_data.get("is_superuser")
-                or cleaned_data.get("is_staff")
             ):
                 raise ValidationError(
                     _(
-                        "Solo un superusuario global puede conceder privilegios administrativos o de superusuario."
+                        "Solo un Administrador Global puede conceder privilegios de administración global."
                     )
                 )
-        else:
-            is_global = cleaned_data.get("is_global_admin", False)
-            if not is_global and self.data.get("is_superuser") in (
-                True,
-                "True",
-                "true",
-                "1",
-                "on",
-            ):
-                is_global = True
-            cleaned_data["is_global_admin"] = is_global
-            cleaned_data["is_superuser"] = is_global
-            cleaned_data["is_staff"] = is_global
         return cleaned_data
 
     def clean_username(self) -> str:
@@ -412,22 +383,16 @@ class UserManagementForm(forms.ModelForm):
 
     def save(self, commit: bool = True) -> Any:
         user = super().save(commit=False)
-        if self.is_superuser:
-            is_global = self.cleaned_data.get("is_global_admin", False)
-            user.is_superuser = is_global
-            user.is_staff = is_global
-        else:
-            # Jerarquía: Si quien gestiona la cuenta no es superusuario, no puede elevar a staff ni superuser
-            if not user.pk:
-                user.is_staff = False
-                user.is_superuser = False
+        user.is_superuser = False
+        user.is_staff = False
         if commit:
             user.save()
             from arcamitte.models import get_or_create_user_profile
 
             profile = get_or_create_user_profile(user)
-            if self.is_superuser:
-                profile.is_global_admin = user.is_superuser
+            if self.is_global_admin:
+                is_global = self.cleaned_data.get("is_global_admin", False)
+                profile.is_global_admin = is_global
                 if "is_mfa_enforced" in self.cleaned_data:
                     profile.is_mfa_enforced = self.cleaned_data.get(
                         "is_mfa_enforced", False

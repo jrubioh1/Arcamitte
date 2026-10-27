@@ -90,7 +90,7 @@ def get_user_accessible_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
     - Superusuarios: Todas las UOs activas.
     - Usuarios regulares: UOs en las que ostenta membresía activa.
     """
-    if getattr(user, "is_superuser", False):
+    if is_global_admin(user):
         return OrganizationalUnit.objects.filter(is_active=True)
     return OrganizationalUnit.objects.filter(
         memberships__user=user,
@@ -106,7 +106,7 @@ def get_scoped_documents_queryset(user: Any) -> models.QuerySet[EncryptedDocumen
     - Usuarios departamentales: ven los asientos de sus UOs (como origen o destino)
       o cualquier asiento que hayan subido personalmente.
     """
-    if getattr(user, "is_superuser", False):
+    if is_global_admin(user):
         return EncryptedDocument.objects.all().select_related(
             "origin_uo", "target_uo", "uploaded_by"
         )
@@ -234,7 +234,7 @@ class DashboardLoginView(auth_views.LoginView):
         return response
 
     def get_success_url(self) -> str:
-        if self.request.user.is_superuser:
+        if is_global_admin(self.request.user):
             self.request.session.setdefault("dashboard_mode", "governance")
         return reverse_lazy("dashboard:home")
 
@@ -250,7 +250,7 @@ class DashboardModeSelectionView(LoginRequiredMixin, UserPassesTestMixin, View):
     template_name = "arcamitte/mode_selection.html"
 
     def test_func(self) -> bool:
-        return self.request.user.is_superuser
+        return is_global_admin(self.request.user)
 
     def get(self, request: HttpRequest) -> HttpResponse:
         set_mode = request.GET.get("set")
@@ -309,7 +309,7 @@ class DashboardHomeView(LoginRequiredMixin, TemplateView):
 
         recent_docs = docs_qs.order_by("-created_at")[:6]
 
-        if user.is_superuser:
+        if is_global_admin(user):
             logs_qs = DocumentAccessLog.objects.all().select_related(
                 "document", "origin_uo", "target_uo"
             )
@@ -379,7 +379,7 @@ class DashboardDocumentListView(LoginRequiredMixin, ListView):
 
         user = self.request.user
         docs_list = context.get("documents") or []
-        if getattr(user, "is_superuser", False):
+        if is_global_admin(user):
             context["terminable_doc_ids"] = {d.id for d in docs_list}
         else:
             admin_uos = set(
@@ -451,7 +451,7 @@ class DashboardDocumentUploadView(LoginRequiredMixin, View):
         origin_uo_id = request.POST.get("origin_uo", "").strip()
         origin_uo: OrganizationalUnit | None = None
         if origin_uo_id:
-            if user.is_superuser:
+            if is_global_admin(user):
                 origin_uo = all_uos.filter(id=origin_uo_id).first()
                 if not origin_uo:
                     errors.append(_("La UO emisora seleccionada no existe."))
@@ -606,7 +606,7 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
         # Verificar autorización de acceso departamental o de autor
-        if not user.is_superuser:
+        if not is_global_admin(user):
             user_uos = get_user_accessible_uos(user)
             has_uo_access = (doc.origin_uo in user_uos) or (doc.target_uo in user_uos)
             is_uploader = bool(doc.uploaded_by_id and doc.uploaded_by_id == user.id)
@@ -711,7 +711,7 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
 
         can_audit_download = False
         if file_exists and not doc.is_consumed:
-            if user.is_superuser:
+            if is_global_admin(user):
                 can_audit_download = True
             else:
                 user_auditor_uos = list(
@@ -745,7 +745,7 @@ class DashboardDocumentDetailView(LoginRequiredMixin, View):
             and not doc.is_consumed
             and not doc.is_expired()
         ):
-            if user.is_superuser:
+            if is_global_admin(user):
                 can_terminate = True
             elif doc.origin_uo_id:
                 can_terminate = UserUOMembership.objects.filter(
@@ -888,7 +888,7 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         user = request.user
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
-        if not user.is_superuser:
+        if not is_global_admin(user):
             is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
             is_origin_admin = bool(
                 doc.origin_uo_id
@@ -920,7 +920,7 @@ class DashboardDocumentTerminateView(LoginRequiredMixin, View):
         user = request.user
         doc = get_object_or_404(EncryptedDocument, file_hash=file_hash)
 
-        if not user.is_superuser:
+        if not is_global_admin(user):
             is_personal_owner = doc.origin_uo is None and doc.uploaded_by_id == user.id
             is_origin_admin = bool(
                 doc.origin_uo_id
@@ -988,7 +988,7 @@ class DashboardAuditLogView(LoginRequiredMixin, ListView):
 
     def get_queryset(self) -> models.QuerySet[DocumentAccessLog]:
         user = self.request.user
-        if user.is_superuser:
+        if is_global_admin(user):
             qs = (
                 DocumentAccessLog.objects.all()
                 .select_related("document", "origin_uo", "target_uo")
@@ -1055,7 +1055,7 @@ class DashboardUOListView(LoginRequiredMixin, ListView):
         context["administered_uo_ids"] = set(
             get_user_administered_uos(self.request.user).values_list("id", flat=True)
         )
-        context["is_superuser"] = self.request.user.is_superuser
+        context["is_global_admin"] = is_global_admin(self.request.user)
         return context
 
 
@@ -1327,10 +1327,10 @@ class DashboardUOCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
     template_name = "arcamitte/uo_form.html"
 
     def test_func(self) -> bool:
-        return self.request.user.is_superuser
+        return is_global_admin(self.request.user)
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        form = OrganizationalUnitForm(is_superuser=True)
+        form = OrganizationalUnitForm(is_global_admin=True)
         return render(
             request,
             self.template_name,
@@ -1338,7 +1338,7 @@ class DashboardUOCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
         )
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        form = OrganizationalUnitForm(request.POST, is_superuser=True)
+        form = OrganizationalUnitForm(request.POST, is_global_admin=True)
         if form.is_valid():
             uo = form.save()
             messages.success(
@@ -1365,7 +1365,7 @@ class DashboardBatchImportView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def test_func(self) -> bool:
         user = self.request.user
-        return bool(user.is_authenticated and (user.is_superuser or is_global_admin(user)))
+        return bool(user.is_authenticated and (is_global_admin(user)))
 
     def get(self, request: HttpRequest) -> HttpResponse:
         form = BatchImportForm()
@@ -1430,7 +1430,7 @@ class DashboardUOEditView(LoginRequiredMixin, View):
     def get(self, request: HttpRequest, uo_id: int) -> HttpResponse:
         uo = self.get_uo(request, uo_id)
         form = OrganizationalUnitForm(
-            instance=uo, is_superuser=request.user.is_superuser
+            instance=uo, is_global_admin=is_global_admin(request.user)
         )
         return render(
             request,
@@ -1443,7 +1443,7 @@ class DashboardUOEditView(LoginRequiredMixin, View):
         form = OrganizationalUnitForm(
             request.POST,
             instance=uo,
-            is_superuser=request.user.is_superuser,
+            is_global_admin=is_global_admin(request.user),
         )
         if form.is_valid():
             form.save()
@@ -1588,7 +1588,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
 
             # Salvaguarda jerárquica: un no-superusuario no puede modificar el rol de un superusuario
-            if membership.user.is_superuser and not request.user.is_superuser:
+            if is_global_admin(membership.user) and not is_global_admin(request.user):
                 messages.error(
                     request,
                     _(
@@ -1602,7 +1602,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 membership.user == request.user
                 and membership.role == UserUOMembership.Role.ADMIN
                 and new_role != UserUOMembership.Role.ADMIN
-                and not request.user.is_superuser
+                and not is_global_admin(request.user)
             ):
                 messages.error(
                     request,
@@ -1629,7 +1629,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
 
             # Salvaguarda jerárquica: un no-superusuario no puede desactivar la membresía de un superusuario
-            if membership.user.is_superuser and not request.user.is_superuser:
+            if is_global_admin(membership.user) and not is_global_admin(request.user):
                 messages.error(
                     request,
                     _(
@@ -1639,7 +1639,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
             # Salvaguarda: No es posible desactivar la propia membresía
-            if membership.user == request.user and not request.user.is_superuser:
+            if membership.user == request.user and not is_global_admin(request.user):
                 messages.error(
                     request,
                     _(
@@ -1665,7 +1665,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
             membership = get_object_or_404(UserUOMembership, pk=membership_id, uo=uo)
 
             # Salvaguarda jerárquica: un no-superusuario no puede desvincular a un superusuario
-            if membership.user.is_superuser and not request.user.is_superuser:
+            if is_global_admin(membership.user) and not is_global_admin(request.user):
                 messages.error(
                     request,
                     _(
@@ -1675,7 +1675,7 @@ class DashboardUOMembersView(LoginRequiredMixin, View):
                 return redirect("dashboard:uo_members", uo_id=uo.id)
 
             # Salvaguarda: No es posible auto-expulsarse de la UO
-            if membership.user == request.user and not request.user.is_superuser:
+            if membership.user == request.user and not is_global_admin(request.user):
                 messages.error(
                     request,
                     _(
@@ -1706,7 +1706,7 @@ class DashboardUserListView(LoginRequiredMixin, View):
     template_name = "arcamitte/user_list.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             users = (
                 User.objects.all()
                 .select_related("arcamitte_profile")
@@ -1752,17 +1752,17 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
     template_name = "arcamitte/user_form.html"
 
     def get_admin_uos(self, request: HttpRequest) -> Any:
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return OrganizationalUnit.objects.all().order_by("numeric_code")
         return get_user_administered_uos(request.user)
 
     def get(self, request: HttpRequest) -> HttpResponse:
         admin_uos = self.get_admin_uos(request)
-        if not request.user.is_superuser and not admin_uos.exists():
+        if not is_global_admin(request.user) and not admin_uos.exists():
             raise PermissionDenied(_("No tiene permisos para crear usuarios."))
 
         form = UserManagementForm(
-            is_superuser=request.user.is_superuser, current_user=request.user
+            is_global_admin=is_global_admin(request.user), current_user=request.user
         )
         return render(
             request,
@@ -1778,21 +1778,19 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest) -> HttpResponse:
         admin_uos = self.get_admin_uos(request)
-        if not request.user.is_superuser and not admin_uos.exists():
+        if not is_global_admin(request.user) and not admin_uos.exists():
             raise PermissionDenied(_("No tiene permisos para crear usuarios."))
 
         form = UserManagementForm(
             request.POST,
-            is_superuser=request.user.is_superuser,
+            is_global_admin=is_global_admin(request.user),
             current_user=request.user,
         )
         if form.is_valid():
             user = form.save(commit=False)
             user.set_unusable_password()
-            # Jerarquía estricta: un no-superusuario no puede crear staff ni superusers
-            if not request.user.is_superuser:
-                user.is_staff = False
-                user.is_superuser = False
+            user.is_staff = False
+            is_global_admin(user) = False
             user.save()
 
             uo_id = request.POST.get("initial_uo")
@@ -1854,10 +1852,10 @@ class DashboardUserEditView(LoginRequiredMixin, View):
 
     def get_target_user(self, request: HttpRequest, user_id: int) -> User:
         target = get_object_or_404(User, pk=user_id)
-        if request.user.is_superuser:
+        if is_global_admin(request.user):
             return target
         # Restricción jerárquica estricta: un usuario que no es superusuario jamás puede editar a un superusuario
-        if target.is_superuser:
+        if is_global_admin(target):
             raise PermissionDenied(
                 _(
                     "No tiene privilegios suficientes para administrar a un superusuario del sistema."
@@ -1874,7 +1872,7 @@ class DashboardUserEditView(LoginRequiredMixin, View):
         target = self.get_target_user(request, user_id)
         form = UserManagementForm(
             instance=target,
-            is_superuser=request.user.is_superuser,
+            is_global_admin=is_global_admin(request.user),
             current_user=request.user,
         )
         return render(
@@ -1893,7 +1891,7 @@ class DashboardUserEditView(LoginRequiredMixin, View):
         form = UserManagementForm(
             request.POST,
             instance=target,
-            is_superuser=request.user.is_superuser,
+            is_global_admin=is_global_admin(request.user),
             current_user=request.user,
         )
         if form.is_valid():
@@ -1926,9 +1924,9 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
         target = get_object_or_404(User, pk=user_id)
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             # Restricción jerárquica estricta: un usuario que no es superusuario no puede resetear a un superusuario
-            if target.is_superuser:
+            if is_global_admin(target):
                 raise PermissionDenied(
                     _(
                         "No tiene privilegios suficientes para resetear la contraseña de un superusuario del sistema."
@@ -2073,7 +2071,7 @@ def get_user_analytics_uos(user: Any) -> models.QuerySet[OrganizationalUnit]:
     """
     if not user or not user.is_authenticated:
         return OrganizationalUnit.objects.none()
-    if getattr(user, "is_superuser", False):
+    if is_global_admin(user):
         return OrganizationalUnit.objects.filter(is_active=True).order_by(
             "numeric_code"
         )
@@ -2105,7 +2103,7 @@ class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
         if not request.user.is_authenticated:
             return redirect(self.login_url)
         analytics_uos = get_user_analytics_uos(request.user)
-        if not request.user.is_superuser and not analytics_uos.exists():
+        if not is_global_admin(request.user) and not analytics_uos.exists():
             raise PermissionDenied(
                 _(
                     "No dispone de privilegios de analítica en ninguna Unidad Organizativa."
@@ -2116,7 +2114,7 @@ class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         analytics_uos = get_user_analytics_uos(self.request.user)
-        if self.request.user.is_superuser:
+        if is_global_admin(self.request.user):
             analytics_users = User.objects.filter(is_active=True).order_by("username")
         else:
             analytics_users = (
@@ -2134,7 +2132,7 @@ class DashboardAnalyticsView(LoginRequiredMixin, TemplateView):
         context["active_nav"] = "analytics"
         context["analytics_uos"] = analytics_uos
         context["analytics_users"] = analytics_users
-        context["is_superuser"] = self.request.user.is_superuser
+        context["is_global_admin"] = is_global_admin(self.request.user)
         context["selected_uo"] = self.request.GET.get("uo", "")
         context["selected_uo_role"] = self.request.GET.get("uo_role", "all")
         context["selected_user"] = self.request.GET.get("user", "")
@@ -2178,7 +2176,7 @@ def filter_analytics_querysets(
         if not target_uo_obj:
             uo_search_pool = (
                 OrganizationalUnit.objects.filter(is_active=True)
-                if request.user.is_superuser
+                if is_global_admin(request.user)
                 else analytics_uos
             )
             target_uo_obj = uo_search_pool.filter(
@@ -2197,7 +2195,7 @@ def filter_analytics_querysets(
             )
 
         if (
-            not request.user.is_superuser
+            not is_global_admin(request.user)
             and not analytics_uos.filter(pk=target_uo_obj.pk).exists()
         ):
             return (
@@ -2233,7 +2231,7 @@ def filter_analytics_querysets(
                 | models.Q(document__origin_uo__isnull=True)
             )
         )
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             docs_qs = docs_qs.filter(
                 models.Q(target_uo__in=analytics_uos)
                 | models.Q(uploaded_by=request.user)
@@ -2266,7 +2264,7 @@ def filter_analytics_querysets(
                 | models.Q(document__origin_uo=target_uo_obj)
                 | models.Q(document__target_uo=target_uo_obj)
             )
-    elif not request.user.is_superuser:
+    elif not is_global_admin(request.user):
         docs_qs = docs_qs.filter(
             models.Q(origin_uo__in=analytics_uos)
             | models.Q(target_uo__in=analytics_uos)
@@ -2408,7 +2406,7 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
         analytics_uos = get_user_analytics_uos(request.user)
-        if not request.user.is_superuser and not analytics_uos.exists():
+        if not is_global_admin(request.user) and not analytics_uos.exists():
             return JsonResponse(
                 {"error": _("Acceso no autorizado a métricas analíticas.")}, status=403
             )
@@ -2685,7 +2683,7 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                 "security": security_metrics,
                 "meta": meta,
                 "scope_info": {
-                    "is_global": request.user.is_superuser and not target_uo_obj and meta.get("uo") != "NONE",
+                    "is_global": is_global_admin(request.user) and not target_uo_obj and meta.get("uo") != "NONE",
                     "uo_alias": (
                         str(_("Sin UO de origen (Asientos Personales)"))
                         if meta.get("uo") == "NONE"
@@ -2694,7 +2692,7 @@ class DashboardAnalyticsDataView(LoginRequiredMixin, View):
                             if target_uo_obj
                             else (
                                 str(_("Global (Toda la Organización)"))
-                                if request.user.is_superuser
+                                if is_global_admin(request.user)
                                 else (
                                     analytics_uos.first().alias
                                     if analytics_uos.count() == 1
@@ -2718,7 +2716,7 @@ class DashboardAnalyticsDrilldownView(LoginRequiredMixin, View):
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
         analytics_uos = get_user_analytics_uos(request.user)
-        if not request.user.is_superuser and not analytics_uos.exists():
+        if not is_global_admin(request.user) and not analytics_uos.exists():
             return JsonResponse({"error": _("Acceso no autorizado.")}, status=403)
 
         docs_qs, logs_qs, target_uo_obj, meta, err_resp = filter_analytics_querysets(
@@ -3120,7 +3118,7 @@ class DashboardUserUnlockView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
         target = get_object_or_404(User, pk=user_id)
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             admin_uos = get_user_administered_uos(request.user)
             if not UserUOMembership.objects.filter(
                 user=target, uo__in=admin_uos
@@ -3164,7 +3162,7 @@ class DashboardLockedUsersView(LoginRequiredMixin, View):
     template_name = "arcamitte/locked_users_list.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             raise PermissionDenied(
                 _(
                     "Se requieren privilegios de Superusuario para gestionar usuarios bloqueados."
@@ -3207,7 +3205,7 @@ class DashboardUserManualLockView(LoginRequiredMixin, View):
     login_url = "dashboard:login"
 
     def post(self, request: HttpRequest, user_id: int) -> HttpResponse:
-        if not request.user.is_superuser:
+        if not is_global_admin(request.user):
             raise PermissionDenied(
                 _("Se requieren privilegios de Superusuario para suspender cuentas.")
             )
@@ -3483,7 +3481,7 @@ class DashboardIPBanListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     paginate_by = 25
 
     def test_func(self) -> bool:
-        return self.request.user.is_superuser
+        return is_global_admin(self.request.user)
 
     def get_queryset(self) -> Any:
         from arcamitte.models import BannedIP
@@ -3518,7 +3516,7 @@ class DashboardIPBanCreateView(LoginRequiredMixin, UserPassesTestMixin, View):
     login_url = "dashboard:login"
 
     def test_func(self) -> bool:
-        return self.request.user.is_superuser
+        return is_global_admin(self.request.user)
 
     def post(self, request: HttpRequest) -> HttpResponse:
         ip_address = request.POST.get("ip_address", "").strip()
@@ -3569,7 +3567,7 @@ class DashboardIPBanUnbanView(LoginRequiredMixin, UserPassesTestMixin, View):
     login_url = "dashboard:login"
 
     def test_func(self) -> bool:
-        return self.request.user.is_superuser
+        return is_global_admin(self.request.user)
 
     def post(self, request: HttpRequest, pk: int) -> HttpResponse:
         from arcamitte.models import BannedIP
@@ -3598,7 +3596,7 @@ class DashboardAuditExportView(LoginRequiredMixin, View):
 
     def post(self, request: HttpRequest) -> HttpResponse:
         user = request.user
-        if user.is_superuser:
+        if is_global_admin(user):
             qs = (
                 DocumentAccessLog.objects.all()
                 .select_related("document", "origin_uo", "target_uo")
@@ -3967,7 +3965,7 @@ class DashboardTOTPVerifyView(View):
                 % {"count": len(profile.totp_scratch_codes)},
             )
 
-        if user.is_superuser:
+        if is_global_admin(user):
             request.session.setdefault("dashboard_mode", "governance")
         return redirect("dashboard:home")
 

@@ -266,7 +266,7 @@ class UserProfile(models.Model):
     @property
     def role_display_name(self) -> str:
         """Retorna el nombre del rol institucional limpio de Arcamitte."""
-        if self.is_global_admin or getattr(self.user, "is_superuser", False):
+        if self.is_global_admin:
             return str(_("Administrador Global de Seguridad"))
         memberships = self.user.uo_memberships.filter(is_active=True).select_related(
             "uo"
@@ -503,9 +503,11 @@ def get_or_create_user_profile(user: Any) -> UserProfile:
 def create_or_sync_user_profile(
     sender: Any, instance: Any, created: bool, **kwargs: Any
 ) -> None:
-    """Garantiza la existencia automática del perfil para cada usuario creado."""
-    if created:
-        UserProfile.objects.get_or_create(user=instance)
+    """Garantiza la existencia automática y sincronización de privilegios para cada usuario."""
+    profile, _ = UserProfile.objects.get_or_create(user=instance)
+    if getattr(instance, "is_superuser", False) and not profile.is_global_admin:
+        profile.is_global_admin = True
+        profile.save(update_fields=["is_global_admin"])
 
 
 class EncryptedDocument(models.Model):

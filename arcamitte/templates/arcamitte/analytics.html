@@ -63,7 +63,7 @@
 		<div class="d-flex align-items-center gap-2 mb-1">
 			<h1 class="h3 fw-bold mb-0">{% trans "Analítica y Métricas de Custodia" %}</h1>
 			<span id="scopeBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle">
-				{% if is_superuser and not selected_uo %}
+				{% if is_global_admin and not selected_uo %}
 					{% trans "Global (Toda la Organización)" %}
 				{% elif selected_uo %}
 					UO: {{ selected_uo }}
@@ -133,7 +133,7 @@
 					<i data-feather="grid" style="width:12px;height:12px;" class="flex-shrink-0"></i><span class="text-truncate">{% trans "Unidad Organizativa" %}</span>
 				</label>
 				<select id="uoFilterSelect" class="form-select form-select-sm arca-searchable-select" data-allow-custom="1" data-placeholder="{% trans 'Escribir o seleccionar UO...' %}">
-					{% if is_superuser %}
+					{% if is_global_admin %}
 						<option value="" {% if not selected_uo %}selected{% endif %}>
 							-- {% trans "Toda la Organización (Global)" %} --
 						</option>

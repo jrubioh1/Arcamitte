@@ -74,7 +74,7 @@
 					<tr>
 						<td>
 							<strong class="font-mono text-dark">{{ u.username }}</strong>
-							{% if u.is_superuser or u.arcamitte_profile.is_global_admin %}
+							{% if u.arcamitte_profile.is_global_admin %}
 								<span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:0.65rem;">
 									{% trans "Admin Global" %}
 								</span>
