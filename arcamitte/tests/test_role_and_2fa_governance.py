@@ -249,10 +249,10 @@ class RoleAnd2FAGovernanceTestCase(TestCase):
         self.assertTrue(form_create.is_valid(), form_create.errors)
         created_user = form_create.save()
 
-        # El usuario creado tiene is_global_admin en profile y Django sync
+        # El usuario creado tiene is_global_admin en profile desacoplado de Django admin
         self.assertTrue(created_user.arcamitte_profile.is_global_admin)
-        self.assertTrue(created_user.is_superuser)
-        self.assertTrue(created_user.is_staff)
+        self.assertFalse(created_user.is_superuser)
+        self.assertFalse(created_user.is_staff)
         self.assertEqual(
             created_user.arcamitte_profile.role_display_name,
             "Administrador Global de Seguridad",

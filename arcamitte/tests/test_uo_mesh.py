@@ -520,10 +520,10 @@ class BatchImportProvisioningTestCase(TestCase):
         membership_lucia = UserUOMembership.objects.get(user=user_lucia, uo=uo_sec)
         self.assertEqual(membership_lucia.role, UserUOMembership.Role.ADMIN)
 
-        # Superusuario con UO y rol departamental
+        # Superusuario con UO y rol departamental (desacoplado de Django admin)
         user_ciso = User.objects.get(username="ciso.corp")
-        self.assertTrue(user_ciso.is_staff)
-        self.assertTrue(user_ciso.is_superuser)
+        self.assertFalse(user_ciso.is_staff)
+        self.assertFalse(user_ciso.is_superuser)
         self.assertTrue(user_ciso.arcamitte_profile.is_global_admin)
         self.assertTrue(user_ciso.arcamitte_profile.is_mfa_enforced)
         membership_ciso = UserUOMembership.objects.get(user=user_ciso, uo=uo_sec)
@@ -531,8 +531,8 @@ class BatchImportProvisioningTestCase(TestCase):
 
         # Superusuario transversal sin UO
         user_indep = User.objects.get(username="global.indep")
-        self.assertTrue(user_indep.is_staff)
-        self.assertTrue(user_indep.is_superuser)
+        self.assertFalse(user_indep.is_staff)
+        self.assertFalse(user_indep.is_superuser)
         self.assertTrue(user_indep.arcamitte_profile.is_global_admin)
         self.assertEqual(UserUOMembership.objects.filter(user=user_indep).count(), 0)
 

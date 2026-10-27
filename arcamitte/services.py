@@ -3252,6 +3252,16 @@ def is_totp_required_for_user(user: Any) -> bool:
         is_uo_operator,
     )
 
+    # 0. Compatibilidad con directiva institucional ARCAMITTE_MFA_REQUIRED_FOR_STAFF
+    if getattr(settings, "ARCAMITTE_MFA_REQUIRED_FOR_STAFF", False):
+        if (
+            getattr(user, "is_staff", False)
+            or getattr(user, "is_superuser", False)
+            or is_global_admin(user)
+            or is_uo_admin(user)
+        ):
+            return True
+
     # 1. Superusuario Global / Administrador de Seguridad (siempre obligatorio por ENS ALTO)
     if is_global_admin(user):
         return True

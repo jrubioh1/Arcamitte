@@ -1787,11 +1787,9 @@ class DashboardUserCreateView(LoginRequiredMixin, View):
             current_user=request.user,
         )
         if form.is_valid():
-            user = form.save(commit=False)
+            user = form.save()
             user.set_unusable_password()
-            user.is_staff = False
-            is_global_admin(user) = False
-            user.save()
+            user.save(update_fields=["password"])
 
             uo_id = request.POST.get("initial_uo")
             initial_role = request.POST.get(

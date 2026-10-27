@@ -178,24 +178,6 @@ class Command(BaseCommand):
                     "must_change_password": False,
                 },
                 {
-                    "username": "admin",
-                    "email": "admin@arcamitte.local",
-                    "first_name": "Administrador",
-                    "last_name": "Maestro",
-                    "password": "AdminMaster#2026",
-                    "is_global_admin": True,
-                    "must_change_password": False,
-                },
-                {
-                    "username": "admin",
-                    "email": "admin@arcamitte.local",
-                    "first_name": "Administrador",
-                    "last_name": "Maestro",
-                    "password": "AdminMaster#2026",
-                    "is_global_admin": True,
-                    "must_change_password": False,
-                },
-                {
                     "username": "admin_dir",
                     "email": "admin_dir@arcamitte.local",
                     "password": "PasswordDir#2026",
@@ -317,7 +299,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.NOTICE("\n🌐 ACCESOS WEB DISPONIBLES:"))
         self.stdout.write(f"   • Panel de Administración Arcamitte: {base_url}/dashboard/")
-                self.stdout.write(f"   • Pasarela Pública (Pedir):          {base_url}/solicitar/")
+        self.stdout.write(f"   • Pasarela Pública (Pedir):          {base_url}/solicitar/")
         self.stdout.write(f"   • Pasarela Pública (Canjear):        {base_url}/canjear/")
 
         self.stdout.write(self.style.NOTICE("\n👥 CUENTAS DE USUARIO Y ROLES DISPONIBLES:"))

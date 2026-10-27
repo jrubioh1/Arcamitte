@@ -1153,14 +1153,18 @@ class DashboardTestCase(TestCase):
         self.assertTrue(form_self.cleaned_data["is_active"])
         self.assertTrue(form_self.cleaned_data["is_staff"])
         self.assertTrue(form_self.cleaned_data["is_superuser"])
+        self.assertTrue(form_self.cleaned_data["is_global_admin"])
 
         saved_user = form_self.save()
         self.assertTrue(saved_user.is_active)
-        self.assertTrue(saved_user.is_staff)
-        self.assertTrue(saved_user.is_superuser)
+        self.assertTrue(saved_user.arcamitte_profile.is_global_admin)
+        self.assertFalse(saved_user.is_superuser)
+        self.assertFalse(saved_user.is_staff)
 
         # 2. Intentar degradar al único superusuario activo del sistema por un tercero -> ValidationError
         # Aseguramos que solo existe un superusuario activo
+        from arcamitte.models import UserProfile
+        UserProfile.objects.filter(is_global_admin=True).exclude(user_id=self.admin_user.pk).update(is_global_admin=False)
         User.objects.filter(is_superuser=True).exclude(pk=self.admin_user.pk).delete()
         other_operator = User.objects.create_user(
             username="gestor_externo",
@@ -1187,7 +1191,7 @@ class DashboardTestCase(TestCase):
         self.assertIn("is_global_admin", form_last_super.errors)
         self.assertIn("único superusuario", str(form_last_super.errors["is_global_admin"]))
 
-        # 3. Asignar is_superuser=True automáticamente otorga is_staff=True
+        # 3. Asignar rol de Administrador Global a nuevo candidato
         new_target = User.objects.create_user(
             username="nuevo_candidato",
             email="candidato@arcamitte.local",
@@ -1209,8 +1213,9 @@ class DashboardTestCase(TestCase):
         )
         self.assertTrue(form_promote.is_valid(), form_promote.errors)
         saved_promoted = form_promote.save()
-        self.assertTrue(saved_promoted.is_superuser)
-        self.assertTrue(saved_promoted.is_staff)
+        self.assertTrue(saved_promoted.arcamitte_profile.is_global_admin)
+        self.assertFalse(saved_promoted.is_superuser)
+        self.assertFalse(saved_promoted.is_staff)
 
     def test_uo_admin_self_protection_in_uo_members(self) -> None:
         """Verifica que un Administrador de UO no pueda auto-degradarse, auto-desactivarse ni auto-expulsarse."""

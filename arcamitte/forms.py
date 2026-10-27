@@ -200,10 +200,13 @@ class UserManagementForm(forms.ModelForm):
         self,
         *args: Any,
         is_global_admin: bool = False,
+        is_superuser: bool | None = None,
         current_user: Any = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
+        if is_superuser is not None:
+            is_global_admin = is_superuser
         self.is_global_admin = is_global_admin
         self.current_user = current_user
         self.is_self = bool(
@@ -286,13 +289,23 @@ class UserManagementForm(forms.ModelForm):
             if other_global_admins == 0:
                 raise ValidationError(
                     _(
-                        "No es posible desactivar al único Administrador Global activo del sistema."
+                        "No es posible desactivar al único superusuario activo del sistema."
                     )
                 )
         return is_active
 
     def clean_is_global_admin(self) -> bool:
         is_global = self.cleaned_data.get("is_global_admin", False)
+        # Compatibilidad con envíos directos de 'is_superuser'
+        if not is_global and self.data.get("is_superuser") in (
+            True,
+            "True",
+            "true",
+            "1",
+            "on",
+        ):
+            is_global = True
+
         profile = getattr(self.instance, "arcamitte_profile", None) if (self.instance and self.instance.pk) else None
         was_global = profile.is_global_admin if profile else False
 
@@ -313,24 +326,41 @@ class UserManagementForm(forms.ModelForm):
             if other_global_admins == 0:
                 raise ValidationError(
                     _(
-                        "No es posible revocar los privilegios al único Administrador Global activo del sistema."
+                        "No es posible revocar los privilegios al único superusuario activo del sistema."
                     )
                 )
         return is_global
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
-        # Restricción jerárquica estricta: Solo un Administrador Global puede conceder privilegios
+        # Restricción jerárquica estricta: Solo un superusuario global puede conceder privilegios
         if not self.is_global_admin:
             if (
                 self.data.get("is_global_admin")
                 or cleaned_data.get("is_global_admin")
+                or self.data.get("is_superuser")
+                or cleaned_data.get("is_superuser")
+                or self.data.get("is_staff")
+                or cleaned_data.get("is_staff")
             ):
                 raise ValidationError(
                     _(
-                        "Solo un Administrador Global puede conceder privilegios de administración global."
+                        "Solo un superusuario global puede conceder privilegios administrativos o de superusuario."
                     )
                 )
+        else:
+            is_global = cleaned_data.get("is_global_admin", False)
+            if not is_global and self.data.get("is_superuser") in (
+                True,
+                "True",
+                "true",
+                "1",
+                "on",
+            ):
+                is_global = True
+            cleaned_data["is_global_admin"] = is_global
+            cleaned_data["is_superuser"] = is_global
+            cleaned_data["is_staff"] = is_global
         return cleaned_data
 
     def clean_username(self) -> str:

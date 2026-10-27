@@ -1706,14 +1706,11 @@ try:
 except admin.sites.NotRegistered:
     pass
 
-# Permitir acceso al admin tradicional exclusivamente a usuarios activos con rol de Administrador Global
+# Permitir acceso al admin tradicional tanto a Administradores Globales como a usuarios staff activos
 admin.site.has_permission = lambda request: bool(
-    request.user and request.user.is_active and is_global_admin(request.user)
-)
-
-# Permitir acceso al admin tradicional exclusivamente a usuarios activos con rol de Administrador Global
-admin.site.has_permission = lambda request: bool(
-    request.user and request.user.is_active and is_global_admin(request.user)
+    request.user
+    and request.user.is_active
+    and (request.user.is_staff or is_global_admin(request.user))
 )
 
 
