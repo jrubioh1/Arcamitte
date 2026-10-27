@@ -51,6 +51,17 @@ TIMING_ATTACK_PBKDF2_ITERATIONS: int = int(
     getattr(settings, "ARCAMITTE_TIMING_PBKDF2_ITERATIONS", 20_000)
 )
 
+
+def _simulate_timing_mitigation_hash(payload: bytes | str = b"timing_mitigation") -> None:
+    """Ejecuta una iteración PBKDF2 con sal criptográfica aleatoria para mitigar ataques de temporización."""
+    data = payload.encode("utf-8") if isinstance(payload, str) else payload
+    hashlib.pbkdf2_hmac(
+        "sha256",
+        data,
+        secrets.token_bytes(16),
+        TIMING_ATTACK_PBKDF2_ITERATIONS,
+    )
+
 _EMAIL_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
 
 
@@ -827,44 +838,24 @@ def request_document_access(
     clean_email = (email or "").strip().lower()
 
     if not HASH_REGEX.match(clean_hash):
-        hashlib.pbkdf2_hmac(
-            "sha256",
-            clean_email.encode("utf-8"),
-            secrets.token_bytes(16),
-            TIMING_ATTACK_PBKDF2_ITERATIONS,
-        )
+        _simulate_timing_mitigation_hash(clean_email)
         return True, GENERIC_ACCESS_MESSAGE
 
     try:
         normalized_email = validate_safe_email(clean_email)
     except ValidationError:
-        hashlib.pbkdf2_hmac(
-            "sha256",
-            b"invalid_email",
-            secrets.token_bytes(16),
-            TIMING_ATTACK_PBKDF2_ITERATIONS,
-        )
+        _simulate_timing_mitigation_hash(b"invalid_email")
         return True, GENERIC_ACCESS_MESSAGE
 
     document = EncryptedDocument.objects.filter(file_hash=clean_hash).first()
 
     if not document:
-        hashlib.pbkdf2_hmac(
-            "sha256",
-            normalized_email.encode("utf-8"),
-            secrets.token_bytes(16),
-            TIMING_ATTACK_PBKDF2_ITERATIONS,
-        )
+        _simulate_timing_mitigation_hash(normalized_email)
         return True, GENERIC_ACCESS_MESSAGE
 
     # Verificación de autorización previa (Mitigación de enumeración y fuga de metadatos)
     if not document.is_email_authorized(normalized_email):
-        hashlib.pbkdf2_hmac(
-            "sha256",
-            normalized_email.encode("utf-8"),
-            secrets.token_bytes(16),
-            TIMING_ATTACK_PBKDF2_ITERATIONS,
-        )
+        _simulate_timing_mitigation_hash(normalized_email)
         return True, GENERIC_ACCESS_MESSAGE
 
     # Verificación de caducidad del asiento (vencimiento de plazo)
@@ -1046,12 +1037,7 @@ def request_document_access(
         return True, GENERIC_ACCESS_MESSAGE
 
     # Correo no autorizado: PBKDF2 simulado y respuesta neutra
-    hashlib.pbkdf2_hmac(
-        "sha256",
-        normalized_email.encode("utf-8"),
-        secrets.token_bytes(16),
-        TIMING_ATTACK_PBKDF2_ITERATIONS,
-    )
+    _simulate_timing_mitigation_hash(normalized_email)
     return True, GENERIC_ACCESS_MESSAGE
 
 

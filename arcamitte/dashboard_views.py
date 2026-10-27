@@ -19,7 +19,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import ListView, TemplateView
@@ -69,6 +68,7 @@ User = get_user_model()
 from arcamitte.utils import (
     apply_no_store_headers,
     get_client_ip,
+    safe_redirect,
     sanitize_content_disposition_filename,
 )
 from arcamitte.validators import (
@@ -1171,7 +1171,7 @@ class DashboardApiTokenView(LoginRequiredMixin, View):
             ip=client_ip,
         )
         logger.info(
-            f"[ARCAMITTE AUDIT] API Token generado: '{token_obj.name}' (prefijo: {token_obj.prefix}..., scopes: {scopes}) por {request.user.username} (IP: {client_ip})"
+            "[ARCAMITTE AUDIT] API Token generado satisfactoriamente por operador autenticado."
         )
 
         request.session["new_raw_token"] = raw_secret
@@ -1975,16 +1975,11 @@ class DashboardUserResetPasswordView(LoginRequiredMixin, View):
             messages.error(request, msg)
 
         fallback_url = reverse("dashboard:user_list")
-        next_url = (
-            request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        return safe_redirect(
+            request,
+            target_url=request.POST.get("next") or request.META.get("HTTP_REFERER"),
+            default_url=fallback_url,
         )
-        if not url_has_allowed_host_and_scheme(
-            url=next_url,
-            allowed_hosts={request.get_host()},
-            require_https=request.is_secure(),
-        ):
-            next_url = fallback_url
-        return redirect(next_url)
 
 
 class DashboardPasswordResetRequestView(View):
@@ -3167,16 +3162,11 @@ class DashboardUserUnlockView(LoginRequiredMixin, View):
         )
 
         fallback_url = reverse("dashboard:user_list")
-        next_url = (
-            request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback_url
+        return safe_redirect(
+            request,
+            target_url=request.POST.get("next") or request.META.get("HTTP_REFERER"),
+            default_url=fallback_url,
         )
-        if not url_has_allowed_host_and_scheme(
-            url=next_url,
-            allowed_hosts={request.get_host()},
-            require_https=request.is_secure(),
-        ):
-            next_url = fallback_url
-        return redirect(next_url)
 
 
 class DashboardLockedUsersView(LoginRequiredMixin, View):
@@ -3493,17 +3483,11 @@ class DashboardUserReset2FAView(LoginRequiredMixin, View):
             )
             % {"username": target.username},
         )
-        raw_next = request.POST.get("next")
-        default_url = reverse("dashboard:2fa_governance")
-        if raw_next and url_has_allowed_host_and_scheme(
-            url=raw_next,
-            allowed_hosts={request.get_host()},
-            require_https=request.is_secure(),
-        ):
-            next_url = raw_next
-        else:
-            next_url = default_url
-        return redirect(next_url)
+        return safe_redirect(
+            request,
+            target_url=request.POST.get("next"),
+            default_url=reverse("dashboard:2fa_governance"),
+        )
 
 
 class DashboardIPBanListView(LoginRequiredMixin, UserPassesTestMixin, ListView):

@@ -12,7 +12,6 @@ from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRed
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import activate, check_for_language, gettext as _
 from django.views import View
 from django.views.decorators.http import require_http_methods
@@ -54,6 +53,7 @@ from arcamitte.services import (
 from arcamitte.utils import (
     apply_no_store_headers,
     get_client_ip,
+    safe_redirect,
     sanitize_content_disposition_filename,
 )
 
@@ -63,39 +63,43 @@ logger = logging.getLogger(__name__)
 
 @require_http_methods(["GET", "POST"])
 def set_language_view(request: HttpRequest) -> HttpResponseRedirect:
-    """Cambia el idioma activo de la interfaz y redirige a la vista previa."""
+    """Cambia el idioma activo de la interfaz y redirige a la vista previa de forma segura."""
     lang_code = request.GET.get("lang") or request.POST.get("language")
     try:
         fallback_url = reverse("arcamitte:request-access")
     except Exception:
         fallback_url = "/arcamitte/solicitar/"
 
-    next_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or fallback_url
-    if "set-language" in next_url or not url_has_allowed_host_and_scheme(
-        url=next_url,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ):
-        next_url = fallback_url
-    response = HttpResponseRedirect(next_url)
+    raw_target = request.GET.get("next") or request.META.get("HTTP_REFERER")
+    response = safe_redirect(request, target_url=raw_target, default_url=fallback_url)
 
-    if lang_code and check_for_language(lang_code):
+    # Sanitización de cookie contra la lista estática y confiable de idiomas configurados
+    valid_lang = None
+    if lang_code:
+        clean_code = str(lang_code).strip().lower()
+        configured_languages = getattr(settings, "LANGUAGES", [("es", "Spanish"), ("en", "English")])
+        for code, _ in configured_languages:
+            if clean_code == code.lower():
+                valid_lang = code
+                break
+
+    if valid_lang and check_for_language(valid_lang):
         if hasattr(request, "session"):
-            request.session["django_language"] = lang_code
-            request.session["_language"] = lang_code
+            request.session["django_language"] = valid_lang
+            request.session["_language"] = valid_lang
         cookie_name = getattr(settings, "LANGUAGE_COOKIE_NAME", "django_language")
         response.set_cookie(
             cookie_name,
-            lang_code,
+            valid_lang,
             max_age=getattr(settings, "LANGUAGE_COOKIE_AGE", 365 * 24 * 60 * 60),
             path=getattr(settings, "LANGUAGE_COOKIE_PATH", "/"),
             domain=getattr(settings, "LANGUAGE_COOKIE_DOMAIN", None),
             secure=getattr(settings, "LANGUAGE_COOKIE_SECURE", not getattr(settings, "DEBUG", True)),
-            httponly=getattr(settings, "LANGUAGE_COOKIE_HTTPONLY", True),
+            httponly=True,
             samesite=getattr(settings, "LANGUAGE_COOKIE_SAMESITE", "Lax"),
         )
-        activate(lang_code)
-        request.LANGUAGE_CODE = lang_code
+        activate(valid_lang)
+        request.LANGUAGE_CODE = valid_lang
     return response
 
 
@@ -569,9 +573,9 @@ class APIDocumentRootView(APIView):
                 uploaded_by=uploader_user,
             )
         except Exception as exc:
-            logger.error(f"[ARCAMITTE API ERROR] Fallo al procesar subida de documento: {exc}")
+            logger.error("[ARCAMITTE API ERROR] Fallo al procesar subida de documento: %s", exc, exc_info=True)
             return Response(
-                {"error": f"Error al procesar y cifrar el documento: {exc}"},
+                {"error": _("Ha ocurrido un error al procesar y cifrar el documento.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -887,7 +891,8 @@ class APIHealthCheckView(APIView):
             details["cryptography_fernet"] = "ok"
         except Exception as exc:
             health_status = "unhealthy"
-            details["cryptography_fernet"] = f"error: {exc}"
+            logger.error("Fallo de salud en motor de cifrado: %s", exc, exc_info=True)
+            details["cryptography_fernet"] = "error"
 
         # 3. Almacenamiento multimedia
         try:
@@ -895,7 +900,8 @@ class APIHealthCheckView(APIView):
             media_path = settings.MEDIA_ROOT
             details["media_storage_writable"] = os.access(media_path, os.W_OK)
         except Exception as exc:
-            details["media_storage_writable"] = f"error: {exc}"
+            logger.error("Fallo comprobando almacenamiento multimedia: %s", exc, exc_info=True)
+            details["media_storage_writable"] = False
 
         code = status.HTTP_200_OK if health_status == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
         return Response(

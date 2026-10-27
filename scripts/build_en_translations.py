@@ -776,6 +776,15 @@ def unescape_po_string(val: str) -> str:
     return val.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
 
 
+def _ensure_safe_repo_path(path: Path) -> Path:
+    """Verifica de forma canónica que la ruta resida dentro del repositorio (Anti-Path Traversal CWE-22)."""
+    repo_root = Path(__file__).resolve().parent.parent
+    resolved = path.resolve()
+    if not resolved.is_relative_to(repo_root):
+        raise ValueError(f"Path traversal detected: {path}")
+    return resolved
+
+
 def update_po_file(po_path: Path, code_msgids: set[str], lang: str) -> tuple[int, int]:
     """
     Updates a .po file in-place:
@@ -783,10 +792,7 @@ def update_po_file(po_path: Path, code_msgids: set[str], lang: str) -> tuple[int
     - Fills empty or fuzzy msgstr values (using TRANSLATIONS for 'en', or identity for 'es')
     - Appends any missing msgids from code_msgids
     """
-    repo_root = Path(__file__).resolve().parent.parent
-    po_path = po_path.resolve()
-    if not po_path.is_relative_to(repo_root):
-        raise ValueError(f"Path traversal detected: {po_path}")
+    po_path = _ensure_safe_repo_path(po_path)
 
     content = po_path.read_text(encoding="utf-8")
     blocks = content.split("\n\n")
@@ -890,11 +896,8 @@ def compile_mo_file(po_path: Path, mo_path: Path) -> int:
     Pure-Python GNU gettext .mo binary compiler.
     Reads a UTF-8 .po file and writes a valid little-endian .mo binary file.
     """
-    repo_root = Path(__file__).resolve().parent.parent
-    po_path = po_path.resolve()
-    mo_path = mo_path.resolve()
-    if not po_path.is_relative_to(repo_root) or not mo_path.is_relative_to(repo_root):
-        raise ValueError(f"Path traversal detected: {po_path} or {mo_path}")
+    po_path = _ensure_safe_repo_path(po_path)
+    mo_path = _ensure_safe_repo_path(mo_path)
 
     content = po_path.read_text(encoding="utf-8")
     blocks = content.split("\n\n")

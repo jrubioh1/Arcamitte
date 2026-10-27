@@ -1291,13 +1291,13 @@ class APIToken(models.Model):
         Retorna la tupla (instancia_en_bd, raw_secret_token).
         El token en texto claro se debe mostrar una sola vez al usuario.
         """
-        import hashlib
         import secrets
+        from arcamitte.utils import hash_api_token
 
         secret_entropy = secrets.token_urlsafe(32)
         raw_token = f"arca_live_{secret_entropy}"
         prefix = raw_token[:14]
-        hashed = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        hashed = hash_api_token(raw_token)
 
         effective_scopes = scopes or [
             cls.Scope.DOCUMENTS_CREATE,

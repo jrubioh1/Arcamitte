@@ -6541,3 +6541,22 @@ msgstr "Rol de miembro en la UO"
 
 msgid "Token API generado"
 msgstr "Token API generado"
+
+
+msgid "El archivo proporcionado no es válido o su formato/contenido no está permitido."
+msgstr "El archivo proporcionado no es válido o su formato/contenido no está permitido."
+
+msgid "El correo electrónico introducido no es válido o no cumple los requisitos corporativos."
+msgstr "El correo electrónico introducido no es válido o no cumple los requisitos corporativos."
+
+msgid "Error al validar el correo electrónico."
+msgstr "Error al validar el correo electrónico."
+
+msgid "Ha ocurrido un error al procesar y cifrar el documento."
+msgstr "Ha ocurrido un error al procesar y cifrar el documento."
+
+msgid "La lista de correos electrónicos autorizados no es válida o contiene formatos erróneos."
+msgstr "La lista de correos electrónicos autorizados no es válida o contiene formatos erróneos."
+
+msgid "La lista de correos electrónicos no es válida o contiene formatos erróneos."
+msgstr "La lista de correos electrónicos no es válida o contiene formatos erróneos."

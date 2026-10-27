@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 from typing import Any, Optional, Tuple
 
@@ -11,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import authentication, exceptions
 
 from arcamitte.models import APIToken
-from arcamitte.utils import get_client_ip
+from arcamitte.utils import get_client_ip, hash_api_token
 
 
 class APITokenAuthentication(authentication.BaseAuthentication):
@@ -42,7 +41,8 @@ class APITokenAuthentication(authentication.BaseAuthentication):
                 code="invalid_token_format",
             )
 
-        token_hash = hashlib.sha256(clean_token.encode("utf-8")).hexdigest()
+        # CodeQL [py/weak-cryptographic-hash] API tokens are 256-bit cryptographically secure random entropy (secrets.token_urlsafe).
+        token_hash = hash_api_token(clean_token)
 
         try:
             token = (

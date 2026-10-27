@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, List, Optional
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -15,14 +16,15 @@ from arcamitte.validators import (
     validate_safe_email,
 )
 
+logger = logging.getLogger(__name__)
+
 HASH_REGEX = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
-def _format_error_message(exc: Exception) -> str:
-    """Extrae un mensaje de error limpio sin envoltorios de listas o comillas."""
-    if hasattr(exc, "messages") and exc.messages:
-        return str(exc.messages[0])
-    return str(exc).strip("[]'\"")
+def _handle_validation_error(exc: Exception, user_message: str, field_name: str = "") -> None:
+    """Registra internamente la excepción y lanza ValidationError con mensaje seguro (Anti-Information Exposure)."""
+    logger.warning("Fallo de validación en campo '%s': %s", field_name, exc)
+    raise serializers.ValidationError(user_message)
 
 
 @extend_schema_field(serializers.ListField(child=serializers.EmailField()))
@@ -38,7 +40,11 @@ class EmailListField(serializers.Field):
         try:
             return normalize_and_validate_email_list(data)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(_format_error_message(exc))
+            _handle_validation_error(
+                exc,
+                _("La lista de correos electrónicos no es válida o contiene formatos erróneos."),
+                "allowed_emails",
+            )
 
     def to_representation(self, value: Any) -> list[str]:
         if isinstance(value, list):
@@ -82,9 +88,14 @@ class PublicAccessRequestSerializer(serializers.Serializer):
         try:
             return validate_safe_email(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(_format_error_message(exc))
+            _handle_validation_error(
+                exc,
+                _("El correo electrónico introducido no es válido o no cumple los requisitos corporativos."),
+                "email",
+            )
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.error("Error inesperado validando email: %s", exc, exc_info=True)
+            raise serializers.ValidationError(_("Error al validar el correo electrónico."))
 
 
 class PublicConsumeSerializer(serializers.Serializer):
@@ -122,9 +133,14 @@ class PublicConsumeSerializer(serializers.Serializer):
         try:
             return validate_safe_email(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(_format_error_message(exc))
+            _handle_validation_error(
+                exc,
+                _("El correo electrónico introducido no es válido o no cumple los requisitos corporativos."),
+                "email",
+            )
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.error("Error inesperado validando email: %s", exc, exc_info=True)
+            raise serializers.ValidationError(_("Error al validar el correo electrónico."))
 
     def validate_otp_code(self, value: str) -> str:
         clean = (value or "").strip()
@@ -190,13 +206,21 @@ class APIDocumentUploadSerializer(serializers.Serializer):
         try:
             return validate_document_file(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(_format_error_message(exc))
+            _handle_validation_error(
+                exc,
+                _("El archivo proporcionado no es válido o su formato/contenido no está permitido."),
+                "original_file",
+            )
 
     def validate_allowed_emails(self, value: Any) -> List[str]:
         try:
             return normalize_and_validate_email_list(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(_format_error_message(exc))
+            _handle_validation_error(
+                exc,
+                _("La lista de correos electrónicos autorizados no es válida o contiene formatos erróneos."),
+                "allowed_emails",
+            )
 
     def validate_expires_at(self, value: Optional[Any]) -> Optional[Any]:
         if value and value <= timezone.now():
