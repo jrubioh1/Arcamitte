@@ -6579,3 +6579,4 @@ msgstr "Ocurrió un error inesperado al procesar el archivo: %(error)s"
 
 msgid "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
 msgstr "Seleccione un archivo con extensión .json estructurado conforme al esquema oficial (organizational_units y users)."
+
