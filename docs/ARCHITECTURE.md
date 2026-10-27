@@ -51,10 +51,13 @@ Arcamitte está concebido como un microservicio autónomo y desacoplado estructu
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                 CAPA DE SERVICIOS CRIPTOGRÁFICOS Y NEGOCIO             │
 │                                                                        │
-│  [ arcamitte.services ]                                                │
+│  [ arcamitte.services / timestamping / totp / security_utils ]         │
 │    • Envelope Encryption (DEK + ARCAMITTE_FERNET_KEY)                  │
 │    • NIST SP 800-88 File Sanitization (os.urandom shredder)           │
-│    • Anti-Timing PBKDF2 Dummy Compute Engine                           │
+│    • Anti-Timing PBKDF2 Dummy Compute Engine (random salt secrets)     │
+│    • RFC 3161 Qualified Timestamping Engine (ASN.1 DER)                │
+│    • Native TOTP 2FA Engine (RFC 6238 HMAC-SHA256)                     │
+│    • Centralized Anti-Open Redirect & Anti-Traversal Controls          │
 │    • OTP Lifecycle & Burn Policy Coordinator                           │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
@@ -64,6 +67,7 @@ Arcamitte está concebido como un microservicio autónomo y desacoplado estructu
 │  [ UO Mesh Multi-Tenant ]      [ Metadatos & DEK ]   [ Audit Engine ]  │
 │    OrganizationalUnit           EncryptedDocument     DocumentAccessLog│
 │    UserUOMembership                                  (WORM inmutable)  │
+│                                                       AuditExportReceipt│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -181,12 +185,13 @@ Para integraciones automatizadas (sistemas de RRHH, gestores documentales, ERPs)
 Si un atacante realiza peticiones concurrentes contra el endpoint de solicitud (`/arcamitte/solicitar/`) variando el hash SHA-256, podría deducir qué documentos existen midiendo diferencias de tiempo entre una respuesta fallida inmediata y una búsqueda exitosa que procesa destinatarios.
 
 Para neutralizar este vector:
-1. Cuando el hash no existe o el correo no coincide, el servicio ejecuta de forma síncrona una rutina sintética de PBKDF2:
+1. Cuando el hash no existe o el correo no coincide, el servicio ejecuta de forma síncrona una rutina sintética de PBKDF2 con sal aleatoria generada criptográficamente (CSPRNG):
    ```python
+   random_salt = secrets.token_bytes(16)
    hashlib.pbkdf2_hmac(
        "sha256",
        email.encode("utf-8"),
-       file_hash.encode("utf-8"),
+       random_salt,
        iterations=TIMING_ATTACK_PBKDF2_ITERATIONS,  # 20,000 iteraciones
    )
    ```

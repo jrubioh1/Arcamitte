@@ -273,7 +273,7 @@ curl -X GET http://127.0.0.1:8000/api/v1/documents/c5f590b2b80041d8e1f5f3e9c68c3
 
 ## 10. Verificación de Seguridad y Pruebas Unitarias
 
-La suite de pruebas incluye **174 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, autenticación multifactor 2FA (TOTP), control de secuestro de sesiones (Session Hijacking), rotación dinámica de claves maestras y telemetría SIEM:
+La suite de pruebas incluye **210 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, autenticación multifactor 2FA (TOTP con HMAC-SHA256), control de secuestro de sesiones (Session Hijacking), rotación dinámica de claves maestras y telemetría SIEM:
 
 ```bash
 poetry run pytest -v
@@ -281,7 +281,7 @@ poetry run pytest -v
 
 Resultado verificado:
 ```text
-============================= 174 passed in 56.87s =============================
+============================= 210 passed in 71.40s =============================
 ```
 
 ### Casos de Prueba Avanzados y Escenarios de Abuso (Adversarial Testing)
@@ -316,7 +316,7 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
   - `op.seg.4`: Detección perimetral y baneo en lista negra de IPs atacantes, enlace de sesión a IP de origen (Anti-Hijacking).
   - `op.sec.4`: Soporte de rotación periódica de claves de cifrado en reposo (MultiFernet).
 - **NIST SP 800-88 Rev. 1 (Media Sanitization):** Sobrescritura aleatoria de almacenamiento físico previa desvinculación de inodo.
-- **NIST SP 800-63B (Digital Identity Guidelines - AAL2):** Verificación en dos pasos (TOTP con HMAC-SHA1 y secreto de 160 bits), contraseñas robustas y caducidad temporal.
+- **NIST SP 800-63B (Digital Identity Guidelines - AAL2):** Verificación en dos pasos (TOTP con HMAC-SHA256 y secreto de 160 bits), contraseñas robustas y caducidad temporal.
 - **NIST SP 800-57 Part 1 Rev. 5 (Key Management):** Rotación de claves maestras criptográficas y separación de claves de cifrado de datos (DEK) y claves de cifrado de claves (KEK).
 - **NIST SP 800-53 Rev. 5:**
   - `AC-7`: Bloqueo automático de cuentas ante intentos no exitosos y alertas de seguridad.
@@ -335,6 +335,7 @@ El código y las dependencias han sido sometidos a auditoría de seguridad exhau
 ## 12. Documentación Técnica Detallada
 
 Para consultar la documentación completa de cada subsistema:
+- [Documentación Técnica y de Arquitectura Completa del MVP](docs/DOCUMENTACION_TECNICA_ARQUITECTURA_MVP.md)
 - [Guía de Arquitectura Criptográfica](docs/ARCHITECTURE.md)
 - [Referencia Completa de la API REST](docs/API_REFERENCE.md)
 - [Manual de Administración y Operaciones](docs/ADMIN_GUIDE.md)

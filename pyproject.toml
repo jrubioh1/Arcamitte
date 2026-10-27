@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "arcamitte"
-version = "2.0.0"
+version = "1.0.0"
 description = "Arcamitte - Microservicio Autónomo de Custodia Criptográfica y Trámite Confidencial"
 authors = ["Jorge <jrubioh@pm.me>"]
 license = "GPL-3.0-or-later"
