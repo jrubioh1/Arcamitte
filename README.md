@@ -138,9 +138,9 @@ Arcamitte proporciona tres interfaces diseñadas para distintos propósitos oper
 - **Python:** 3.12, 3.13 o 3.14
 - **Gestor de Paquetes:** [Poetry](https://python-poetry.org/) (o `pip`)
 - **Librerías Criptográficas y Web:**
-  - `django >= 5.1`
-  - `djangorestframework >= 3.15`
-  - `cryptography >= 43.0`
+  - `django >= 5.2.19`
+  - `djangorestframework >= 3.18.3`
+  - `cryptography >= 50.0.2`
   - `pypdf >= 7.0.0`
   - `python-magic >= 0.4.27`
   - `pillow >= 10.4.0`
@@ -301,7 +301,7 @@ La batería de tests incluye pruebas específicas contra vectores de ataque y es
 
 ### Controles de Seguridad Verificados (SAST & SCA)
 El código y las dependencias han sido sometidos a auditoría de seguridad exhaustiva:
-- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 44.0.1`, `djangorestframework >= 3.18.2`, `pypdf >= 7.0.0` [CVE-2026-119204 y GHSA mitigados], `segno >= 1.6.6`).
+- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 50.0.2`, `djangorestframework >= 3.18.3`, `pypdf >= 7.0.0` [CVE-2026-119204 y GHSA mitigados], `segno >= 1.6.6`).
 - **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 13.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
 - **SAST OWASP (Semgrep OSS):** 0 hallazgos bloqueantes sobre 456 reglas activas (OWASP Top 10, CWE, inyecciones y CSRF).
 - **Subresource Integrity (SRI):** Atributos `integrity="sha384-..."` y `crossorigin="anonymous"` obligatorios en todos los recursos externos CDN.
