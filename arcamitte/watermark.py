@@ -1,26 +1,31 @@
 """
-Módulo de Estampado y Marca de Agua Forense Dinámica (Dynamic Forensic PDF Watermarking).
+Módulo de Estampado y Marca de Agua Forense en Metadatos (Forensic Metadata PDF Watermarking).
 
 Cumplimiento Normativo y Estándares:
 - ENS (Esquema Nacional de Seguridad) - Nivel ALTO: Trazabilidad, integridad y prevención de fugas de información.
-- NIST SP 800-53 Rev. 5 (AC-21 Information Sharing, AU-10 Non-repudiation).
-- ISO/IEC 27001:2022 - Control A.8.12 (Data Leakage Prevention).
+- NIST SP 800-53 Rev. 5: AC-21 (Information Sharing), AU-10 (Non-repudiation).
+- ISO/IEC 27001:2022: Control A.8.12 (Data Leakage Prevention).
 
-Permite inyectar de forma transparente e indelible la identidad del destinatario,
+Inyecta de forma no intrusiva e indeleble la identidad del destinatario,
 dirección IP de consulta, marca temporal exacta (UTC) y huella criptográfica del
-documento en cada página de un archivo PDF antes de su descarga o visualización.
+documento en los metadatos del PDF (/Info dictionary) antes de su entrega o descarga,
+manteniendo las páginas del documento 100% limpias e intactas visualmente.
 """
 
 from __future__ import annotations
 
 import io
 import logging
-from typing import Optional
+from typing import Any, Optional
+
 from django.conf import settings
 from django.utils import timezone
 import pypdf
 
 logger = logging.getLogger("arcamitte.security")
+
+# Límite defensivo anti-DoS contra bombas de descompresión de páginas en PDFs
+MAX_PDF_PAGES_TO_WATERMARK: int = 1000
 
 
 class WatermarkError(Exception):
@@ -30,11 +35,7 @@ class WatermarkError(Exception):
 
 
 def _escape_pdf_text(text: str) -> str:
-    """
-    Escapa caracteres especiales en cadenas de texto para flujos de operadores PDF (Tj).
-    Sustituye barras invertidas y paréntesis no balanceados.
-    """
-    # Limitar a caracteres imprimibles Latin-1 / ASCII para tipografía estándar Type1
+    """Escapa caracteres especiales en cadenas de texto para flujos de operadores PDF (Tj)."""
     sanitized = text.encode("ascii", "replace").decode("ascii")
     return sanitized.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
@@ -46,49 +47,36 @@ def _build_watermark_page_bytes(
     opacity: float = 0.18,
 ) -> bytes:
     """
-    Genera un documento PDF de una sola página en memoria con texto oblicuo semitransparente
-    construido bajo especificación ISO 32000-1 (PDF 1.4+).
-    No depende de ReportLab ni librerías pesadas en C/C++.
+    Genera un documento PDF de una página en memoria con operadores gráficos estándar.
+    Mantenido como utilidad para pruebas y compatibilidad.
     """
     header = b"%PDF-1.4\n"
-    objs: list[bytes] = []
-
-    # Objeto 1: Catalog
-    objs.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-    # Objeto 2: Pages
-    objs.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
-
-    # Construcción de operadores del flujo gráfico
-    stream_lines = [
-        "q",
-        "/GS1 gs",
-        "0.35 0.35 0.35 rg",  # Gris oscuro atenuado
-        "BT",
-        "/F1 14 Tf",
+    objs: list[bytes] = [
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
     ]
 
-    # Calcular posiciones repetitivas diagonales (45 grados) a lo largo del plano
-    # Matriz de rotación a 45 grados: cos(45)=0.7071, sin(45)=0.7071, -sin(45)=-0.7071, cos(45)=0.7071
-    # Colocar 2 o 3 bloques escalonados según el tamaño de la página
-    offsets_y = [height * 0.25, height * 0.60] if height < 600 else [height * 0.20, height * 0.50, height * 0.80]
+    stream_lines = ["q", "/GS1 gs", "0.35 0.35 0.35 rg", "BT", "/F1 14 Tf"]
+    offsets_y = (
+        [height * 0.25, height * 0.60]
+        if height < 600
+        else [height * 0.20, height * 0.50, height * 0.80]
+    )
 
     for y_pos in offsets_y:
         x_pos = width * 0.15
-        stream_lines.append(f"0.7071 0.7071 -0.7071 0.7071 {x_pos:.2f} {y_pos:.2f} cm")
+        stream_lines.append(
+            f"0.7071 0.7071 -0.7071 0.7071 {x_pos:.2f} {y_pos:.2f} cm"
+        )
         for idx, line in enumerate(lines):
             safe = _escape_pdf_text(line)
-            if idx == 0:
-                stream_lines.append(f"({safe}) Tj")
-            else:
-                stream_lines.append("0 -20 Td")
-                stream_lines.append(f"({safe}) Tj")
-        # Resetear matriz de transformación
+            cmd = f"({safe}) Tj" if idx == 0 else f"0 -20 Td\n({safe}) Tj"
+            stream_lines.append(cmd)
         stream_lines.append("1 0 0 1 0 0 cm")
 
     stream_lines.extend(["ET", "Q\n"])
     stream_content = "\n".join(stream_lines).encode("latin-1")
 
-    # Objeto 3: Page con ExtGState para opacidad/transparencia y fuente Helvetica-Bold
     page_def = (
         f"3 0 obj\n<<\n  /Type /Page\n  /Parent 2 0 R\n"
         f"  /MediaBox [0 0 {width:.2f} {height:.2f}]\n"
@@ -101,7 +89,6 @@ def _build_watermark_page_bytes(
     ).encode("latin-1")
     objs.append(page_def)
 
-    # Objeto 4: Flujo de contenido
     stream_obj = (
         f"4 0 obj\n<< /Length {len(stream_content)} >>\nstream\n".encode("latin-1")
         + stream_content
@@ -109,7 +96,6 @@ def _build_watermark_page_bytes(
     )
     objs.append(stream_obj)
 
-    # Cálculo exacto de desplazamientos (XREF Table)
     body = bytearray(header)
     offsets: list[int] = [0]
     for obj in objs:
@@ -128,6 +114,32 @@ def _build_watermark_page_bytes(
     return bytes(body + b"".join(xref) + trailer)
 
 
+def _prepare_forensic_metadata(
+    existing_meta: dict[str, Any],
+    recipient_email: str,
+    client_ip: str,
+    timestamp_str: str,
+    doc_hash: Optional[str] = None,
+) -> dict[str, str]:
+    """Construye el diccionario de metadatos forenses preservando las claves previas."""
+    clean_meta: dict[str, str] = {}
+    for key, value in existing_meta.items():
+        if isinstance(key, str) and not key.startswith("/Arcamitte"):
+            clean_meta[key] = str(value)
+
+    clean_meta.update(
+        {
+            "/Producer": "Arcamitte Cryptographic Microservice",
+            "/ArcamitteAuditTrail": "ARCAMITTE AUDIT TRAIL - COPIA CONTROLADA",
+            "/ArcamitteRecipient": recipient_email.strip().lower(),
+            "/ArcamitteClientIP": client_ip,
+            "/ArcamitteTimestamp": timestamp_str,
+            "/ArcamitteDocHash": doc_hash or "",
+        }
+    )
+    return clean_meta
+
+
 def apply_pdf_watermark(
     pdf_content: bytes,
     recipient_email: str,
@@ -135,78 +147,82 @@ def apply_pdf_watermark(
     timestamp_str: Optional[str] = None,
     doc_hash: Optional[str] = None,
     opacity: Optional[float] = None,
+    **kwargs: Any,
 ) -> bytes:
     """
-    Aplica una marca de agua forense oblicua y semitransparente a todas las páginas de un PDF.
+    Aplica la marca de agua forense exclusivamente en los metadatos del archivo PDF.
+    Las páginas del documento se transfieren intactas para preservar la legibilidad visual 100%.
 
     Parámetros:
     - pdf_content: Bytes binarios del archivo PDF original descifrado.
     - recipient_email: Correo electrónico o identificador del usuario que retira el documento.
     - client_ip: Dirección IP del solicitante.
     - timestamp_str: Marca temporal legible (si es None, toma la hora UTC actual).
-    - doc_hash: Hash SHA-256 del documento original (para traza forense).
-    - opacity: Nivel de opacidad alfa (0.0 a 1.0). Si es None, utiliza settings.ARCAMITTE_WATERMARK_OPACITY.
+    - doc_hash: Hash SHA-256 del documento original (para trazabilidad forense).
+    - opacity: Ignorado por diseño (mantenido por compatibilidad de firma).
 
     Retorna:
-    - Bytes binarios del archivo PDF resultante con la marca de agua forense integrada.
+    - Bytes binarios del archivo PDF con los metadatos forenses inyectados de forma invisible.
     """
     if not pdf_content:
         raise WatermarkError("El contenido del PDF a marcar está vacío.")
 
-    if opacity is None:
-        opacity = getattr(settings, "ARCAMITTE_WATERMARK_OPACITY", 0.18)
-
-    if not timestamp_str:
-        timestamp_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-
-    hash_preview = f"ID: {doc_hash[:16]}..." if doc_hash else "ID: N/A"
-
-    lines = [
-        "ARCAMITTE AUDIT TRAIL - COPIA CONTROLADA",
-        f"DESTINATARIO: {recipient_email.strip().lower()}",
-        f"IP: {client_ip} | FECHA: {timestamp_str}",
-        f"HUELLA: {hash_preview}",
-    ]
+    effective_timestamp = timestamp_str or timezone.now().strftime(
+        "%Y-%m-%d %H:%M:%S UTC"
+    )
 
     try:
         reader = pypdf.PdfReader(io.BytesIO(pdf_content))
     except Exception as exc:
-        raise WatermarkError(f"Error al analizar estructura del archivo PDF original: {exc}") from exc
+        raise WatermarkError(
+            f"Error al analizar estructura del archivo PDF original: {exc}"
+        ) from exc
 
-    if len(reader.pages) == 0:
+    total_pages = len(reader.pages)
+    if total_pages == 0:
         raise WatermarkError("El archivo PDF no contiene ninguna página procesable.")
 
-    writer = pypdf.PdfWriter()
+    if total_pages > MAX_PDF_PAGES_TO_WATERMARK:
+        raise WatermarkError(
+            f"El documento PDF excede el número máximo permitido de páginas ({total_pages} > {MAX_PDF_PAGES_TO_WATERMARK})."
+        )
 
-    for idx, page in enumerate(reader.pages):
-        try:
-            mb = page.mediabox
-            width = float(mb.width)
-            height = float(mb.height)
+    try:
+        writer = pypdf.PdfWriter()
 
-            # Generar capa de marca de agua con dimensiones exactas de la página
-            wm_pdf_bytes = _build_watermark_page_bytes(
-                width=width,
-                height=height,
-                lines=lines,
-                opacity=opacity,
-            )
-            wm_reader = pypdf.PdfReader(io.BytesIO(wm_pdf_bytes))
-            wm_page = wm_reader.pages[0]
+        # Transferencia directa de páginas sin alterar el contenido visual
+        for page in reader.pages:
+            writer.add_page(page)
 
-            # Agregar la página al writer y fusionar la capa de marca de agua
-            added_page = writer.add_page(page)
-            added_page.merge_page(wm_page)
-        except Exception as exc:
-            logger.error(f"[WATERMARK] Fallo al estampar página #{idx + 1}: {exc}")
-            raise WatermarkError(f"Fallo al estampar página #{idx + 1}: {exc}") from exc
+        existing_meta = dict(reader.metadata or {})
+        forensic_meta = _prepare_forensic_metadata(
+            existing_meta=existing_meta,
+            recipient_email=recipient_email,
+            client_ip=client_ip,
+            timestamp_str=effective_timestamp,
+            doc_hash=doc_hash,
+        )
+        writer.add_metadata(forensic_meta)
 
-    output_stream = io.BytesIO()
-    writer.write(output_stream)
-    watermarked_bytes = output_stream.getvalue()
+        output_stream = io.BytesIO()
+        writer.write(output_stream)
+        watermarked_bytes = output_stream.getvalue()
 
-    logger.info(
-        f"[WATERMARK] Marca forense aplicada con éxito a PDF ({len(watermarked_bytes)} bytes, "
-        f"{len(reader.pages)} págs) para {recipient_email} desde {client_ip}."
-    )
-    return watermarked_bytes
+        logger.info(
+            f"[WATERMARK] Marca forense en metadatos aplicada con éxito ({len(watermarked_bytes)} bytes, "
+            f"{total_pages} págs) para {recipient_email} desde {client_ip}."
+        )
+        return watermarked_bytes
+
+    except (MemoryError, RecursionError) as exc:
+        logger.error(f"[WATERMARK] Anomalía de recursos al procesar PDF: {exc}")
+        raise WatermarkError(
+            f"Fallo de recursos al procesar metadatos del PDF: {exc}"
+        ) from exc
+    except Exception as exc:
+        if isinstance(exc, WatermarkError):
+            raise
+        logger.error(f"[WATERMARK] Fallo al inyectar metadatos forenses: {exc}")
+        raise WatermarkError(
+            f"Fallo al inyectar metadatos forenses: {exc}"
+        ) from exc

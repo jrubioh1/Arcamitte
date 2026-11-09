@@ -16,6 +16,7 @@
 7. [Defensa Perimetral: Bloqueo de Cuentas y Baneo de IPs](file:///home/jorge/GitHubRepositories/Arcamitte/docs/SECURITY_CONFIG_GUIDE.md#7-defensa-perimetral-bloqueo-de-cuentas-y-baneo-de-ips)
 8. [Conector SIEM / Webhooks en Tiempo Real](file:///home/jorge/GitHubRepositories/Arcamitte/docs/SECURITY_CONFIG_GUIDE.md#8-conector-siem--webhooks-en-tiempo-real)
 9. [Destrucción Física de Archivos (NIST SP 800-88)](file:///home/jorge/GitHubRepositories/Arcamitte/docs/SECURITY_CONFIG_GUIDE.md#9-destrucci%C3%B3n-f%C3%ADsica-de-archivos-nist-sp-800-88)
+10. [Marcas de Agua Forenses en Metadatos: Trazabilidad Legal sin Alteración Visual](file:///home/jorge/GitHubRepositories/Arcamitte/docs/SECURITY_CONFIG_GUIDE.md#10-marcas-de-agua-forenses-en-metadatos-trazabilidad-legal-sin-alteraci%C3%B3n-visual)
 
 ---
 
@@ -289,6 +290,14 @@ timing_pbkdf2_iterations = 20000
 # trust_x_forwarded_for: Solo poner a 'true' si Arcamitte está detrás de un proxy inverso confiable (Nginx/Traefik).
 # Evita que un atacante falsee su IP mediante la cabecera X-Forwarded-For (CWE-348).
 trust_x_forwarded_for = false
+
+# ------------------------------------------------------------------------------
+# 8. MARCA DE AGUA FORENSE EN METADATOS DE PDF (ENS ALTO / NIST SP 800-53 AU-10)
+# ------------------------------------------------------------------------------
+# watermark_enabled: Si es true, inyecta metadatos forenses invisibles (/Info)
+# en cada entrega de PDF (destinatario, IP, marca temporal UTC y hash documental).
+# Las páginas visuales se mantienen 100% limpias e intactas para garantizar la legibilidad.
+watermark_enabled = true
 ```
 
 ---
@@ -429,3 +438,50 @@ Cuando un documento se consume (política *Burn-After-Read*) o vence su fecha de
 4. Solo tras confirmar la sobrescritura física, desvincula el inodo del sistema de archivos (`unlink`).
 
 Cualquier intento posterior de recuperación forense solo encontrará ruido blanco criptográfico irrecuperable.
+
+---
+
+## 10. Marcas de Agua Forenses en Metadatos: Trazabilidad Legal sin Alteración Visual
+
+### ¿Por qué Arcamitte inyecta la marca de agua en metadatos y no sobre las páginas?
+En muchas pasarelas tradicionales, las marcas de agua se imprimen como texto semitransparente oblicuo sobre cada página del documento. Aunque esto es visual, introduce dos graves problemas:
+1. **Deterioro de la legibilidad:** El texto superpuesto puede tapar cláusulas contractuales, números de cuentas, importes económicos, sellos oficiales o firmas digitales, dificultando la lectura normal.
+2. **Impacto en recursos y vulnerabilidades de parsing:** Superponer texto en cada página (`merge_page`) obliga a reescribir y aplanar el árbol de páginas y recursos gráficos de todo el PDF.
+
+Por diseño estricto (**"siempre en metadatos"**), Arcamitte resuelve ambos dilemas:
+* **Páginas 100% limpias e intactas:** El documento visual se entrega exactamente como fue emitido por su autor.
+* **Trazabilidad forense inalterable:** Toda la cadena de custodia legal se incrusta en el diccionario de metadatos oficial (`/Info` dictionary) del estándar PDF (ISO 32000-1).
+
+### Diccionario Forense Inyectado en el PDF
+
+Cada vez que un destinatario canjea un documento con su código OTP o un auditor autorizado realiza una descarga pericial, el módulo [`arcamitte.watermark`](file:///home/jorge/GitHubRepositories/Arcamitte/arcamitte/watermark.py) inyecta de forma indeleble:
+
+| Clave de Metadatos | Descripción y Propósito Legal | Ejemplo de Valor |
+| :--- | :--- | :--- |
+| `/ArcamitteAuditTrail` | Declaración formal de custodia y copia controlada. | `ARCAMITTE AUDIT TRAIL - COPIA CONTROLADA` |
+| `/ArcamitteRecipient` | Correo electrónico corporativo o identificador oficial del receptor. | `director.financiero@empresa.com` |
+| `/ArcamitteClientIP` | Dirección IP desde la que se solicitó y completó la descarga. | `192.168.1.50` |
+| `/ArcamitteTimestamp` | Marca temporal universal exacta (UTC) del canje o inspección. | `2026-11-09 19:12:00 UTC` |
+| `/ArcamitteDocHash` | Hash criptográfico SHA-256 del documento confidencial original. | `c5f590b2b80041d8e1f5f3e9c68c34f...` |
+| `/Producer` | Firma institucional del microservicio generador. | `Arcamitte Cryptographic Microservice` |
+
+### ¿Cómo puede un perito o auditor verificar esta información?
+Cualquier auditor, perito judicial o administrador puede constatar la trazabilidad del archivo descargado mediante herramientas estándar:
+* **Desde terminal con `pdfinfo`:**
+  ```bash
+  pdfinfo -meta documento_descargado.pdf
+  ```
+* **Desde Adobe Acrobat Reader o visores PDF estándar:**
+  Menú *Archivo* &rarr; *Propiedades* &rarr; pestaña *Descripción / Avanzadas*.
+* **Programáticamente desde Python con `pypdf`:**
+  ```python
+  import pypdf
+  reader = pypdf.PdfReader("documento_descargado.pdf")
+  print("Destinatario :", reader.metadata.get("/ArcamitteRecipient"))
+  print("IP Descarga  :", reader.metadata.get("/ArcamitteClientIP"))
+  print("Fecha UTC    :", reader.metadata.get("/ArcamitteTimestamp"))
+  print("Hash SHA-256 :", reader.metadata.get("/ArcamitteDocHash"))
+  ```
+
+### Protección Defensiva Anti-DoS (*Defense in Depth*)
+Para prevenir ataques de denegación de servicio por agotamiento de recursos o descompresión maliciosa (*PDF Bombs*), el módulo incorpora un límite duro de páginas (`MAX_PDF_PAGES_TO_WATERMARK = 1000`) y captura defensiva de `MemoryError` y `RecursionError`. Si un documento supera este umbral, el sistema rechaza el procesamiento con un error controlado protegiendo la disponibilidad del microservicio.

@@ -66,9 +66,8 @@ session_ip_binding = true
 siem_webhook_url = 
 siem_webhook_token = 
 siem_webhook_events = ip_ban,user_lockout,log_tamper,audit_export,master_key_rotated,malware_detected
-# Marca de Agua Forense Dinámica en Descargas PDF
+# Marca de Agua Forense en Metadatos de Descargas PDF (Invisibles en lectura)
 watermark_enabled = true
-watermark_opacity = 0.18
 
 [antivirus]
 # Motor Antivirus ClamAV en Memoria (Protocolo zINSTREAM)

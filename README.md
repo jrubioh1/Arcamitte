@@ -141,6 +141,7 @@ Arcamitte proporciona tres interfaces diseñadas para distintos propósitos oper
   - `django >= 5.1`
   - `djangorestframework >= 3.15`
   - `cryptography >= 43.0`
+  - `pypdf >= 6.21.4`
   - `python-magic >= 0.4.27`
   - `pillow >= 10.4.0`
 
@@ -273,7 +274,7 @@ curl -X GET http://127.0.0.1:8000/api/v1/documents/c5f590b2b80041d8e1f5f3e9c68c3
 
 ## 10. Verificación de Seguridad y Pruebas Unitarias
 
-La suite de pruebas incluye **210 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, autenticación multifactor 2FA (TOTP con HMAC-SHA256), control de secuestro de sesiones (Session Hijacking), rotación dinámica de claves maestras y telemetría SIEM:
+La suite de pruebas incluye **211 tests automatizados** con verificación rigurosa de controles de seguridad, validación de formatos mágicos, sanitización NIST SP 800-88, aislamiento de mallas UO, ciclo de vida de usuarios/contraseñas, gobernanza jerárquica, defensas anti-fuerza bruta, autenticación multifactor 2FA (TOTP con HMAC-SHA256), control de secuestro de sesiones (Session Hijacking), rotación dinámica de claves maestras, marcas de agua forenses invisibles en metadatos y telemetría SIEM:
 
 ```bash
 poetry run pytest -v
@@ -281,12 +282,13 @@ poetry run pytest -v
 
 Resultado verificado:
 ```text
-============================= 210 passed in 71.40s =============================
+============================= 211 passed in 92.69s =============================
 ```
 
 ### Casos de Prueba Avanzados y Escenarios de Abuso (Adversarial Testing)
 La batería de tests incluye pruebas específicas contra vectores de ataque y escenarios de abuso:
 - **Autenticación Multifactor Nativa (RFC 6238 / RFC 4226):** Verificación de derivas temporales, validación contra vectores oficiales de prueba del NIST/RFC 6238 Apéndice B y consumo único de códigos de rescate con hashes SHA-256 (`test_advanced_security_phase_a.py`).
+- **Marcas de Agua Forenses en Metadatos (Invisible Stamping) y Hardening Anti-DoS:** Inyección indeleble de trazabilidad forense en el diccionario de metadatos (`/Info`) del PDF sin alterar visualmente las páginas del documento, junto con protección de límite de 1.000 páginas frente a ataques de agotamiento de recursos (`test_advanced_security_phase_b.py`).
 - **Prevención de Secuestro de Sesión (Session Hijacking):** Detección perimetral de discrepancia de IP en peticiones HTTP con cookies activas, invalidación inmediata de sesión, alerta SIEM y registro forense inalterable en `SessionSecurityMiddleware`.
 - **Control de Concurrencia (Single Concurrent Session):** Revocación automática de sesiones anteriores al detectarse un nuevo inicio de sesión desde otro navegador o dispositivo.
 - **Rotación Criptográfica en Caliente (MultiFernet Keyring):** Recifrado transaccional atómico de claves de datos (DEK) en reposo sin pérdida de disponibilidad mediante `python manage.py rotate_master_key`.
@@ -299,7 +301,7 @@ La batería de tests incluye pruebas específicas contra vectores de ataque y es
 
 ### Controles de Seguridad Verificados (SAST & SCA)
 El código y las dependencias han sido sometidos a auditoría de seguridad exhaustiva:
-- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 44.0.1`, `djangorestframework >= 3.18.2`, `segno >= 1.6.6`).
+- **SCA (pip-audit):** 0 vulnerabilidades conocidas en librerías en tiempo de ejecución (`cryptography >= 44.0.1`, `djangorestframework >= 3.18.2`, `pypdf >= 6.21.4` [CVE-2026-119204 mitigado], `segno >= 1.6.6`).
 - **SAST Python (Bandit):** 0 vulnerabilidades de severidad Alta o Media en más de 13.000 líneas de código. Eliminación del 100% de llamadas a `mark_safe` en favor de `format_html` sanitizado.
 - **SAST OWASP (Semgrep OSS):** 0 hallazgos bloqueantes sobre 456 reglas activas (OWASP Top 10, CWE, inyecciones y CSRF).
 - **Subresource Integrity (SRI):** Atributos `integrity="sha384-..."` y `crossorigin="anonymous"` obligatorios en todos los recursos externos CDN.

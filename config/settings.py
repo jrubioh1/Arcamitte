@@ -130,12 +130,9 @@ ARCAMITTE_SIEM_WEBHOOK_EVENTS = [
     e.strip().lower() for e in _raw_siem_events.split(",") if e.strip()
 ]
 
-# Marca de Agua Forense Dinámica en Descargas PDF (ENS ALTO / NIST SP 800-53 AU-10)
+# Marca de Agua Forense en Metadatos de Descargas PDF (ENS ALTO / NIST SP 800-53 AU-10)
 ARCAMITTE_WATERMARK_ENABLED = config.getboolean(
     "security", "watermark_enabled", fallback=True
-)
-ARCAMITTE_WATERMARK_OPACITY = float(
-    config.get("security", "watermark_opacity", fallback="0.18")
 )
 
 # Motor Antivirus ClamAV en Memoria (Protocolo zINSTREAM - Zero Disk Footprint)

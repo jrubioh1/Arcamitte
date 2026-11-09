@@ -38,6 +38,7 @@ La primera versión operativa (Minimum Viable Product) de Arcamitte incluye las 
 | **Auditoría Forense y Recibos Criptográficos** | Registro inmutable encadenado por hash SHA-256 (`DocumentAccessLog`). Exportación certificada de evidencias en formato CSV/JSON firmada mediante recibos de auditoría sellados temporalmente (`AuditExportReceipt`). Portal público de verificación de autenticidad de recibos. |
 | **API REST v1 de Integración M2M** | Endpoints de subida, consulta y salud para integración máquina a máquina protegidos por Bearer Tokens de alta entropía con persistencia en hash SHA-256 de conocimiento cero (`APIToken`). |
 | **Firewall de Aplicación y Bloqueo de IPs** | Registro de direcciones IP bloqueadas temporal o indefinidamente (`BannedIP`), con vista administrativa dedicada y corte perimetral de peticiones maliciosas. |
+| **Marcas de Agua Forenses en Metadatos (Invisible Stamping)** | Inyección no intrusiva de trazabilidad legal en el diccionario de metadatos (`/Info`) del PDF (destinatario, IP, marca temporal UTC y hash documental) sin alterar visualmente las páginas, con hardening anti-DoS de límite de páginas (`pypdf >= 6.21.4`). |
 | **Internacionalización y UI Moderna** | Soporte bilingüe completo (Español / Inglés) con catálogos compilados Gettext (.po/.mo) al 100%. Interfaz moderna basada en Tailwind CSS, Flowbite y Tom Select sin dependencias obsoletas. |
 
 ### 1.3 Límites Actuales (Fuera de Alcance en MVP)
@@ -449,7 +450,7 @@ Arcamitte/
 │       ├── test_dashboard.py
 │       ├── test_security_hardening.py
 │       ├── test_services.py
-│       └── ... (210 tests automatizados con 100% de éxito)
+│       └── ... (211 tests automatizados con 100% de éxito)
 │
 ├── docs/                                 # Documentación técnica, guías de arquitectura y despliegue
 │   ├── ADMIN_GUIDE.md                    # Manual de usuario para administradores y auditores
@@ -554,7 +555,7 @@ poetry run python manage.py check
 # Análisis estático de tipos y estilo
 poetry run ruff check --select F arcamitte/ config/ scripts/
 
-# Ejecución de los 210 tests unitarios y de integración
+# Ejecución de los 211 tests unitarios y de integración
 poetry run pytest
 ```
 

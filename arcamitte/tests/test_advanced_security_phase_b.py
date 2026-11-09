@@ -117,7 +117,7 @@ class AdvancedSecurityPhaseBTests(TestCase):
         self.assertIn("test@arcamitte.local", extracted)
 
     def test_apply_pdf_watermark_single_page(self) -> None:
-        """Verifica el estampado forense en un documento PDF de una sola página."""
+        """Verifica la inyección forense en metadatos y la limpieza visual de las páginas."""
         pdf_bytes = _create_minimal_pdf_bytes(pages=1)
         watermarked = apply_pdf_watermark(
             pdf_content=pdf_bytes,
@@ -125,16 +125,27 @@ class AdvancedSecurityPhaseBTests(TestCase):
             client_ip="192.168.1.100",
             doc_hash="a" * 64,
         )
-        self.assertGreater(len(watermarked), len(pdf_bytes))
+        self.assertGreater(len(watermarked), 0)
         reader = pypdf.PdfReader(io.BytesIO(watermarked))
         self.assertEqual(len(reader.pages), 1)
+
+        # 1. Verificar presencia de metadatos forenses inyectados
+        meta = reader.metadata or {}
+        self.assertEqual(meta.get("/ArcamitteRecipient"), "agente01@gob.es")
+        self.assertEqual(meta.get("/ArcamitteClientIP"), "192.168.1.100")
+        self.assertEqual(meta.get("/ArcamitteDocHash"), "a" * 64)
+        self.assertEqual(
+            meta.get("/ArcamitteAuditTrail"),
+            "ARCAMITTE AUDIT TRAIL - COPIA CONTROLADA",
+        )
+
+        # 2. Verificar que las páginas quedan 100% limpias visualmente (sin marcas sobre el texto)
         text = reader.pages[0].extract_text()
-        self.assertIn("agente01@gob.es", text)
-        self.assertIn("192.168.1.100", text)
-        self.assertIn("ARCAMITTE AUDIT TRAIL", text)
+        self.assertNotIn("ARCAMITTE AUDIT TRAIL", text)
+        self.assertNotIn("agente01@gob.es", text)
 
     def test_apply_pdf_watermark_multi_page(self) -> None:
-        """Verifica que todas las páginas de un PDF multi-página reciben el estampado forense."""
+        """Verifica que un PDF multi-página recibe los metadatos forenses manteniendo sus páginas limpias."""
         pdf_bytes = _create_minimal_pdf_bytes(pages=3)
         watermarked = apply_pdf_watermark(
             pdf_content=pdf_bytes,
@@ -144,10 +155,16 @@ class AdvancedSecurityPhaseBTests(TestCase):
         )
         reader = pypdf.PdfReader(io.BytesIO(watermarked))
         self.assertEqual(len(reader.pages), 3)
+
+        meta = reader.metadata or {}
+        self.assertEqual(meta.get("/ArcamitteRecipient"), "auditor@entidad.es")
+        self.assertEqual(meta.get("/ArcamitteClientIP"), "10.0.50.25")
+        self.assertEqual(meta.get("/ArcamitteDocHash"), "b" * 64)
+
         for page in reader.pages:
             text = page.extract_text()
-            self.assertIn("auditor@entidad.es", text)
-            self.assertIn("10.0.50.25", text)
+            self.assertNotIn("ARCAMITTE AUDIT TRAIL", text)
+            self.assertNotIn("auditor@entidad.es", text)
 
     def test_apply_pdf_watermark_invalid_file_raises_error(self) -> None:
         """Verifica que un archivo binario corrupto o no-PDF lanza WatermarkError."""
@@ -158,8 +175,25 @@ class AdvancedSecurityPhaseBTests(TestCase):
                 client_ip="1.2.3.4",
             )
 
+    def test_apply_pdf_watermark_max_pages_limit(self) -> None:
+        """Verifica que un documento que supera el umbral de páginas es rechazado por protección anti-DoS."""
+        writer = pypdf.PdfWriter()
+        for _ in range(1001):
+            writer.add_blank_page(width=100, height=100)
+        buf = io.BytesIO()
+        writer.write(buf)
+        oversized_pdf = buf.getvalue()
+
+        with self.assertRaises(WatermarkError) as ctx:
+            apply_pdf_watermark(
+                pdf_content=oversized_pdf,
+                recipient_email="ataque@dos.local",
+                client_ip="1.1.1.1",
+            )
+        self.assertIn("excede el número máximo", str(ctx.exception))
+
     def test_watermark_applied_on_otp_consume(self) -> None:
-        """Verifica que al canjear un PDF con OTP, los bytes retornados están marcados forensemente."""
+        """Verifica que al canjear un PDF con OTP, los bytes retornados contienen los metadatos forenses."""
         pdf_bytes = _create_minimal_pdf_bytes()
         uploaded_file = SimpleUploadedFile(
             "informe_secreto.pdf", pdf_bytes, content_type="application/pdf"
@@ -186,11 +220,17 @@ class AdvancedSecurityPhaseBTests(TestCase):
         )
         self.assertTrue(success)
         self.assertTrue(decrypted.startswith(b"%PDF"))
-        # Comprobar que contiene la marca forense
+
+        # Comprobar metadatos forenses en el PDF descifrado
         reader = pypdf.PdfReader(io.BytesIO(decrypted))
+        meta = reader.metadata or {}
+        self.assertEqual(meta.get("/ArcamitteRecipient"), "receptor@gob.es")
+        self.assertEqual(meta.get("/ArcamitteClientIP"), "185.20.30.40")
+        self.assertEqual(meta.get("/ArcamitteDocHash"), doc.file_hash)
+
+        # Comprobar que visualmente la página no tiene texto de marca sobreimpreso
         text = reader.pages[0].extract_text()
-        self.assertIn("receptor@gob.es", text)
-        self.assertIn("185.20.30.40", text)
+        self.assertNotIn("ARCAMITTE AUDIT TRAIL", text)
 
         # Verificar registro en auditoría de la marca aplicada
         wm_log = DocumentAccessLog.objects.filter(
@@ -200,7 +240,7 @@ class AdvancedSecurityPhaseBTests(TestCase):
         self.assertIsNotNone(wm_log)
 
     def test_watermark_applied_on_admin_decrypt(self) -> None:
-        """Verifica que en descargas de auditoría administrativa también se aplica la marca forense."""
+        """Verifica que en descargas de auditoría administrativa también se inyectan los metadatos forenses."""
         pdf_bytes = _create_minimal_pdf_bytes()
         uploaded_file = SimpleUploadedFile(
             "acta_confidencial.pdf", pdf_bytes, content_type="application/pdf"
@@ -219,9 +259,10 @@ class AdvancedSecurityPhaseBTests(TestCase):
         )
         self.assertTrue(success)
         reader = pypdf.PdfReader(io.BytesIO(decrypted))
-        text = reader.pages[0].extract_text()
-        self.assertIn("auditor@arcamitte.local", text)
-        self.assertIn("10.20.30.40", text)
+        meta = reader.metadata or {}
+        self.assertIn("auditor@arcamitte.local", meta.get("/ArcamitteRecipient", ""))
+        self.assertEqual(meta.get("/ArcamitteClientIP"), "10.20.30.40")
+        self.assertEqual(meta.get("/ArcamitteDocHash"), doc.file_hash)
 
     # ==========================================================================
     # 2. PRUEBAS DE INTEGRACIÓN CON MOTOR ANTIVIRUS CLAMAV (zINSTREAM)

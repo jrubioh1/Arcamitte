@@ -51,8 +51,9 @@ Arcamitte está concebido como un microservicio autónomo y desacoplado estructu
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                 CAPA DE SERVICIOS CRIPTOGRÁFICOS Y NEGOCIO             │
 │                                                                        │
-│  [ arcamitte.services / timestamping / totp / security_utils ]         │
+│  [ arcamitte.services / timestamping / totp / watermark / security_utils ] │
 │    • Envelope Encryption (DEK + ARCAMITTE_FERNET_KEY)                  │
+│    • Forensic Metadata PDF Watermarking Engine (ISO 32000-1 /Info)      │
 │    • NIST SP 800-88 File Sanitization (os.urandom shredder)           │
 │    • Anti-Timing PBKDF2 Dummy Compute Engine (random salt secrets)     │
 │    • RFC 3161 Qualified Timestamping Engine (ASN.1 DER)                │
@@ -211,3 +212,18 @@ Cada interacción con un documento queda registrada en la tabla `DocumentAccessL
       raise PermissionDenied("Los registros de auditoría son inmutables y de custodia legal.")
   ```
 - **Preservación de Metadatos:** Se registra dirección IP del cliente, User-Agent, sello de tiempo UTC y correo del solicitante.
+
+---
+
+## 8. Marcas de Agua Forenses en Metadatos (Trazabilidad Invisible)
+
+Para garantizar la no alteración visual del documento confidencial preservando simultáneamente la trazabilidad legal del receptor (ENS ALTO / NIST SP 800-53 AU-10):
+- **Cero alteración de páginas:** Las páginas del documento se transfieren 100% limpias e intactas, sin texto oblicuo visible que degrade la legibilidad.
+- **Inyección estricta en el diccionario `/Info`:** Toda la trazabilidad forense se incrusta en los metadatos del estándar PDF (ISO 32000-1):
+  - `/ArcamitteAuditTrail`: `"ARCAMITTE AUDIT TRAIL - COPIA CONTROLADA"`
+  - `/ArcamitteRecipient`: Identificador del solicitante o auditor.
+  - `/ArcamitteClientIP`: Dirección IP de la descarga.
+  - `/ArcamitteTimestamp`: Fecha y hora exacta UTC.
+  - `/ArcamitteDocHash`: Hash SHA-256 del documento confidencial.
+  - `/Producer`: `"Arcamitte Cryptographic Microservice"`
+- **Hardening Anti-DoS:** Límite máximo acotado a 1.000 páginas (`MAX_PDF_PAGES_TO_WATERMARK = 1000`) y captura defensiva de `MemoryError`/`RecursionError`.
