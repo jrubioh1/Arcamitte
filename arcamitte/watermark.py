@@ -18,7 +18,6 @@ import io
 import logging
 from typing import Any, Optional
 
-from django.conf import settings
 from django.utils import timezone
 import pypdf
 
