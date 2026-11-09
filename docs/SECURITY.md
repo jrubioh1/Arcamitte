@@ -51,7 +51,7 @@ Arcamitte neutraliza este riesgo mediante el procedimiento `shred_and_delete_fil
 
 Para cumplir con **ENS Nivel ALTO** y **NIST SP 800-53 (AC-21 / AU-10)** sin degradar la experiencia visual del usuario:
 1. **Marcas en Metadatos (Sin alteración visual):** El módulo `arcamitte.watermark` inyecta las evidencias de entrega (`/ArcamitteRecipient`, `/ArcamitteClientIP`, `/ArcamitteTimestamp`, `/ArcamitteDocHash`) exclusivamente en el diccionario `/Info` del PDF. Las páginas permanecen 100% limpias e intactas.
-2. **Mitigación CVE-2026-119204 (`pypdf >= 6.21.4`):** El entorno utiliza `pypdf 6.21.4`, que incorpora límites duros al análisis y copias del árbol de páginas (`/Pages`) y recursos compartidos (`/Resources`), eliminando el riesgo de denegación de servicio por consumo masivo de memoria.
+2. **Mitigación CVE-2026-119204 y Alertas GHSA (`pypdf >= 7.0.0`):** El entorno utiliza `pypdf 7.0.0`, que incorpora límites duros al análisis y copias del árbol de páginas (`/Pages`), límites a formularios XFA y decodificación estricta de imágenes, eliminando riesgos de denegación de servicio por consumo masivo de memoria o bucles infinitos.
 3. **Hardening Anti-DoS en Aplicación:** Se impone un umbral máximo de 1.000 páginas (`MAX_PDF_PAGES_TO_WATERMARK = 1000`) y captura defensiva de `MemoryError`/`RecursionError` para proteger la disponibilidad de los workers de Django.
 
 ---
